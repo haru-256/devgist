@@ -1,7 +1,7 @@
 from loguru import logger
 
 
-def main():
+def main() -> None:
     logger.info("Hello from crawler!")
 
 
