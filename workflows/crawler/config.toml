@@ -1,0 +1,6 @@
+[sites]
+[sites.netflix]
+sitemap_url = "https://netflixtechblog.com/sitemap.xml"
+
+[sites.arxiv]
+start_urls = []

@@ -4,7 +4,13 @@ version = "0.1.0"
 description = "A web crawler of arxiv and tech blog sites."
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["loguru~=0.7.3"]
+dependencies = [
+  "loguru~=0.7.3",
+  "httpx~=0.28.1",
+  "feedparser~=6.0.12",
+  "certifi~=2025.11.12",
+  "truststore~=0.10.4",
+]
 
 [dependency-groups]
 test = ["pytest~=9.0.1", "pytest-console-scripts~=1.4.1"]
