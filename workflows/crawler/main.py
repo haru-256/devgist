@@ -1,74 +1,15 @@
 import asyncio
 import xml.etree.ElementTree as ET
-from urllib.parse import urljoin
-from urllib.robotparser import RobotFileParser
 
 import httpx
 import truststore
 from loguru import logger
 
+from libs import RobotGuard
+
 # SSL: CERTIFICATE_VERIFY_FAILED の回避策
 # macOS Keychainを利用し、中間証明書のチェーンを補完する
 truststore.inject_into_ssl()
-
-
-class RobotGuard:
-    def __init__(self, base_url: str, user_agent: str = "*"):
-        self.base_url = base_url
-        self.user_agent = user_agent
-        self.robots_txt_url = urljoin(base_url, "robots.txt")
-        parser = RobotFileParser()
-        parser.set_url(self.robots_txt_url)
-        self.parser = parser
-        self.loaded = False
-
-    async def load(self, client: httpx.AsyncClient) -> None:
-        """
-        robots.txtを非同期で取得し、パーサーに読み込ませる
-        """
-        # RobotFileParserは307リダイレクトに対応していないため、事前にhttpxで取得してからパースさせる
-        resp = await client.get(self.robots_txt_url, timeout=10.0)
-        if resp.status_code == 200:
-            # テキストを行ごとに分割して標準パーサーに渡す
-            lines = resp.text.splitlines()
-            self.parser.parse(lines)
-            logger.debug(f"Loaded robots.txt from {self.robots_txt_url}")
-        elif resp.status_code == 404:
-            # 404なら全許可とみなすのが一般的
-            self.parser.allow_all = True  # type: ignore
-            logger.debug("robots.txt not found (Allow all)")
-        else:
-            # 403などの場合は安全側に倒して全拒否にするケースも多い
-            self.parser.disallow_all = True  # type: ignore
-            logger.debug(f"Failed to load robots.txt: {resp.status_code}")
-        self.loaded = True
-
-    def can_fetch(self, url: str) -> bool:
-        """
-        指定されたURLがクロール可能か判定する(同期メソッドでOK)
-        """
-        if not self.loaded:
-            logger.error("robots.txt not loaded yet.")
-            raise RuntimeError("robots.txt not loaded yet.")
-        return self.parser.can_fetch(self.user_agent, url)
-
-    def get_crawl_delay(self) -> float | None:
-        """
-        Crawl-delay(待機時間)の設定があれば取得する
-        """
-        if not self.loaded:
-            logger.error("robots.txt not loaded yet.")
-            raise RuntimeError("robots.txt not loaded yet.")
-        return self.parser.crawl_delay(self.user_agent)  # type: ignore
-
-    def get_sitemaps(self) -> list[str]:
-        """
-        SitemapのURLリストを取得する
-        """
-        if not self.loaded:
-            logger.error("robots.txt not loaded yet.")
-            raise RuntimeError("robots.txt not loaded yet.")
-        return self.parser.sitemaps  # type: ignore
 
 
 async def parse_medium_sitemaps(
@@ -123,7 +64,7 @@ async def parse_medium_articles(
     sem: asyncio.Semaphore,
     client: httpx.AsyncClient,
     article_urls: list[str],
-):
+) -> None:
     tasks: list[asyncio.Task[None]] = []
     try:
         async with asyncio.TaskGroup() as tg:
