@@ -1,0 +1,73 @@
+name: Python CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
+  workflow_dispatch:
+    inputs:
+      target_projects:
+        description: "Projects to run lint and test on"
+        required: false
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  find_target_projects:
+    name: Find target Projects
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.find-target-projects.outputs.projects }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/find_target_projects/
+        id: find-target-projects
+        with:
+          max_depth: 3
+          required_files: pyproject.toml, Makefile
+          target_projects: ${{ github.event.inputs.target_projects }}
+
+  lint-and-test:
+    name: Lint and Test
+    needs: find_target_projects
+    if: ${{ needs.find_target_projects.outputs.projects != '' && toJson(fromJson(needs.find_target_projects.outputs.projects)) != '[]' }}
+    strategy:
+      matrix:
+        project: ${{ fromJson(needs.find_target_projects.outputs.projects) }}
+      fail-fast: false
+    runs-on: ubuntu-latest
+    env:
+      RUFF_OUTPUT_FORMAT: github
+    concurrency:
+      group: ${{ github.workflow }}-${{ matrix.project }}
+      cancel-in-progress: true
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "${{ matrix.project }}/pyproject.toml"
+          cache-suffix: "${{ matrix.project }}"
+      - name: Install the project
+        run: make install
+      - name: Lint
+        run: make lint
+      - name: Test
+        run: make test
