@@ -87,7 +87,7 @@ class RobotGuard:
             raise RuntimeError("robots.txt not loaded yet.")
         return self.parser.can_fetch(self.user_agent, url)
 
-    def get_crawl_delay(self) -> float | None:
+    def get_crawl_delay(self) -> int | None:
         """Crawl-delay(クロール間隔の待機時間)の設定を取得します。
 
         robots.txtで指定されたCrawl-delay設定を取得します。
