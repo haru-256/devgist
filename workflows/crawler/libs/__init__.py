@@ -59,11 +59,11 @@ class RobotGuard:
             logger.debug(f"Loaded robots.txt from {self.robots_txt_url}")
         elif resp.status_code == 404:
             # 404なら全許可とみなすのが一般的
-            self.parser.allow_all = True  # type: ignore
+            self.parser.parse([])
             logger.debug("robots.txt not found (Allow all)")
         else:
             # 403などの場合は安全側に倒して全拒否にするケースも多い
-            self.parser.disallow_all = True  # type: ignore
+            self.parser.parse(["User-agent: *", "Disallow: /"])
             logger.debug(f"Failed to load robots.txt: {resp.status_code}")
         self.loaded = True
 
