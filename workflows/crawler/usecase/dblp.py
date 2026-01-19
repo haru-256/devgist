@@ -1,3 +1,10 @@
+"""DBLP APIを使用して学術論文情報を検索・取得するモジュール。
+
+このモジュールは、DBLP Computer Science Bibliographyから
+特定のカンファレンスと年度の論文情報を取得する機能を提供します。
+robots.txtを尊重し、適切なレート制限を行いながらクロールを実行します。
+"""
+
 from typing import Any, Literal
 
 import httpx
@@ -8,15 +15,46 @@ from libs import RobotGuard
 
 
 class DBLPSearch:
+    """DBLP APIから論文情報を検索・取得するクラス。
+
+    このクラスは非同期コンテキストマネージャーとして設計されており、
+    `async with`文を使用して利用します。robots.txtを自動的にチェックし、
+    クロールが許可されている場合のみAPIリクエストを実行します。
+
+    Attributes:
+        base_url: DBLPのベースURL
+        search_api: DBLP検索APIのエンドポイント
+        robot_guard: robots.txtをチェックするRobotGuardインスタンス
+        headers: HTTPリクエストで使用するヘッダー
+        client: 非同期HTTPクライアント（コンテキストマネージャー内でのみ有効）
+
+    Example:
+        >>> headers = {"User-Agent": "MyBot/1.0"}
+        >>> async with DBLPSearch(headers) as search:
+        ...     papers = await search.fetch_papers(conf="recsys", year=2025)
+    """
+
     base_url = "https://dblp.org"
     search_api = "https://dblp.org/search/publ/api"
 
     def __init__(self, headers: dict[str, str]) -> None:
+        """DBLPSearchインスタンスを初期化します。
+
+        Args:
+            headers: HTTPリクエストで使用するヘッダー辞書
+        """
         self.robot_guard = RobotGuard(self.base_url, user_agent="ArchilogBot")
         self.headers = headers
         self.client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "DBLPSearch":
+        """非同期コンテキストマネージャーのエントリーポイント。
+
+        HTTPクライアントを初期化し、robots.txtをロードします。
+
+        Returns:
+            初期化されたDBLPSearchインスタンス
+        """
         limits = httpx.Limits(
             max_connections=100,  # 全体で保持する最大接続数
             max_keepalive_connections=20,  # アイドル状態で維持する最大接続数
@@ -29,6 +67,10 @@ class DBLPSearch:
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """非同期コンテキストマネージャーの終了処理。
+
+        HTTPクライアントを適切にクローズします。
+        """
         if self.client is not None:
             await self.client.aclose()
 
@@ -38,6 +80,27 @@ class DBLPSearch:
         year: int,
         h: int = 1000,
     ) -> list[Paper]:
+        """指定されたカンファレンスと年度の論文情報を取得します。
+
+        DBLP APIを使用して、特定のカンファレンスと年度に該当する
+        論文のメタデータを取得します。robots.txtで許可されていない
+        場合はPermissionErrorを発生させます。
+
+        Args:
+            conf: 対象カンファレンス名（recsys, kdd, wsdm, www, sigir, cikm）
+            year: 対象年度
+            h: 取得する最大論文数（デフォルト: 1000）
+
+        Returns:
+            取得した論文のリスト
+
+        Raises:
+            RuntimeError: コンテキストマネージャー外で呼び出された場合
+            PermissionError: robots.txtでクロールが拒否されている場合
+            httpx.HTTPStatusError: APIリクエストが失敗した場合
+            httpx.RequestError: ネットワークエラーが発生した場合
+            ValueError: レスポンスのパースに失敗した場合
+        """
         if self.client is None:
             raise RuntimeError(
                 "DBLPSearch must be used as an async contex manager (use 'async with')"
@@ -73,6 +136,20 @@ class DBLPSearch:
             raise
 
     def _parse_paper(self, data: dict[str, Any]) -> list[Paper]:
+        """DBLP APIのレスポンスJSONから論文情報を抽出します。
+
+        必須フィールド（title, authors, year, venue）が欠けている
+        論文はスキップされます。
+
+        Args:
+            data: DBLP APIから返されたJSONレスポンス
+
+        Returns:
+            パースされた論文のリスト
+
+        Raises:
+            ValueError: 検索結果が0件の場合
+        """
         hits = data.get("result", {}).get("hits", {})
         num_hits = int(hits.get("@total", 0))
         if num_hits <= 0:
