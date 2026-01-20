@@ -39,7 +39,7 @@ class SemanticScholarSearch:
     paper_search_api = "https://api.semanticscholar.org/graph/v1/paper"
     paper_batch_search_api = "https://api.semanticscholar.org/graph/v1/paper/batch"
 
-    arxiv_abs_link_pattern = re.compile(r"https://arxiv.org/abs/(\w+)\.(\w+)")
+    arxiv_abs_link_pattern = re.compile(r"https://arxiv\.org/abs/([\w.]+)")
 
     def __init__(self, headers: dict[str, str]) -> None:
         """SemanticScholarSearchインスタンスを初期化します。
