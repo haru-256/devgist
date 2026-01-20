@@ -185,7 +185,6 @@ class DBLPSearch:
                     venue=venue,
                     type=info.get("type"),
                     doi=info.get("doi"),
-                    url=info.get("url"),
                     ee=info.get("ee"),
                 )
             )

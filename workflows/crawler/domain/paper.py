@@ -16,7 +16,8 @@ class Paper(BaseModel):
         doi: Digital Object Identifier（オプション）
         type: 論文の種類（例: "Conference and Workshop Papers"）（オプション）
         ee: 電子版へのリンク（オプション）
-        url: DBLP上の論文ページURL（オプション）
+        pdf_url: PDF版へのリンク（オプション）
+        abstract: 論文の要約（オプション）
     """
 
     title: str
@@ -26,4 +27,5 @@ class Paper(BaseModel):
     doi: str | None = None
     type: str | None = None
     ee: str | None = None
-    url: str | None = None
+    pdf_url: str | None = None
+    abstract: str | None = None
