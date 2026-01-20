@@ -14,7 +14,7 @@ def test_paper_creation_with_all_fields() -> None:
         doi="10.1145/test",
         type="Conference and Workshop Papers",
         ee="https://doi.org/10.1145/test",
-        url="https://dblp.org/rec/conf/recsys/test",
+        pdf_url="https://dblp.org/rec/conf/recsys/test",
     )
 
     assert paper.title == "Test Paper Title"
@@ -24,7 +24,7 @@ def test_paper_creation_with_all_fields() -> None:
     assert paper.doi == "10.1145/test"
     assert paper.type == "Conference and Workshop Papers"
     assert paper.ee == "https://doi.org/10.1145/test"
-    assert paper.url == "https://dblp.org/rec/conf/recsys/test"
+    assert paper.pdf_url == "https://dblp.org/rec/conf/recsys/test"
 
 
 def test_paper_creation_with_optional_fields_none() -> None:
@@ -37,7 +37,7 @@ def test_paper_creation_with_optional_fields_none() -> None:
         doi=None,
         type=None,
         ee=None,
-        url=None,
+        pdf_url=None,
     )
 
     assert paper.title == "Test Paper"
@@ -47,7 +47,7 @@ def test_paper_creation_with_optional_fields_none() -> None:
     assert paper.doi is None
     assert paper.type is None
     assert paper.ee is None
-    assert paper.url is None
+    assert paper.pdf_url is None
 
 
 def test_paper_creation_without_optional_fields() -> None:
@@ -66,7 +66,7 @@ def test_paper_creation_without_optional_fields() -> None:
     assert paper.doi is None
     assert paper.type is None
     assert paper.ee is None
-    assert paper.url is None
+    assert paper.pdf_url is None
 
 
 def test_paper_missing_required_title() -> None:
@@ -193,7 +193,7 @@ def test_paper_serialization() -> None:
     assert data["doi"] == "10.1145/serial"
     assert data["type"] is None
     assert data["ee"] is None
-    assert data["url"] is None
+    assert data["pdf_url"] is None
 
 
 def test_paper_deserialization() -> None:
@@ -206,7 +206,7 @@ def test_paper_deserialization() -> None:
         "doi": "10.1145/deserial",
         "type": "Journal Articles",
         "ee": "https://example.com",
-        "url": "https://dblp.org/test",
+        "pdf_url": "https://dblp.org/test",
     }
 
     paper = Paper(**data)  # type: ignore[arg-type]
@@ -218,7 +218,7 @@ def test_paper_deserialization() -> None:
     assert paper.doi == data["doi"]
     assert paper.type == data["type"]
     assert paper.ee == data["ee"]
-    assert paper.url == data["url"]
+    assert paper.pdf_url == data["pdf_url"]
 
 
 def test_paper_equality() -> None:
