@@ -5,14 +5,15 @@ DBLPから取得した基本的な論文情報を充実させる機能を提供�
 バッチ処理により効率的に複数の論文を処理できます。
 """
 
+import asyncio
 import re
 from typing import Any
 
 import httpx
 from loguru import logger
-from libs.http_utils import post_with_retry
 
 from domain.paper import Paper
+from libs.http_utils import post_with_retry
 
 
 class SemanticScholarSearch:
@@ -152,11 +153,14 @@ class SemanticScholarSearch:
             doi_list.append(paper.doi)
         return doi_list
 
-    async def _fetch_semantic_scholar_data(self, dois: list[str]) -> list[dict[str, Any]]:
+    async def _fetch_semantic_scholar_data(
+        self, dois: list[str], semaphore: asyncio.Semaphore | None = None
+    ) -> list[dict[str, Any]]:
         """Semantic Scholar APIからバッチでデータを取得します。
 
         Args:
             dois: DOIのリスト
+            semaphore: 並行実行数を制限するセマフォ（デフォルト: None）
 
         Returns:
             APIレスポンスのデータリスト（Noneを除外済み）
@@ -167,17 +171,36 @@ class SemanticScholarSearch:
         if self.client is None:
             raise RuntimeError("Client is not initialized")
 
+        # クロージャ内でself.clientを参照すると型エラーになる可能性があるためローカル変数にする
+        client = self.client
+
+        # デフォルトのセマフォを設定（デフォルト引数でインスタンス化するとイベントループの問題が起きるため）
+        sem = semaphore or asyncio.Semaphore(10)
+
+        # Semantic Scholar APIは最大500件までバッチで取得可能
+        batch_size = 500
         params = {"fields": "externalIds,abstract,openAccessPdf"}
-        payload = {"ids": [f"DOI:{doi}" for doi in dois]}
 
-        resp = await post_with_retry(
-            self.client, self.paper_batch_search_api, params=params, json=payload
-        )
-        resp.raise_for_status()
+        async def fetch_batch(batch_dois: list[str]) -> list[dict[str, Any] | None]:
+            async with sem:
+                payload = {"ids": [f"DOI:{doi}" for doi in batch_dois]}
+                resp = await post_with_retry(
+                    client, self.paper_batch_search_api, params=params, json=payload
+                )
+                resp.raise_for_status()
+                batch_data: list[dict[str, Any] | None] = resp.json()
+            return batch_data
 
-        data: list[dict[str, Any] | None] = resp.json()
-        # データが取得できない場合（None）を除外
-        return [d for d in data if d is not None]
+        # TaskGroup でバッチリクエストを並行実行
+        tasks: list[asyncio.Task[list[dict[str, Any] | None]]] = []
+        async with asyncio.TaskGroup() as tg:
+            for i in range(0, len(dois), batch_size):
+                batch = dois[i : i + batch_size]
+                tasks.append(tg.create_task(fetch_batch(batch)))
+
+        all_results = [task.result() for task in tasks]
+        flat_list = [item for batch in all_results for item in batch if item is not None]
+        return flat_list
 
     async def _enrich_paper_metadata(self, paper: Paper, data: dict[str, Any]) -> Paper:
         """APIレスポンスから論文のメタデータを充実させます。
