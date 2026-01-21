@@ -1,10 +1,9 @@
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
 from pytest_mock import MockerFixture
-from tenacity import RetryError
 
 from libs.http_utils import is_rate_limit, post_with_retry
 
