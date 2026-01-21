@@ -75,7 +75,6 @@ async def test_enrich_papers_success(
     mock_api_response.json.return_value = mock_semantic_scholar_response
 
     mocker.patch("httpx.AsyncClient.post", return_value=mock_api_response)
-    mocker.patch("httpx.AsyncClient.aclose")
 
     async with SemanticScholarSearch(headers) as search:
         enriched_papers = await search.enrich_papers(sample_papers)
@@ -107,7 +106,6 @@ async def test_enrich_papers_with_partial_data(
     mock_api_response.json.return_value = partial_response
 
     mocker.patch("httpx.AsyncClient.post", return_value=mock_api_response)
-    mocker.patch("httpx.AsyncClient.aclose")
 
     async with SemanticScholarSearch(headers) as search:
         enriched_papers = await search.enrich_papers(sample_papers)
@@ -268,7 +266,6 @@ async def test_enrich_papers_api_error(
     mock_response.raise_for_status = mock_raise_for_status
 
     mocker.patch("httpx.AsyncClient.post", return_value=mock_response)
-    mocker.patch("httpx.AsyncClient.aclose")
 
     async with SemanticScholarSearch(headers) as search:
         with pytest.raises(Exception):  # httpx.HTTPStatusError

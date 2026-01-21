@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 from loguru import logger
+from libs.http_utils import post_with_retry
 
 from domain.paper import Paper
 
@@ -169,7 +170,9 @@ class SemanticScholarSearch:
         params = {"fields": "externalIds,abstract,openAccessPdf"}
         payload = {"ids": [f"DOI:{doi}" for doi in dois]}
 
-        resp = await self.client.post(self.paper_batch_search_api, params=params, json=payload)
+        resp = await post_with_retry(
+            self.client, self.paper_batch_search_api, params=params, json=payload
+        )
         resp.raise_for_status()
 
         data: list[dict[str, Any] | None] = resp.json()
