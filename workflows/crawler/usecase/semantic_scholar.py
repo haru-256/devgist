@@ -37,11 +37,14 @@ class SemanticScholarSearch:
         ...     enriched_papers = await searcher.enrich_papers(papers)
     """
 
-    base_url = "https://api.semanticscholar.org"
-    paper_search_api = "https://api.semanticscholar.org/graph/v1/paper"
-    paper_batch_search_api = "https://api.semanticscholar.org/graph/v1/paper/batch"
-
-    arxiv_abs_link_pattern = re.compile(r"https://arxiv\.org/abs/([\w./-]+)")
+    DEFAULT_CONCURRENCY = 10
+    # Semantic Scholar APIは最大500件までバッチで取得可能
+    SEMANTIC_SCHOLAR_BATCH_SIZE = 500
+    SEMANTIC_SCHOLAR_FIELDS = "externalIds,abstract,openAccessPdf"
+    BASE_URL = "https://api.semanticscholar.org"
+    PAPER_SEARCH_API = "https://api.semanticscholar.org/graph/v1/paper"
+    PAPER_BATCH_SEARCH_API = "https://api.semanticscholar.org/graph/v1/paper/batch"
+    ARXIV_ABS_LINK_PATTERN = re.compile(r"https://arxiv\.org/abs/([\w./-]+)")
 
     def __init__(self, headers: dict[str, str]) -> None:
         """SemanticScholarSearchインスタンスを初期化します。
@@ -66,7 +69,7 @@ class SemanticScholarSearch:
             keepalive_expiry=5.0,
         )
         self.client = httpx.AsyncClient(
-            headers=self.headers, base_url=self.base_url, limits=limits, timeout=30.0
+            headers=self.headers, base_url=self.BASE_URL, limits=limits, timeout=30.0
         )
         return self
 
@@ -175,17 +178,16 @@ class SemanticScholarSearch:
         client = self.client
 
         # デフォルトのセマフォを設定（デフォルト引数でインスタンス化するとイベントループの問題が起きるため）
-        sem = semaphore or asyncio.Semaphore(10)
+        sem = semaphore or asyncio.Semaphore(self.DEFAULT_CONCURRENCY)
 
-        # Semantic Scholar APIは最大500件までバッチで取得可能
-        batch_size = 500
-        params = {"fields": "externalIds,abstract,openAccessPdf"}
+        batch_size = self.SEMANTIC_SCHOLAR_BATCH_SIZE
+        params = {"fields": self.SEMANTIC_SCHOLAR_FIELDS}
 
         async def fetch_batch(batch_dois: list[str]) -> list[dict[str, Any] | None]:
             async with sem:
                 payload = {"ids": [f"DOI:{doi}" for doi in batch_dois]}
                 resp = await post_with_retry(
-                    client, self.paper_batch_search_api, params=params, json=payload
+                    client, self.PAPER_BATCH_SEARCH_API, params=params, json=payload
                 )
                 resp.raise_for_status()
                 batch_data: list[dict[str, Any] | None] = resp.json()
@@ -198,8 +200,7 @@ class SemanticScholarSearch:
                 batch = dois[i : i + batch_size]
                 tasks.append(tg.create_task(fetch_batch(batch)))
 
-        all_results = [task.result() for task in tasks]
-        flat_list = [item for batch in all_results for item in batch if item is not None]
+        flat_list = [item for task in tasks for item in task.result() if item is not None]
         return flat_list
 
     async def _enrich_paper_metadata(self, paper: Paper, data: dict[str, Any]) -> Paper:
@@ -253,7 +254,7 @@ class SemanticScholarSearch:
         if self.client is None:
             return None
 
-        match = self.arxiv_abs_link_pattern.search(disclaimer)
+        match = self.ARXIV_ABS_LINK_PATTERN.search(disclaimer)
         if match is None:
             return None
 
