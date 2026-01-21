@@ -6,12 +6,16 @@ in test output during test execution.
 """
 
 import logging
+from typing import TYPE_CHECKING
 
 import pytest
 from loguru import logger
 
+if TYPE_CHECKING:
+    from loguru import Message
 
-def logging_sink(message: "loguru.Message") -> None:  # type: ignore[name-defined]
+
+def logging_sink(message: "Message") -> None:
     """Sink function that forwards loguru messages to Python's logging system.
     
     This allows pytest's log_cli to capture and display loguru logs.
@@ -36,11 +40,12 @@ def logging_sink(message: "loguru.Message") -> None:  # type: ignore[name-define
     level = level_map.get(record["level"].name, logging.INFO)
     
     # Get or create a logger for the module
-    py_logger = logging.getLogger(record["name"])
+    module_name = record["name"] or "__main__"
+    py_logger = logging.getLogger(module_name)
     
     # Create a proper LogRecord with source location info
     log_record = py_logger.makeRecord(
-        name=record["name"],
+        name=module_name,
         level=level,
         fn=record["file"].path,
         lno=record["line"],
