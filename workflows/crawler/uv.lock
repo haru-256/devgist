@@ -51,6 +51,7 @@ dependencies = [
     { name = "httpx" },
     { name = "loguru" },
     { name = "pydantic" },
+    { name = "tenacity" },
     { name = "truststore" },
 ]
 
@@ -73,10 +74,12 @@ requires-dist = [
     { name = "httpx", specifier = "~=0.28.1" },
     { name = "loguru", specifier = "~=0.7.3" },
     { name = "pydantic", specifier = "~=2.12.5" },
+    { name = "tenacity", specifier = "~=9.1.2" },
     { name = "truststore", specifier = "~=0.10.4" },
 ]
 
 [package.metadata.requires-dev]
+dev = []
 lint = [
     { name = "mypy", specifier = "~=1.19.0" },
     { name = "ruff", specifier = "~=0.14.7" },
@@ -432,6 +435,15 @@ name = "sgmllib3k"
 version = "1.0.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/9e/bd/3704a8c3e0942d711c1299ebf7b9091930adae6675d7c8f476a7ce48653c/sgmllib3k-1.0.0.tar.gz", hash = "sha256:7868fb1c8bfa764c1ac563d3cf369c381d1325d36124933a726f29fcdaa812e9", size = 5750, upload-time = "2010-08-24T14:33:52.445Z" }
+
+[[package]]
+name = "tenacity"
+version = "9.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0a/d4/2b0cd0fe285e14b36db076e78c93766ff1d529d70408bd1d2a5a84f1d929/tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb", size = 48036, upload-time = "2025-04-02T08:25:09.966Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e5/30/643397144bfbfec6f6ef821f36f33e57d35946c44a2352d3c9f0ae847619/tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138", size = 28248, upload-time = "2025-04-02T08:25:07.678Z" },
+]
 
 [[package]]
 name = "truststore"
