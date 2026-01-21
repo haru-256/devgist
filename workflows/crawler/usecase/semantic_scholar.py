@@ -81,7 +81,9 @@ class SemanticScholarSearch:
         if self.client is not None:
             await self.client.aclose()
 
-    async def enrich_papers(self, papers: list[Paper]) -> list[Paper]:
+    async def enrich_papers(
+        self, papers: list[Paper], semaphore: asyncio.Semaphore | None = None
+    ) -> list[Paper]:
         """論文リストをSemantic Scholar APIから取得したメタデータで充実させます。
 
         各論文のDOIを使用してSemantic Scholar APIから要約やPDF URLを取得し、
@@ -90,6 +92,7 @@ class SemanticScholarSearch:
 
         Args:
             papers: 充実させる論文のリスト（DOIが必須）
+            semaphore: 並行実行数を制限するセマフォ（デフォルト: None）
 
         Returns:
             メタデータで充実された論文のリスト
@@ -111,7 +114,7 @@ class SemanticScholarSearch:
         doi_to_paper_map = {p.doi: p for p in papers if p.doi}
 
         # Semantic Scholar APIからデータを取得
-        data_list = await self._fetch_semantic_scholar_data(doi_list)
+        data_list = await self._fetch_semantic_scholar_data(doi_list, semaphore=semaphore)
 
         # 元の論文とマッチングして充実
         enriched_papers: list[Paper] = []
@@ -152,7 +155,8 @@ class SemanticScholarSearch:
         doi_list: list[str] = []
         for paper in papers:
             if paper.doi is None:
-                raise ValueError(f"Paper '{paper.title}' must have a DOI")
+                logger.error(f"Paper '{paper.title}' has no DOI")
+                continue
             doi_list.append(paper.doi)
         return doi_list
 

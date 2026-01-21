@@ -5,6 +5,7 @@
 robots.txtを尊重し、適切なレート制限を行いながらクロールを実行します。
 """
 
+import asyncio
 from typing import Any, Literal
 
 import httpx
@@ -12,6 +13,7 @@ from loguru import logger
 
 from domain.paper import Paper
 from libs import RobotGuard
+from libs.http_utils import get_with_retry
 
 
 class DBLPSearch:
@@ -79,6 +81,7 @@ class DBLPSearch:
         conf: Literal["recsys", "kdd", "wsdm", "www", "sigir", "cikm"],
         year: int,
         h: int = 1000,
+        semaphore: asyncio.Semaphore | None = None,
     ) -> list[Paper]:
         """指定されたカンファレンスと年度の論文情報を取得します。
 
@@ -90,6 +93,7 @@ class DBLPSearch:
             conf: 対象カンファレンス名（recsys, kdd, wsdm, www, sigir, cikm）
             year: 対象年度
             h: 取得する最大論文数（デフォルト: 1000）
+            semaphore: 並列実行数を制限するセマフォ（デフォルト: None）
 
         Returns:
             取得した論文のリスト
@@ -121,8 +125,13 @@ class DBLPSearch:
         }
 
         try:
-            resp = await self.client.get(self.search_api, params=params)
-            resp.raise_for_status()
+            # セマフォを使用してリクエスト並列数を制御
+            if semaphore is not None:
+                async with semaphore:
+                    resp = await get_with_retry(self.client, self.search_api, params=params)
+            else:
+                resp = await get_with_retry(self.client, self.search_api, params=params)
+
             papers = self._parse_paper(resp.json())
             return papers
         except httpx.HTTPStatusError as e:
@@ -160,9 +169,15 @@ class DBLPSearch:
             info: dict[str, Any] = hit.get("info", {})
 
             # 必須パラメータのvalidation
-            title: str | None = info.get("title")
+            title: str | list[str] | None = info.get("title")
+            if isinstance(title, list):
+                logger.error(f"Title is list: {title}")
+                continue
             year: str | None = info.get("year")
-            venue: str | None = info.get("venue")
+            venue: str | list[str] | None = info.get("venue")
+            if isinstance(venue, list):
+                venue = ", ".join(venue)
+
             if title is None:
                 logger.error("Title is None")
                 continue

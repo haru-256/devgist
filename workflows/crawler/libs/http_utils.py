@@ -3,11 +3,11 @@ from typing import Any, NoReturn
 import httpx
 from loguru import logger
 from tenacity import (
+    RetryCallState,
     retry,
+    retry_if_result,
     stop_after_attempt,
     wait_random_exponential,
-    retry_if_result,
-    RetryCallState,
 )
 
 
@@ -47,7 +47,8 @@ def before_log(retry_state: RetryCallState) -> None:
         logger.info(f"Starting request to URL: {url}")
     else:
         if retry_state.outcome is None:
-            raise ValueError("Retry state has no outcome")
+            logger.warning("Retry state has no outcome")
+            return
         last_response = retry_state.outcome.result()
         logger.info(
             f"Attempt {attempt - 1} failed with status {last_response.status_code}, retrying..."
@@ -64,8 +65,55 @@ def before_log(retry_state: RetryCallState) -> None:
 async def post_with_retry(
     client: httpx.AsyncClient, url: str, params: dict[str, Any], json: dict[str, Any]
 ) -> httpx.Response:
-    """指数バックオフとRate Limitリトライ付きでPOSTリクエストを送信します。"""
+    """指数バックオフとRate Limitリトライ付きでPOSTリクエストを送信します。
+
+    Args:
+        client: HTTPX非同期クライアント
+        url: リクエストURL
+        params: クエリパラメータ
+        json: JSONボディ
+
+    Returns:
+        HTTPレスポンス
+
+    Raises:
+        httpx.HTTPStatusError: 429以外のHTTPエラーが発生した場合
+        ValueError: リトライ状態が不正な場合
+    """
     response = await client.post(url, params=params, json=json)
+    # 200 OK: 成功、429: Rate limit（リトライ対象）
+    # それ以外のステータスコードは即座にエラーとして扱う
+    if response.status_code not in (200, 429):
+        response.raise_for_status()
+
+    return response
+
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_random_exponential(multiplier=0.5, min=1, max=10),
+    retry=retry_if_result(is_rate_limit),
+    before=before_log,
+    retry_error_callback=log_and_raise_final_error,
+)
+async def get_with_retry(
+    client: httpx.AsyncClient, url: str, params: dict[str, Any] | None = None
+) -> httpx.Response:
+    """指数バックオフとRate Limitリトライ付きでGETリクエストを送信します。
+
+    Args:
+        client: HTTPX非同期クライアント
+        url: リクエストURL
+        params: クエリパラメータ（オプション）
+
+    Returns:
+        HTTPレスポンス
+
+    Raises:
+        httpx.HTTPStatusError: 429以外のHTTPエラーが発生した場合
+        ValueError: リトライ状態が不正な場合
+    """
+    response = await client.get(url, params=params)
     # 200 OK: 成功、429: Rate limit（リトライ対象）
     # それ以外のステータスコードは即座にエラーとして扱う
     if response.status_code not in (200, 429):
