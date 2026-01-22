@@ -19,7 +19,7 @@ async def recsys_crawl(
 ) -> list[Paper]:
     """RecSysカンファレンスの論文情報を収集します。
 
-    2025年のRecSysカンファレンスで発表された論文のメタデータを
+    指定された年のRecSysカンファレンスで発表された論文のメタデータを
     DBLPから取得し、Semantic Scholarから要約やPDF URLを取得します。
 
     Args:
