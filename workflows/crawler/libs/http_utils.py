@@ -58,7 +58,10 @@ def before_log(retry_state: RetryCallState) -> None:
 def wait_retry_after(retry_state: RetryCallState) -> float:
     """Retry-Afterヘッダーを考慮した待機時間を計算します。
 
-    Retry-Afterヘッダーが存在する場合はその値を、存在しない場合は
+    Retry-Afterヘッダーが存在し、その値が数値形式（delay-seconds）である場合は
+    その値を待機時間として使用します。HTTP-date形式のRetry-After値は現在
+    サポートしておらず、その場合はValueErrorとして扱われ、指数バックオフに
+    フォールバックします。Retry-Afterヘッダーが存在しない場合も同様に
     指数バックオフを使用します。
     """
     default_wait = wait_random_exponential(multiplier=0.5, min=1, max=10)(retry_state)
