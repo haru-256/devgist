@@ -171,8 +171,8 @@ class DBLPSearch:
             # 必須パラメータのvalidation
             title: str | list[str] | None = info.get("title")
             if isinstance(title, list):
-                logger.error(f"Title is list: {title}")
-                continue
+                title = ", ".join(title)
+            year: str | None = info.get("year")
             year: str | None = info.get("year")
             venue: str | list[str] | None = info.get("venue")
             if isinstance(venue, list):
