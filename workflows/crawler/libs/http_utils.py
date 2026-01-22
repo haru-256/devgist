@@ -46,9 +46,12 @@ def before_log(retry_state: RetryCallState) -> None:
             url = "unknown"
         logger.info(f"Starting request to URL: {url}")
     else:
-        # before callbackではリトライ前に呼ばれるため、
-        # 2回目以降はリトライしていることをログに記録
-        logger.info(f"Retrying (attempt #{attempt})...")
+        if retry_state.outcome is None:
+            raise ValueError("Retry state has no outcome")
+        last_response = retry_state.outcome.result()
+        logger.info(
+            f"Attempt {attempt - 1} failed with status {last_response.status_code}, retrying..."
+        )
 
 
 @retry(

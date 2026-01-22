@@ -1,5 +1,5 @@
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 import time
 
 import httpx
@@ -80,8 +80,10 @@ class TestPostWithRetry:
             sample_url, params=sample_params, json=sample_json
         )
 
+    @patch("libs.http_utils.before_log")
     async def test_retry_on_429_then_success(
         self,
+        mock_before_log: Any,
         mock_client: AsyncMock,
         sample_url: str,
         sample_params: dict[str, Any],
@@ -107,8 +109,10 @@ class TestPostWithRetry:
         assert result.json() == {"result": "success"}
         assert mock_client.post.await_count == 2
 
+    @patch("libs.http_utils.before_log")
     async def test_retry_multiple_429_then_success(
         self,
+        mock_before_log: Any,
         mock_client: AsyncMock,
         sample_url: str,
         sample_params: dict[str, Any],
@@ -139,8 +143,10 @@ class TestPostWithRetry:
         assert result.json() == {"result": "success"}
         assert mock_client.post.await_count == 4
 
+    @patch("libs.http_utils.before_log")
     async def test_retry_exhausted_after_5_attempts(
         self,
+        mock_before_log: Any,
         mock_client: AsyncMock,
         sample_url: str,
         sample_params: dict[str, Any],
@@ -224,8 +230,10 @@ class TestPostWithRetry:
         # 1回のみ呼ばれる（リトライしない）
         mock_client.post.assert_awaited_once()
 
+    @patch("libs.http_utils.before_log")
     async def test_exponential_backoff_timing(
         self,
+        mock_before_log: Any,
         mock_client: AsyncMock,
         sample_url: str,
         sample_params: dict[str, Any],
