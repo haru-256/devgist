@@ -93,7 +93,7 @@ class ArxivSearch:
             data = await self._fetch_from_arxiv(f"doi:{paper.doi}", sem)
 
         if not data and paper.title:
-            data = await self._fetch_from_arxiv(f'ti:"{paper.title}"', sem)
+            data = await self._fetch_from_arxiv(f'ti:"{paper.title.replace('"', '')}"', sem)
 
         if data:
             self._apply_metadata(paper, data, overwrite)
