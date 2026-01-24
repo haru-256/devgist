@@ -41,7 +41,7 @@ async def recsys_crawl(
     # Semantic Scholarから要約, pdfを取得
     async with SemanticScholarSearch(headers) as semantic_scholar_search_usecase:
         enriched_papers = await semantic_scholar_search_usecase.enrich_papers(
-            papers, semaphore=semaphore, overwrite=True
+            papers, semaphore=semaphore, overwrite=False
         )
     # UnpaywallからPDF URLを取得。もし既にPDF URLが設定されている場合は上書きしない
     async with UnpaywallSearch(headers) as unpaywall_search_usecase:

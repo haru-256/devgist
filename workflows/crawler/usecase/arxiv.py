@@ -16,9 +16,9 @@ class ArxivSearch:
     BASE_URL = "https://export.arxiv.org/api/query"
     # XMLの名前空間定義
     NAMESPACES = {
-        "atom": "http://www.w3.org/2005/Atom",
-        "opensearch": "http://a9.com/-/spec/opensearch/1.1/",
-        "arxiv": "http://arxiv.org/schemas/atom",
+        "atom": "https://www.w3.org/2005/Atom",
+        "opensearch": "https://a9.com/-/spec/opensearch/1.1/",
+        "arxiv": "https://arxiv.org/schemas/atom",
     }
 
     def __init__(self, headers: dict[str, str]) -> None:
@@ -33,7 +33,14 @@ class ArxivSearch:
         Returns:
             初期化されたArxivSearchインスタンス
         """
-        self.client = httpx.AsyncClient(headers=self.headers, base_url=self.BASE_URL, timeout=30.0)
+        limits = httpx.Limits(
+            max_connections=100,
+            max_keepalive_connections=20,
+            keepalive_expiry=5.0,
+        )
+        self.client = httpx.AsyncClient(
+            headers=self.headers, base_url=self.BASE_URL, timeout=30.0, limits=limits
+        )
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -93,7 +100,7 @@ class ArxivSearch:
             data = await self._fetch_from_arxiv(f"doi:{paper.doi}", sem)
 
         if not data and paper.title:
-            data = await self._fetch_from_arxiv(f'ti:"{paper.title.replace('"', '')}"', sem)
+            data = await self._fetch_from_arxiv(f'ti:"{paper.title.replace('"', "")}"', sem)
 
         if data:
             self._apply_metadata(paper, data, overwrite)
