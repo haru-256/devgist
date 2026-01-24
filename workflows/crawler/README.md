@@ -15,6 +15,7 @@ DBLP Computer Science Bibliographyから主要な推薦システム・データ�
 
 ## 処理フロー
 
+```mermaid
 graph LR
     A[DBLP API] -->|基本情報取得| B[Paper]
     B -->|DOIで検索| C[Semantic Scholar API]
@@ -23,7 +24,6 @@ graph LR
     E -->|PDF付加| B
     B -->|DOI/Titleで検索| F[arXiv API]
     F -->|Abstract/PDF付加| B
-
 ```
 
 1. **DBLP APIからの基本情報取得**
