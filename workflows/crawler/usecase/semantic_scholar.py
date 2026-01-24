@@ -42,8 +42,8 @@ class SemanticScholarSearch:
     SEMANTIC_SCHOLAR_BATCH_SIZE = 500
     SEMANTIC_SCHOLAR_FIELDS = "externalIds,abstract,openAccessPdf"
     BASE_URL = "https://api.semanticscholar.org"
-    PAPER_SEARCH_API = "https://api.semanticscholar.org/graph/v1/paper"
-    PAPER_BATCH_SEARCH_API = "https://api.semanticscholar.org/graph/v1/paper/batch"
+    PAPER_SEARCH_PATH = "graph/v1/paper"
+    PAPER_BATCH_SEARCH_PATH = "graph/v1/paper/batch"
     ARXIV_ABS_LINK_PATTERN = re.compile(r"https://arxiv\.org/abs/([\w./-]+)")
 
     def __init__(self, headers: dict[str, str]) -> None:
@@ -114,7 +114,7 @@ class SemanticScholarSearch:
         doi_to_paper_map = {p.doi: p for p in papers if p.doi}
 
         # Semantic Scholar APIからデータを取得
-        data_list = await self._fetch_semantic_scholar_data(doi_list, semaphore=semaphore)
+        data_list = await self._fetch_papers(doi_list, semaphore=semaphore)
 
         # 元の論文とマッチングして充実
         enriched_papers: list[Paper] = []
@@ -159,7 +159,7 @@ class SemanticScholarSearch:
             doi_list.append(paper.doi)
         return doi_list
 
-    async def _fetch_semantic_scholar_data(
+    async def _fetch_papers(
         self, dois: list[str], semaphore: asyncio.Semaphore | None = None
     ) -> list[dict[str, Any]]:
         """Semantic Scholar APIからバッチでデータを取得します。
@@ -177,34 +177,49 @@ class SemanticScholarSearch:
         if self.client is None:
             raise RuntimeError("Client is not initialized")
 
-        # クロージャ内でself.clientを参照すると型エラーになる可能性があるためローカル変数にする
-        client = self.client
-
         # デフォルトのセマフォを設定（デフォルト引数でインスタンス化するとイベントループの問題が起きるため）
         sem = semaphore or asyncio.Semaphore(self.DEFAULT_CONCURRENCY)
-
         batch_size = self.SEMANTIC_SCHOLAR_BATCH_SIZE
-        params = {"fields": self.SEMANTIC_SCHOLAR_FIELDS}
-
-        async def fetch_batch(batch_dois: list[str]) -> list[dict[str, Any] | None]:
-            async with sem:
-                payload = {"ids": [f"DOI:{doi}" for doi in batch_dois]}
-                resp = await post_with_retry(
-                    client, self.PAPER_BATCH_SEARCH_API, params=params, json=payload
-                )
-                resp.raise_for_status()
-                batch_data: list[dict[str, Any] | None] = resp.json()
-            return batch_data
 
         # TaskGroup でバッチリクエストを並行実行
         tasks: list[asyncio.Task[list[dict[str, Any] | None]]] = []
         async with asyncio.TaskGroup() as tg:
             for i in range(0, len(dois), batch_size):
                 batch = dois[i : i + batch_size]
-                tasks.append(tg.create_task(fetch_batch(batch)))
+                tasks.append(tg.create_task(self._fetch_paper(batch, sem)))
 
         flat_list = [item for task in tasks for item in task.result() if item is not None]
         return flat_list
+
+    async def _fetch_paper(
+        self, batch_dois: list[str], sem: asyncio.Semaphore
+    ) -> list[dict[str, Any] | None]:
+        """Semantic Scholar APIからバッチでデータを取得します。
+
+        Args:
+            batch_dois: DOIのリスト
+            sem: 並行実行数を制限するセマフォ
+
+        Returns:
+            APIレスポンスのデータリスト（Noneを除外済み）
+
+        Raises:
+            httpx.HTTPStatusError: APIリクエストが失敗した場合
+        """
+        if self.client is None:
+            raise RuntimeError("Client is not initialized")
+        async with sem:
+            payload = {"ids": [f"DOI:{doi}" for doi in batch_dois]}
+            params = {"fields": self.SEMANTIC_SCHOLAR_FIELDS}
+            resp = await post_with_retry(
+                self.client,
+                f"{self.BASE_URL}/{self.PAPER_BATCH_SEARCH_PATH}",
+                params=params,
+                json=payload,
+            )
+            resp.raise_for_status()
+            batch_data: list[dict[str, Any] | None] = resp.json()
+        return batch_data
 
     async def _enrich_paper_metadata(self, paper: Paper, data: dict[str, Any]) -> Paper:
         """APIレスポンスから論文のメタデータを充実させます。

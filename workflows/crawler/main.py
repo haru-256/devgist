@@ -12,6 +12,7 @@ from domain.paper import Paper
 from libs.log import setup_logger
 from usecase.dblp import DBLPSearch
 from usecase.semantic_scholar import SemanticScholarSearch
+from usecase.unpaywall import UnpaywallSearch
 
 
 async def recsys_crawl(
@@ -36,9 +37,15 @@ async def recsys_crawl(
     papers = [p for p in papers if p.doi is not None]
 
     total_papers_count = len(papers)
+    # Semantic Scholarから要約, pdfを取得
     async with SemanticScholarSearch(headers) as semantic_scholar_search_usecase:
         enriched_papers = await semantic_scholar_search_usecase.enrich_papers(
             papers, semaphore=semaphore
+        )
+    # UnpaywallからPDF URLを取得。もし既にPDF URLが設定されている場合は上書きしない
+    async with UnpaywallSearch(headers) as unpaywall_search_usecase:
+        enriched_papers = await unpaywall_search_usecase.enrich_papers(
+            enriched_papers, semaphore=semaphore, overwrite=False
         )
 
     if total_papers_count > 0:
