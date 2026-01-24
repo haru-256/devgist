@@ -180,18 +180,22 @@ class SemanticScholarSearch:
         batch_size = self.SEMANTIC_SCHOLAR_BATCH_SIZE
 
         # TaskGroup でバッチリクエストを並行実行
-        tasks: list[asyncio.Task[list[dict[str, Any] | None]]] = []
+        tasks: list[asyncio.Task[list[dict[str, Any]] | None]] = []
         async with asyncio.TaskGroup() as tg:
             for i in range(0, len(dois), batch_size):
                 batch = dois[i : i + batch_size]
                 tasks.append(tg.create_task(self._fetch_paper_batch(batch, sem)))
 
-        flat_list = [item for task in tasks for item in task.result() if item is not None]
+        flat_list: list[dict[str, Any]] = []
+        for task in tasks:
+            result = task.result()
+            if result is not None:
+                flat_list.extend(result)
         return flat_list
 
     async def _fetch_paper_batch(
         self, batch_dois: list[str], sem: asyncio.Semaphore
-    ) -> list[dict[str, Any] | None]:
+    ) -> list[dict[str, Any]] | None:
         """Semantic Scholar APIからバッチでデータを取得します。
 
         Args:
@@ -206,18 +210,25 @@ class SemanticScholarSearch:
         """
         if self.client is None:
             raise RuntimeError("Client is not initialized")
-        async with sem:
-            payload = {"ids": [f"DOI:{doi}" for doi in batch_dois]}
-            params = {"fields": self.SEMANTIC_SCHOLAR_FIELDS}
-            resp = await post_with_retry(
-                self.client,
-                f"{self.BASE_URL}/{self.PAPER_BATCH_SEARCH_PATH}",
-                params=params,
-                json=payload,
-            )
+        try:
+            async with sem:
+                payload = {"ids": [f"DOI:{doi}" for doi in batch_dois]}
+                params = {"fields": self.SEMANTIC_SCHOLAR_FIELDS}
+                resp = await post_with_retry(
+                    self.client,
+                    f"/{self.PAPER_BATCH_SEARCH_PATH}",
+                    params=params,
+                    json=payload,
+                )
             resp.raise_for_status()
-            batch_data: list[dict[str, Any] | None] = resp.json()
-        return batch_data
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            # 404 Not Foundは論文が存在しないケースとして扱う
+            if e.response.status_code == 404:
+                logger.debug(f"No paper found for DOIs {batch_dois} on Semantic Scholar (404).")
+            else:
+                logger.warning(f"Failed to fetch paper for DOIs {batch_dois}: {e}")
+            return None
 
     async def _enrich_paper_metadata(
         self, paper: Paper, data: dict[str, Any], overwrite: bool = False

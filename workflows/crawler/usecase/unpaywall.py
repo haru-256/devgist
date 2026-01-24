@@ -158,13 +158,21 @@ class UnpaywallSearch:
         """
         if self.client is None:
             raise RuntimeError("Client is not initialized")
-        url = f"{self.BASE_URL}/{self.PAPER_SEARCH_PATH}/{doi}"
 
-        async with sem:
-            resp = await get_with_retry(self.client, url, params={"email": email})
+        url = f"/{self.PAPER_SEARCH_PATH}/{doi}"
+
+        try:
+            async with sem:
+                resp = await get_with_retry(self.client, url, params={"email": email})
             resp.raise_for_status()
-            data: dict[str, Any] | None = resp.json()
-        return data
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            # 404 Not Foundは論文が存在しないケースとして扱う
+            if e.response.status_code == 404:
+                logger.debug(f"No paper found for DOI {doi} on Unpaywall (404).")
+            else:
+                logger.warning(f"Failed to fetch paper for DOI {doi}: {e}")
+            return None
 
     async def _enrich_paper_metadata(
         self, paper: Paper, data: dict[str, Any], overwrite: bool = False

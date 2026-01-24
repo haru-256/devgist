@@ -159,8 +159,9 @@ async def test_enrich_papers_api_error(
         mock_get.return_value = mock_response
 
         async with unpaywall_search:
-            with pytest.raises(Exception):
-                await unpaywall_search.enrich_papers([mock_paper])
+            enriched_papers = await unpaywall_search.enrich_papers([mock_paper])
+    assert len(enriched_papers) == 1
+    assert enriched_papers[0].pdf_url is None
 
 
 @pytest.mark.asyncio

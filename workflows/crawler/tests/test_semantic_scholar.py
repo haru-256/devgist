@@ -270,5 +270,9 @@ async def test_enrich_papers_api_error(
     mocker.patch("httpx.AsyncClient.post", return_value=mock_response)
 
     async with SemanticScholarSearch(headers) as search:
-        with pytest.raises(Exception):  # httpx.HTTPStatusError
-            await search.enrich_papers(sample_papers)
+        enriched_papers = await search.enrich_papers(sample_papers)
+
+    # エラーが発生しても例外は送出されず、エンリッチされずに返される
+    assert len(enriched_papers) == 2
+    assert enriched_papers[0].abstract is None
+    assert enriched_papers[0].pdf_url is None
