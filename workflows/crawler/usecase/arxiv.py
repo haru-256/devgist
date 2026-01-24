@@ -1,7 +1,7 @@
 import asyncio
-import xml.etree.ElementTree as ET
 from typing import Any
 
+import defusedxml.ElementTree as ET
 import httpx
 from loguru import logger
 
