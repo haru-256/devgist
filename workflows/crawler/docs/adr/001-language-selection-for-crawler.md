@@ -60,23 +60,23 @@ DBLP等の学術データベースやテックブログから論文・記事情�
 
 1. **開発速度**: 3週間でプロトタイプから本番品質の実装完了
 2. **柔軟性**: API変更への迅速な対応（著者フィールド対応: ~10行の実装）
-3. **品質保証**: 48個の包括的なテスト（DBLP 11、SemanticScholar 17、Paper 15、RobotGuard 5）
+3. **品質保証**: 78個の包括的なテスト（DBLP 11、SemanticScholar 17、Arxiv 9、Unpaywall 18、Paper 15、RobotGuard 5）
 4. **将来性**: データ活用への明確なパス（NLP、レコメンド等）
 
 **定量的な成果:**
 
-- テストカバレッジ: 48テスト、100%パス
+- テストカバレッジ: 78テスト、100%パス
 - コード品質: mypy、ruff全チェックパス
 - 保守性: 全クラス・メソッドにdocstring完備
 
 ### Negative (デメリット)
 
 1. **並行処理性能**: GoのGoroutineと比較して、asyncioはメモリ効率やCPU処理で劣る
-   - 現状規模（数百URL）では問題なし
+    - 現状規模（数百URL）では問題なし
 2. **デプロイサイズ**: Pythonランタイム含むため、コンテナイメージが大きい
-   - 現状では許容範囲（~500MB程度）
+    - 現状では許容範囲（~500MB程度）
 3. **起動速度**: Goのシングルバイナリと比較して遅い
-   - バッチ処理のため影響軽微
+    - バッチ処理のため影響軽微
 
 ### Risks / Future Review (将来の課題)
 
@@ -119,11 +119,13 @@ DBLP等の学術データベースやテックブログから論文・記事情�
 
 - [DBLPSearch](../../usecase/dblp.py) - DBLP API連携（不定形データ処理の実例）
 - [SemanticScholarSearch](../../usecase/semantic_scholar.py) - Semantic Scholar連携
+- [ArxivSearch](../../usecase/arxiv.py) - arXiv連携（セキュアなXMLパース）
+- [UnpaywallSearch](../../usecase/unpaywall.py) - Unpaywall連携
 - [Paper Model](../../domain/paper.py) - Pydanticによる型定義
 
 ### テスト
 
-- [Test Suite](../../tests/) - 48個のテストによる品質保証
+- [Test Suite](../../tests/) - 78個のテストによる品質保証
 
 ### 関連ドキュメント
 

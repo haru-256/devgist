@@ -15,11 +15,15 @@ DBLP Computer Science Bibliographyから主要な推薦システム・データ�
 
 ## 処理フロー
 
-```mermaid
 graph LR
     A[DBLP API] -->|基本情報取得| B[Paper]
     B -->|DOIで検索| C[Semantic Scholar API]
-    C -->|Abstract/PDF付加| D[Enriched Paper]
+    C -->|Abstract/PDF付加| B
+    B -->|DOIで検索| E[Unpaywall API]
+    E -->|PDF付加| B
+    B -->|DOI/Titleで検索| F[arXiv API]
+    F -->|Abstract/PDF付加| B
+
 ```
 
 1. **DBLP APIからの基本情報取得**
@@ -29,11 +33,17 @@ graph LR
 2. **Semantic Scholarでの充実**
    - DOIを使用して各論文の詳細情報を取得
    - Abstract（要約）とPDF URLを付加
-   - arXivリンクが含まれる場合は、arXiv PDFへのリンクを取得
+
+3. **UnpaywallでのPDF取得**
+   - DOIを使用してUnpaywallからオープンアクセスPDFを取得
+
+4. **arXivでの充実**
+   - DOIまたはタイトルでarXivを検索
+   - AbstractとPDF URLを補完
 
 ## ディレクトリ構成
 
-```
+```text
 crawler/
 ├── domain/              # ドメインモデル層
 │   ├── __init__.py
@@ -42,8 +52,10 @@ crawler/
 │   └── __init__.py      # RobotGuard（robots.txt処理）
 ├── usecase/             # ユースケース層（ビジネスロジック）
 │   ├── __init__.py
+│   ├── arxiv.py         # arXiv API連携クラス
 │   ├── dblp.py          # DBLP API連携クラス
-│   └── semantic_scholar.py  # Semantic Scholar API連携クラス
+│   ├── semantic_scholar.py  # Semantic Scholar API連携クラス
+│   └── unpaywall.py     # Unpaywall API連携クラス
 ├── tests/               # 単体テスト
 │   ├── test_dblp.py
 │   ├── test_libs.py
@@ -53,6 +65,7 @@ crawler/
 ├── config.toml          # 設定ファイル
 ├── pyproject.toml       # プロジェクト設定
 └── README.md
+
 ```
 
 ## 主要コンポーネント
@@ -107,6 +120,32 @@ Semantic Scholar APIから論文の詳細情報を取得するクラス。
 - バッチAPIによる効率的な処理
 - arXivリンクの自動検出と変換
 - 元のPaperオブジェクトを変更せず、新規作成
+
+#### `UnpaywallSearch` (usecase/unpaywall.py)
+
+Unpaywall APIからオープンアクセスなPDF URLを取得するクラス。
+
+**主要メソッド:**
+
+- `enrich_papers(papers)`: DOIを使用してPDF URLを取得・付加
+
+**特徴:**
+
+- 正式なオープンアクセスリンクを優先して取得
+
+#### `ArxivSearch` (usecase/arxiv.py)
+
+arXiv APIから論文情報を取得するクラス。
+
+**主要メソッド:**
+
+- `enrich_papers(papers)`: DOIまたはタイトルで検索し、Abstract/PDFを付加
+
+**特徴:**
+
+- 安全なXMLパース (`defusedxml`使用)
+- 検索戦略: DOI検索 → 失敗したらタイトル検索
+- レート制限への配慮（同時実行数制御）
 
 ### Libs層
 
