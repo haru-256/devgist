@@ -203,7 +203,7 @@ class SemanticScholarSearch:
             sem: 並行実行数を制限するセマフォ
 
         Returns:
-            APIレスポンスのデータリスト（Noneを除外済み）
+            APIレスポンスのデータリスト（Noneを含む可能性あり）
 
         Raises:
             httpx.HTTPStatusError: APIリクエストが失敗した場合
