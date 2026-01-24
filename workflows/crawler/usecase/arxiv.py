@@ -13,7 +13,7 @@ class ArxivSearch:
     """arXiv APIを使用して論文メタデータを取得・補完するクラス。"""
 
     DEFAULT_CONCURRENCY = 5  # arXivは短時間の大量リクエストに厳しいため控えめに設定
-    BASE_URL = "http://export.arxiv.org/api/query"
+    BASE_URL = "https://export.arxiv.org/api/query"
     # XMLの名前空間定義
     NAMESPACES = {
         "atom": "http://www.w3.org/2005/Atom",
