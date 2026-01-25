@@ -80,7 +80,6 @@ class ArxivRepository:
         async with asyncio.TaskGroup() as tg:
             for paper in papers:
                 tg.create_task(self._enrich_single_paper(paper, sem, overwrite))
-
         return papers
 
     async def _enrich_single_paper(

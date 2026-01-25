@@ -26,6 +26,10 @@ test = [
 ]
 lint = ["ruff~=0.14.7", "mypy~=1.19.0", "types-defusedxml~=0.7.0.20250822"]
 
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100

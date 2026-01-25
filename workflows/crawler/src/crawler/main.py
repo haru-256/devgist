@@ -66,7 +66,8 @@ async def main() -> None:
     """
     headers = {"User-Agent": "ArchilogBot/1.0"}
     sem = asyncio.Semaphore(3)
-    years = range(2010, 2026)
+    # years = range(2010, 2026)
+    years = range(2025, 2026)
 
     logger.info(f"Starting crawl for years: {years}")
     tasks = []
