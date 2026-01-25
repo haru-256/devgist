@@ -4,6 +4,7 @@ from typing import Any
 import httpx
 from loguru import logger
 
+from crawler.configs import EMAIL
 from crawler.domain.paper import Paper
 from crawler.utils.http_utils import get_with_retry
 
@@ -102,8 +103,6 @@ class UnpaywallRepository:
             PaperEnricherプロトコルからは削除されましたが、内部ヘルパーとして維持、
             または個別のテスト用にpublicのままにしておきます。
         """
-        # EMAIL定数を使用
-        from crawler.configs import EMAIL
 
         if self.client is None:
             raise RuntimeError("Client is not initialized")
