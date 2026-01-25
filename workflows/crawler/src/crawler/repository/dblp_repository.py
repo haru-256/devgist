@@ -163,8 +163,10 @@ class DBLPRepository:
                 type=info.get("type"),
                 ee=info.get("ee"),
             )
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to parse single paper from DBLP hit: {hit}. Error: {e}")
             return None
+
 
     def _parse_authors(self, authors_data: Any) -> list[str]:
         """著者データをパースしてリスト化します。"""
