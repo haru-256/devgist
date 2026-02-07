@@ -16,6 +16,7 @@ from crawler.repository import (
     UnpaywallRepository,
 )
 from crawler.usecase.fetch_papers import FetchRecSysPapers
+from crawler.utils.http_client import create_http_client
 from crawler.utils.log import setup_logger
 
 
@@ -30,13 +31,16 @@ async def recsys_crawl(
         semaphore: 各APIへのリクエスト並列数を制限するためのセマフォ
     """
 
-    # リポジトリインスタンスを作成
-    async with (
-        DBLPRepository(headers) as dblp_repo,
-        SemanticScholarRepository(headers) as ss_repo,
-        UnpaywallRepository(headers) as unpaywall_repo,
-        ArxivRepository(headers) as arxiv_repo,
-    ):
+    # 共有HTTPクライアントを作成
+    async with create_http_client(headers=headers) as client:
+        # リポジトリインスタンスを作成
+        dblp_repo = DBLPRepository(client)
+        await dblp_repo.setup()  # RobotGuard setup
+
+        ss_repo = SemanticScholarRepository(client)
+        unpaywall_repo = UnpaywallRepository(client)
+        arxiv_repo = ArxivRepository(client)
+
         # ユースケースの初期化
         usecase = FetchRecSysPapers(
             paper_retriever=dblp_repo,

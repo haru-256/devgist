@@ -2,6 +2,7 @@ import asyncio
 from typing import Any
 
 import httpx
+from aiolimiter import AsyncLimiter
 from loguru import logger
 
 from crawler.configs import EMAIL
@@ -14,41 +15,20 @@ class UnpaywallRepository:
 
     BASE_URL = "https://api.unpaywall.org"
     PAPER_SEARCH_PATH = "v2"
+    DEFAULT_SLEEP_SECONDS = 0.1
 
-    def __init__(self, headers: dict[str, str]) -> None:
+    def __init__(self, client: httpx.AsyncClient, limiter: AsyncLimiter | None = None) -> None:
         """UnpaywallRepositoryインスタンスを初期化します。
 
         Args:
-            headers: HTTPリクエストで使用するヘッダー辞書
+            client: HTTPリクエストに使用するAsyncClientインスタンス
+            limiter: レート制限を行うAsyncLimiterインスタンス。省略時はデフォルト設定を使用。
         """
-        self.headers = headers
-        self.client: httpx.AsyncClient | None = None
-
-    async def __aenter__(self) -> "UnpaywallRepository":
-        """非同期コンテキストマネージャーのエントリーポイント。
-
-        HTTPクライアントを初期化します。
-
-        Returns:
-            初期化されたUnpaywallRepositoryインスタンス
-        """
-        limits = httpx.Limits(
-            max_connections=100,
-            max_keepalive_connections=20,
-            keepalive_expiry=5.0,
-        )
-        self.client = httpx.AsyncClient(
-            headers=self.headers, base_url=self.BASE_URL, limits=limits, timeout=30.0
-        )
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """非同期コンテキストマネージャーの終了処理。
-
-        HTTPクライアントを適切にクローズします。
-        """
-        if self.client is not None:
-            await self.client.aclose()
+        self.client = client
+        if limiter:
+            self.limiter = limiter
+        else:
+            self.limiter = AsyncLimiter(1, self.DEFAULT_SLEEP_SECONDS)
 
     async def enrich_papers(
         self,
@@ -57,6 +37,8 @@ class UnpaywallRepository:
         overwrite: bool = False,
     ) -> list[Paper]:
         """論文リストにUnpaywallのデータを付与します。
+
+        DOIを持つ論文のみが処理対象となります。
 
         Args:
             papers: 更新対象の論文リスト
@@ -104,13 +86,10 @@ class UnpaywallRepository:
             または個別のテスト用にpublicのままにしておきます。
         """
 
-        if self.client is None:
-            raise RuntimeError("Client is not initialized")
-
-        url = f"/{self.PAPER_SEARCH_PATH}/{doi}"
+        url = f"{self.BASE_URL}/{self.PAPER_SEARCH_PATH}/{doi}"
 
         try:
-            async with sem:
+            async with sem, self.limiter:
                 resp = await get_with_retry(self.client, url, params={"email": EMAIL})
             resp.raise_for_status()
             data = resp.json()

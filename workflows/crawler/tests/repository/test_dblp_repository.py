@@ -1,6 +1,7 @@
 import asyncio
 from typing import Any
 
+import httpx
 import pytest
 from pytest_mock import MockerFixture
 
@@ -13,8 +14,9 @@ def semaphore() -> asyncio.Semaphore:
 
 
 @pytest.fixture
-def headers() -> dict[str, str]:
-    return {"User-Agent": "ArchilogBot/1.0"}
+def mock_client(mocker: MockerFixture) -> httpx.AsyncClient:
+    """Mock AsyncClient fixture."""
+    return mocker.AsyncMock(spec=httpx.AsyncClient)
 
 
 @pytest.fixture
@@ -60,10 +62,10 @@ def mock_dblp_response_data() -> dict[str, Any]:
 
 
 def test_parse_papers_valid(
-    headers: dict[str, str], mock_dblp_response_data: dict[str, Any]
+    mock_client: httpx.AsyncClient, mock_dblp_response_data: dict[str, Any]
 ) -> None:
     """正常系: パース処理のテスト"""
-    repo = DBLPRepository(headers)
+    repo = DBLPRepository(mock_client)
     papers = repo._parse_papers(mock_dblp_response_data)
 
     assert len(papers) == 2
@@ -78,25 +80,25 @@ def test_parse_papers_valid(
     assert papers[1].doi is None
 
 
-def test_parse_papers_no_hits(headers: dict[str, str]) -> None:
+def test_parse_papers_no_hits(mock_client: httpx.AsyncClient) -> None:
     """ヒットなしの場合のパーステスト"""
-    repo = DBLPRepository(headers)
+    repo = DBLPRepository(mock_client)
     data = {"result": {"hits": {"@total": "0"}}}
     papers = repo._parse_papers(data)
     assert papers == []
 
 
-def test_parse_papers_invalid_data(headers: dict[str, str]) -> None:
+def test_parse_papers_invalid_data(mock_client: httpx.AsyncClient) -> None:
     """不正なデータのパーステスト"""
-    repo = DBLPRepository(headers)
+    repo = DBLPRepository(mock_client)
     data = {"invalid": "data"}
     papers = repo._parse_papers(data)
     assert papers == []
 
 
-def test_parse_authors(headers: dict[str, str]) -> None:
+def test_parse_authors(mock_client: httpx.AsyncClient) -> None:
     """著者情報のパーステスト"""
-    repo = DBLPRepository(headers)
+    repo = DBLPRepository(mock_client)
 
     # リスト形式
     data_list = {"author": [{"text": "A"}, {"text": "B"}]}
@@ -114,32 +116,70 @@ def test_parse_authors(headers: dict[str, str]) -> None:
 
 
 async def test_fetch_papers_integration_mock(
-    headers: dict[str, str],
+    mock_client: httpx.AsyncClient,
     mock_dblp_response_data: dict[str, Any],
     semaphore: asyncio.Semaphore,
     mocker: MockerFixture,
 ) -> None:
-    """fetch_papersメソッドの統合的テスト（APIコールのみモック）"""
-    mock_api_response = mocker.MagicMock()
-    mock_api_response.status_code = 200
-    mock_api_response.json.return_value = mock_dblp_response_data
+    """fetch_papersメソッドの統合的テスト（get_with_retryモック）"""
+    mock_api_response = httpx.Response(
+        200, json=mock_dblp_response_data, request=httpx.Request("GET", "http://test")
+    )
 
-    mock_robots_response = mocker.MagicMock()
-    mock_robots_response.status_code = 200
-    mock_robots_response.text = "User-agent: *\nAllow: /"
-
-    async def mock_get(*args: object, **kwargs: object) -> object:
-        # URLを見てrobots.txtかAPIかを判定する簡易ロジック
-        url = str(args[1]) if len(args) > 1 else ""
-        if "robots.txt" in url:
-            return mock_robots_response
+    async def mock_get_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
         return mock_api_response
 
-    mocker.patch("httpx.AsyncClient.get", side_effect=mock_get)
-    mocker.patch("httpx.AsyncClient.aclose")
+    # Initialize needs to be mocked or handled
+    # DBLPRepository.initialize calls robot_guard.load()
+    # We can mock robot_guard.load to do nothing
+    from crawler.utils import RobotGuard
 
-    async with DBLPRepository(headers) as repo:
-        papers = await repo.fetch_papers(conf="recsys", year=2025, semaphore=semaphore)
+    mocker.patch.object(RobotGuard, "load", return_value=None)
+    mocker.patch.object(RobotGuard, "can_fetch", return_value=True)
+
+    mocker.patch(
+        "crawler.repository.dblp_repository.get_with_retry", side_effect=mock_get_with_retry
+    )
+
+    repo = DBLPRepository(mock_client)
+    await repo.setup()
+    papers = await repo.fetch_papers(conf="recsys", year=2025, semaphore=semaphore)
 
     assert len(papers) == 2
     assert papers[0].title == "Test Paper 1"
+
+
+async def test_fetch_call_args(
+    mock_client: httpx.AsyncClient,
+    mock_dblp_response_data: dict[str, Any],
+    semaphore: asyncio.Semaphore,
+    mocker: MockerFixture,
+) -> None:
+    """fetch_papersが正しく引数を渡しているか確認する"""
+    mock_api_response = httpx.Response(
+        200, json=mock_dblp_response_data, request=httpx.Request("GET", "http://test")
+    )
+
+    async def mock_get_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
+        return mock_api_response
+
+    from crawler.utils import RobotGuard
+
+    mocker.patch.object(RobotGuard, "load", return_value=None)
+    mocker.patch.object(RobotGuard, "can_fetch", return_value=True)
+
+    mock_func = mocker.patch(
+        "crawler.repository.dblp_repository.get_with_retry", side_effect=mock_get_with_retry
+    )
+
+    repo = DBLPRepository(mock_client)
+    await repo.setup()
+    await repo.fetch_papers(conf="recsys", year=2025, semaphore=semaphore)
+
+    assert mock_func.call_count == 1
+    call_args = mock_func.call_args
+    # call_args[0] is positional args: (client, url)
+    assert call_args[0][0] == mock_client
+    # call_args[1] is keyword args: params, headers
+    # headers is NOT passed
+    assert "headers" not in call_args[1]

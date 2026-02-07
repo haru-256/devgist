@@ -2,6 +2,7 @@ import asyncio
 from typing import Any, Literal
 
 import httpx
+from aiolimiter import AsyncLimiter
 from loguru import logger
 
 from crawler.domain.paper import Paper
@@ -14,43 +15,28 @@ class DBLPRepository:
 
     BASE_URL = "https://dblp.org"
     SEARCH_API = "https://dblp.org/search/publ/api"
+    DEFAULT_SLEEP_SECONDS = 0.1
 
-    def __init__(self, headers: dict[str, str]) -> None:
+    def __init__(self, client: httpx.AsyncClient, limiter: AsyncLimiter | None = None) -> None:
         """DBLPRepositoryインスタンスを初期化します。
 
         Args:
-            headers: HTTPリクエストで使用するヘッダー辞書
+            client: HTTPリクエストに使用するAsyncClientインスタンス
+            limiter: レート制限を行うAsyncLimiterインスタンス。省略時はデフォルト設定を使用。
         """
+        self.client = client
         self.robot_guard = RobotGuard(self.BASE_URL, user_agent="ArchilogBot")
-        self.headers = headers
-        self.client: httpx.AsyncClient | None = None
+        if limiter:
+            self.limiter = limiter
+        else:
+            self.limiter = AsyncLimiter(1, self.DEFAULT_SLEEP_SECONDS)
 
-    async def __aenter__(self) -> "DBLPRepository":
-        """非同期コンテキストマネージャーのエントリーポイント。
+    async def setup(self) -> None:
+        """リポジトリの初期化処理を実行します。
 
-        HTTPクライアントを初期化し、robots.txtをロードします。
-
-        Returns:
-            初期化されたDBLPRepositoryインスタンス
+        robots.txtをロードします。この関数は使用前に一度呼び出す必要があります。
         """
-        limits = httpx.Limits(
-            max_connections=100,
-            max_keepalive_connections=20,
-            keepalive_expiry=5.0,
-        )
-        self.client = httpx.AsyncClient(
-            headers=self.headers, base_url=self.BASE_URL, limits=limits, timeout=30.0
-        )
         await self.robot_guard.load(client=self.client)
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """非同期コンテキストマネージャーの終了処理。
-
-        HTTPクライアントを適切にクローズします。
-        """
-        if self.client is not None:
-            await self.client.aclose()
 
     async def fetch_papers(
         self,
@@ -75,8 +61,6 @@ class DBLPRepository:
             PermissionError: robots.txtでクロールが拒否されている場合
             httpx.HTTPStatusError: APIリクエストが失敗した場合
         """
-        if self.client is None:
-            raise RuntimeError("Client is not initialized")
         if not self.robot_guard.loaded:
             await self.robot_guard.load(client=self.client)
 
@@ -94,9 +78,8 @@ class DBLPRepository:
 
         try:
             # セマフォを使用してリクエスト並列数を制御
-            request_coro = get_with_retry(self.client, self.SEARCH_API, params=params)
-            async with semaphore:
-                resp = await request_coro
+            async with semaphore, self.limiter:
+                resp = await get_with_retry(self.client, self.SEARCH_API, params=params)
 
             resp.raise_for_status()
             data = resp.json()

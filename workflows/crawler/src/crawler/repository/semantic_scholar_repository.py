@@ -2,6 +2,7 @@ import asyncio
 from typing import Any
 
 import httpx
+from aiolimiter import AsyncLimiter
 from loguru import logger
 
 from crawler.domain.paper import Paper
@@ -11,55 +12,35 @@ from crawler.utils.http_utils import post_with_retry
 class SemanticScholarRepository:
     """Semantic Scholar APIとの通信を担当するリポジトリクラス。"""
 
-    DEFAULT_CONCURRENCY = 10
     # Semantic Scholar APIは最大500件までバッチで取得可能
     BATCH_SIZE = 500
     FIELDS = "externalIds,abstract,openAccessPdf,title,year,venue,authors,url"
     BASE_URL = "https://api.semanticscholar.org"
     PAPER_BATCH_SEARCH_PATH = "graph/v1/paper/batch"
+    DEFAULT_SLEEP_SECONDS = 0.1
 
-    def __init__(self, headers: dict[str, str]) -> None:
+    def __init__(self, client: httpx.AsyncClient, limiter: AsyncLimiter | None = None) -> None:
         """SemanticScholarRepositoryインスタンスを初期化します。
 
         Args:
-            headers: HTTPリクエストで使用するヘッダー辞書
+            client: HTTPリクエストに使用するAsyncClientインスタンス
+            limiter: レート制限を行うAsyncLimiterインスタンス。省略時はデフォルト設定を使用。
         """
-        self.headers = headers
-        self.client: httpx.AsyncClient | None = None
-
-    async def __aenter__(self) -> "SemanticScholarRepository":
-        """非同期コンテキストマネージャーのエントリーポイント。
-
-        HTTPクライアントを初期化します。
-
-        Returns:
-            初期化されたSemanticScholarRepositoryインスタンス
-        """
-        limits = httpx.Limits(
-            max_connections=100,
-            max_keepalive_connections=20,
-            keepalive_expiry=5.0,
-        )
-        self.client = httpx.AsyncClient(
-            headers=self.headers, base_url=self.BASE_URL, limits=limits, timeout=30.0
-        )
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """非同期コンテキストマネージャーの終了処理。
-
-        HTTPクライアントを適切にクローズします。
-        """
-        if self.client is not None:
-            await self.client.aclose()
+        self.client = client
+        if limiter:
+            self.limiter = limiter
+        else:
+            self.limiter = AsyncLimiter(1, self.DEFAULT_SLEEP_SECONDS)
 
     async def enrich_papers(
         self,
         papers: list[Paper],
-        semaphore: asyncio.Semaphore | None = None,
+        semaphore: asyncio.Semaphore,
         overwrite: bool = False,
     ) -> list[Paper]:
         """論文リストにSemantic Scholarのデータ（Abstract と PDF URL）を付与します。
+
+        DOIを持つ論文のみが処理対象となります。
 
         Args:
             papers: 更新対象の論文リスト
@@ -93,9 +74,7 @@ class SemanticScholarRepository:
 
         return papers
 
-    async def fetch_papers_batch(
-        self, dois: list[str], sem: asyncio.Semaphore | None = None
-    ) -> list[Paper]:
+    async def fetch_papers_batch(self, dois: list[str], sem: asyncio.Semaphore) -> list[Paper]:
         """Semantic Scholar APIからバッチで論文データを取得します。
 
         Args:
@@ -108,11 +87,7 @@ class SemanticScholarRepository:
         Raises:
             RuntimeError: クライアントが初期化されていない場合
         """
-        if self.client is None:
-            raise RuntimeError("Client is not initialized")
-
-        # セマフォが指定されていない場合はデフォルトを使用
-        _sem = sem or asyncio.Semaphore(self.DEFAULT_CONCURRENCY)
+        _sem = sem
 
         # バッチサイズごとに分割
         tasks: list[asyncio.Task[list[Paper] | None]] = []
@@ -141,16 +116,14 @@ class SemanticScholarRepository:
         Returns:
             Paperオブジェクトのリスト。取得エラー時はNone。
         """
-        if self.client is None:
-            raise RuntimeError("Client is not initialized")
 
         try:
-            async with sem:
+            async with sem, self.limiter:
                 payload = {"ids": [f"DOI:{doi}" for doi in batch_dois]}
                 params = {"fields": self.FIELDS}
                 resp = await post_with_retry(
                     self.client,
-                    f"/{self.PAPER_BATCH_SEARCH_PATH}",
+                    f"{self.BASE_URL}/{self.PAPER_BATCH_SEARCH_PATH}",
                     params=params,
                     json=payload,
                 )
@@ -218,8 +191,6 @@ class SemanticScholarRepository:
 
     async def check_url_exists(self, url: str) -> bool:
         """指定されたURLが存在するか確認します。"""
-        if self.client is None:
-            return False
 
         try:
             resp = await self.client.head(url)
