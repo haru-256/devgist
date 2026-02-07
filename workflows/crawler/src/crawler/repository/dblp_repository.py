@@ -31,7 +31,7 @@ class DBLPRepository:
         else:
             self.limiter = AsyncLimiter(1, self.DEFAULT_SLEEP_SECONDS)
 
-    async def initialize(self) -> None:
+    async def setup(self) -> None:
         """リポジトリの初期化処理を実行します。
 
         robots.txtをロードします。この関数は使用前に一度呼び出す必要があります。

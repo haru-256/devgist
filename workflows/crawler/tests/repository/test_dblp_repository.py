@@ -142,7 +142,7 @@ async def test_fetch_papers_integration_mock(
     )
 
     repo = DBLPRepository(mock_client)
-    await repo.initialize()
+    await repo.setup()
     papers = await repo.fetch_papers(conf="recsys", year=2025, semaphore=semaphore)
 
     assert len(papers) == 2
@@ -173,7 +173,7 @@ async def test_fetch_call_args(
     )
 
     repo = DBLPRepository(mock_client)
-    await repo.initialize()
+    await repo.setup()
     await repo.fetch_papers(conf="recsys", year=2025, semaphore=semaphore)
 
     assert mock_func.call_count == 1

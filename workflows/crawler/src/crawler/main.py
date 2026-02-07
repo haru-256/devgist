@@ -35,7 +35,7 @@ async def recsys_crawl(
     async with create_http_client(headers=headers) as client:
         # リポジトリインスタンスを作成
         dblp_repo = DBLPRepository(client)
-        await dblp_repo.initialize()  # RobotGuard setup
+        await dblp_repo.setup()  # RobotGuard setup
 
         ss_repo = SemanticScholarRepository(client)
         unpaywall_repo = UnpaywallRepository(client)
