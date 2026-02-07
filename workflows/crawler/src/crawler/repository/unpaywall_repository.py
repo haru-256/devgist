@@ -71,7 +71,7 @@ class UnpaywallRepository:
         if not target_papers:
             return papers
 
-        sem = semaphore or asyncio.Semaphore(10)  # Default concurrency
+        sem = semaphore
 
         async with asyncio.TaskGroup() as tg:
             for paper in target_papers:

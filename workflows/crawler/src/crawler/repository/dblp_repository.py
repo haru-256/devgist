@@ -65,7 +65,7 @@ class DBLPRepository:
             conf: 対象カンファレンス名
             year: 対象年度
             h: 取得する最大論文数（デフォルト: 1000）
-            sem: 並列実行数を制限するセマフォ（デフォルト: None）
+            semaphore: 並列実行数を制限するセマフォ
 
         Returns:
             Paperオブジェクトのリスト
@@ -95,10 +95,7 @@ class DBLPRepository:
         try:
             # セマフォを使用してリクエスト並列数を制御
             request_coro = get_with_retry(self.client, self.SEARCH_API, params=params)
-            if semaphore is not None:
-                async with semaphore:
-                    resp = await request_coro
-            else:
+            async with semaphore:
                 resp = await request_coro
 
             resp.raise_for_status()
