@@ -87,9 +87,6 @@ class SemanticScholarRepository:
         Raises:
             RuntimeError: クライアントが初期化されていない場合
         """
-        if self.client is None:
-            raise RuntimeError("Client is not initialized")
-
         _sem = sem
 
         # バッチサイズごとに分割
@@ -194,8 +191,6 @@ class SemanticScholarRepository:
 
     async def check_url_exists(self, url: str) -> bool:
         """指定されたURLが存在するか確認します。"""
-        if self.client is None:
-            return False
 
         try:
             resp = await self.client.head(url)

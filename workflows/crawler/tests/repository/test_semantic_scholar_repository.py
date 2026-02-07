@@ -120,9 +120,7 @@ async def test_fetch_call_args(
     mocker: MockerFixture,
 ) -> None:
     """fetch_papers_batchが正しく引数を渡しているか確認する"""
-    mock_response = httpx.Response(
-        200, json=[], request=httpx.Request("POST", "http://test")
-    )
+    mock_response = httpx.Response(200, json=[], request=httpx.Request("POST", "http://test"))
 
     async def mock_post_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
         return mock_response
