@@ -31,13 +31,6 @@ class DBLPRepository:
         else:
             self.limiter = AsyncLimiter(1, self.DEFAULT_SLEEP_SECONDS)
 
-    async def initialize(self) -> None:
-        """リポジトリの初期化処理を実行します。
-
-        robots.txtをロードします。この関数は使用前に一度呼び出す必要があります。
-        """
-        await self.robot_guard.load(client=self.client)
-
     async def fetch_papers(
         self,
         conf: Literal["recsys", "kdd", "wsdm", "www", "sigir", "cikm"],
