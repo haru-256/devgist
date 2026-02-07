@@ -1,8 +1,8 @@
 import asyncio
-from typing import Any
 
 import defusedxml.ElementTree as ET
 import httpx
+from aiolimiter import AsyncLimiter
 from loguru import logger
 
 from crawler.domain.paper import Paper
@@ -12,7 +12,7 @@ from crawler.utils.http_utils import get_with_retry
 class ArxivRepository:
     """arXiv APIとの通信を担当するリポジトリクラス。"""
 
-    BASE_URL = "https://export.arxiv.org/api/query"
+    BASE_URL = "https://export.arxiv.org"
     # XMLの名前空間定義
     NAMESPACES = {
         "atom": "http://www.w3.org/2005/Atom",
@@ -20,47 +20,26 @@ class ArxivRepository:
         "arxiv": "http://arxiv.org/schemas/atom",
     }
 
-    DEFAULT_CONCURRENCY = 5
+    DEFAULT_SLEEP_SECONDS = 1.0
 
-    def __init__(self, headers: dict[str, str]) -> None:
+    def __init__(self, client: httpx.AsyncClient, limiter: AsyncLimiter | None = None) -> None:
         """ArxivRepositoryインスタンスを初期化します。
 
         Args:
-            headers: HTTPリクエストで使用するヘッダー辞書
+            client: HTTPリクエストに使用するAsyncClientインスタンス
+            limiter: レート制限を行うAsyncLimiterインスタンス。省略時はデフォルト設定を使用。
         """
-        self.headers = headers
-        self.client: httpx.AsyncClient | None = None
-
-    async def __aenter__(self) -> "ArxivRepository":
-        """非同期コンテキストマネージャーのエントリーポイント。
-
-        HTTPクライアントを初期化します。
-
-        Returns:
-            初期化されたArxivRepositoryインスタンス
-        """
-        limits = httpx.Limits(
-            max_connections=100,
-            max_keepalive_connections=20,
-            keepalive_expiry=5.0,
-        )
-        self.client = httpx.AsyncClient(
-            headers=self.headers, base_url=self.BASE_URL, timeout=30.0, limits=limits
-        )
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """非同期コンテキストマネージャーの終了処理。
-
-        HTTPクライアントを適切にクローズします。
-        """
-        if self.client is not None:
-            await self.client.aclose()
+        self.client = client
+        # arXivのレート制限（1リクエスト/秒）を管理するリミッター
+        if limiter:
+            self.limiter = limiter
+        else:
+            self.limiter = AsyncLimiter(1, self.DEFAULT_SLEEP_SECONDS)
 
     async def enrich_papers(
         self,
         papers: list[Paper],
-        semaphore: asyncio.Semaphore | None = None,
+        semaphore: asyncio.Semaphore,
         overwrite: bool = False,
     ) -> list[Paper]:
         """論文リストにarXivのデータ（Abstract, PDF URL）を付与します。
@@ -75,11 +54,9 @@ class ArxivRepository:
         Returns:
             更新された論文リスト
         """
-        sem = semaphore or asyncio.Semaphore(self.DEFAULT_CONCURRENCY)
-
         async with asyncio.TaskGroup() as tg:
             for paper in papers:
-                tg.create_task(self._enrich_single_paper(paper, sem, overwrite))
+                tg.create_task(self._enrich_single_paper(paper, semaphore, overwrite))
         return papers
 
     async def _enrich_single_paper(
@@ -102,7 +79,7 @@ class ArxivRepository:
             if fetched_paper.pdf_url and (not paper.pdf_url or overwrite):
                 paper.pdf_url = fetched_paper.pdf_url
 
-    async def fetch_by_doi(self, doi: str, sem: asyncio.Semaphore | None = None) -> Paper | None:
+    async def fetch_by_doi(self, doi: str, sem: asyncio.Semaphore) -> Paper | None:
         """DOIを使用してarXiv APIから論文データを取得します。
 
         Args:
@@ -111,15 +88,10 @@ class ArxivRepository:
 
         Returns:
             Paperオブジェクト（pdf_url, abstractなどの詳細を含む）。取得失敗時はNone。
-
-        Raises:
-            RuntimeError: コンテキストマネージャー外で呼び出された場合
         """
         return await self._fetch(f"doi:{doi}", sem)
 
-    async def fetch_by_title(
-        self, title: str, sem: asyncio.Semaphore | None = None
-    ) -> Paper | None:
+    async def fetch_by_title(self, title: str, sem: asyncio.Semaphore) -> Paper | None:
         """タイトルを使用してarXiv APIから論文データを取得します。
 
         Args:
@@ -128,15 +100,12 @@ class ArxivRepository:
 
         Returns:
             Paperオブジェクト（pdf_url, abstractなどの詳細を含む）。取得失敗時はNone。
-
-        Raises:
-            RuntimeError: コンテキストマネージャー外で呼び出された場合
         """
         # タイトルに含まれるダブルクォートをエスケープ
         escaped_title = title.replace('"', "")
         return await self._fetch(f'ti:"{escaped_title}"', sem)
 
-    async def _fetch(self, query: str, sem: asyncio.Semaphore | None) -> Paper | None:
+    async def _fetch(self, query: str, sem: asyncio.Semaphore) -> Paper | None:
         """arXiv APIを叩き、最初のヒット結果を返します。
 
         Args:
@@ -146,19 +115,16 @@ class ArxivRepository:
         Returns:
             パースされたPaperオブジェクト。取得失敗やヒットなしの場合はNone。
 
-        Raises:
-            RuntimeError: コンテキストマネージャー外で呼び出された場合
         """
-        if self.client is None:
-            raise RuntimeError("Client is not initialized")
-
         params = {"search_query": query, "start": 0, "max_results": 1}
         try:
-            if sem:
-                async with sem:
-                    resp = await get_with_retry(self.client, "", params=params)
-            else:
-                resp = await get_with_retry(self.client, "", params=params)
+            async with sem, self.limiter:
+                resp = await get_with_retry(
+                    self.client,
+                    f"{self.BASE_URL}/api/query",
+                    params=params,
+                    headers={"Accept": "application/atom+xml"},
+                )
             resp.raise_for_status()
             return self._parse_xml(resp.text)
         except Exception as e:

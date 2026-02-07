@@ -87,7 +87,11 @@ def wait_retry_after(retry_state: RetryCallState) -> float:
     retry_error_callback=log_and_raise_final_error,
 )
 async def post_with_retry(
-    client: httpx.AsyncClient, url: str, params: dict[str, Any], json: dict[str, Any]
+    client: httpx.AsyncClient,
+    url: str,
+    params: dict[str, Any],
+    json: dict[str, Any],
+    headers: dict[str, str] | None = None,
 ) -> httpx.Response:
     """指数バックオフとRate Limitリトライ付きでPOSTリクエストを送信します。
 
@@ -96,6 +100,7 @@ async def post_with_retry(
         url: リクエストURL
         params: クエリパラメータ
         json: JSONボディ
+        headers: リクエストヘッダー（オプション）
 
     Returns:
         HTTPレスポンス
@@ -104,7 +109,7 @@ async def post_with_retry(
         httpx.HTTPStatusError: 429以外のHTTPエラーが発生した場合
         ValueError: リトライ状態が不正な場合
     """
-    response = await client.post(url, params=params, json=json)
+    response = await client.post(url, params=params, json=json, headers=headers)
     # 200 OK: 成功、429: Rate limit（リトライ対象）
     # それ以外のステータスコードは即座にエラーとして扱う
     if response.status_code not in (200, 429):
@@ -121,7 +126,10 @@ async def post_with_retry(
     retry_error_callback=log_and_raise_final_error,
 )
 async def get_with_retry(
-    client: httpx.AsyncClient, url: str, params: dict[str, Any] | None = None
+    client: httpx.AsyncClient,
+    url: str,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> httpx.Response:
     """指数バックオフとRate Limitリトライ付きでGETリクエストを送信します。
 
@@ -129,6 +137,7 @@ async def get_with_retry(
         client: HTTPX非同期クライアント
         url: リクエストURL
         params: クエリパラメータ（オプション）
+        headers: リクエストヘッダー（オプション）
 
     Returns:
         HTTPレスポンス
@@ -137,7 +146,7 @@ async def get_with_retry(
         httpx.HTTPStatusError: 429以外のHTTPエラーが発生した場合
         ValueError: リトライ状態が不正な場合
     """
-    response = await client.get(url, params=params)
+    response = await client.get(url, params=params, headers=headers)
     # 200 OK: 成功、429: Rate limit（リトライ対象）
     # それ以外のステータスコードは即座にエラーとして扱う
     if response.status_code not in (200, 429):
