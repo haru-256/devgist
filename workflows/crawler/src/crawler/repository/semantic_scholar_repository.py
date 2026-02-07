@@ -100,7 +100,7 @@ class SemanticScholarRepository:
 
         Args:
             dois: DOIのリスト
-            sem: 並列実行数を制限するセマフォ（オプション）
+            sem: 並列実行数を制限するセマフォ
 
         Returns:
             Paperオブジェクトのリスト（取得できたもののみ）

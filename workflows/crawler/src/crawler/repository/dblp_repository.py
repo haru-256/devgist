@@ -64,8 +64,8 @@ class DBLPRepository:
         Args:
             conf: 対象カンファレンス名
             year: 対象年度
-            h: 取得する最大論文数（デフォルト: 1000）
             semaphore: 並列実行数を制限するセマフォ
+            h: 取得する最大論文数（デフォルト: 1000）
 
         Returns:
             Paperオブジェクトのリスト

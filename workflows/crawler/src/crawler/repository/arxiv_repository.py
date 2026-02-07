@@ -107,7 +107,7 @@ class ArxivRepository:
 
         Args:
             doi: 論文のDOI
-            sem: セマフォ（オプション）
+            sem: 並列実行数を制限するセマフォ
 
         Returns:
             Paperオブジェクト（pdf_url, abstractなどの詳細を含む）。取得失敗時はNone。
@@ -124,7 +124,7 @@ class ArxivRepository:
 
         Args:
             title: 論文のタイトル
-            sem: セマフォ（オプション）
+            sem: 並列実行数を制限するセマフォ
 
         Returns:
             Paperオブジェクト（pdf_url, abstractなどの詳細を含む）。取得失敗時はNone。
