@@ -10,7 +10,7 @@ resource "google_project_service" "api_services" {
   disable_on_destroy = false
 }
 
-// GCE APIが有効化されるまで待機するリソース
+// APIが有効化された後、伝播するまで待機するリソース
 resource "time_sleep" "wait_for_gce_api" {
   for_each        = google_project_service.api_services
   create_duration = "${var.wait_seconds}s"

@@ -1,5 +1,4 @@
 terraform {
-  backend "gcs" {
-    bucket = "haru256-sandbox-20250225-tfstate"
-  }
+  # partial backend configurationで指定するため、ここでは空を設定
+  backend "gcs" {}
 }
