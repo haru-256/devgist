@@ -171,3 +171,7 @@ class DBLPRepository:
                 return [text] if text else []
 
         return []
+
+    @staticmethod
+    def create_limiter() -> AsyncLimiter:
+        return AsyncLimiter(1, DBLPRepository.DEFAULT_SLEEP_SECONDS)

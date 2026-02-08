@@ -136,3 +136,7 @@ class UnpaywallRepository:
             doi=doi,
             pdf_url=pdf_url,
         )
+
+    @staticmethod
+    def create_limiter() -> AsyncLimiter:
+        return AsyncLimiter(1, UnpaywallRepository.DEFAULT_SLEEP_SECONDS)

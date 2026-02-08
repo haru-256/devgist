@@ -19,35 +19,28 @@ from crawler.usecase.fetch_papers import FetchRecSysPapers
 from crawler.utils.http_client import create_http_client
 from crawler.utils.log import setup_logger
 
+LIMITER_KEY_DBLP = "dblp"
+LIMITER_KEY_SEMANTIC_SCHOLAR = "semantic_scholar"
+LIMITER_KEY_UNPAYWALL = "unpaywall"
+LIMITER_KEY_ARXIV = "arxiv"
 
-async def recsys_crawl(
-    headers: dict[str, str], year: int, semaphore: asyncio.Semaphore
+
+async def run_crawl_task(
+    usecase: FetchRecSysPapers,
+    year: int,
+    semaphore: asyncio.Semaphore,
 ) -> list[Paper]:
-    """RecSysカンファレンスの論文情報を収集します。
+    """指定された年のクロールタスクを実行し、結果をログ出力します。
 
     Args:
-        headers: HTTPリクエストで使用するヘッダー辞書
-        year: 論文の発表年
-        semaphore: 各APIへのリクエスト並列数を制限するためのセマフォ
+        usecase: 実行するユースケース
+        year: 対象年
+        semaphore: 並列実行制限用セマフォ
+
+    Returns:
+        取得・補完された論文リスト
     """
-
-    # 共有HTTPクライアントを作成
-    async with create_http_client(headers=headers) as client:
-        # リポジトリインスタンスを作成
-        dblp_repo = DBLPRepository(client)
-        await dblp_repo.setup()  # RobotGuard setup
-
-        ss_repo = SemanticScholarRepository(client)
-        unpaywall_repo = UnpaywallRepository(client)
-        arxiv_repo = ArxivRepository(client)
-
-        # ユースケースの初期化
-        usecase = FetchRecSysPapers(
-            paper_retriever=dblp_repo,
-            paper_enrichers=[ss_repo, unpaywall_repo, arxiv_repo],
-        )
-
-        enriched_papers = await usecase.execute(year, semaphore)
+    enriched_papers = await usecase.execute(year, semaphore)
 
     # 統計情報のログ出力
     total_papers_count = len(enriched_papers)
@@ -69,16 +62,40 @@ async def main() -> None:
     ログメッセージを出力後、RecSysのクロール処理を実行します。
     """
     headers = {"User-Agent": "ArchilogBot/1.0"}
-    sem = asyncio.Semaphore(3)
-    # years = range(2010, 2026)
-    years = range(2025, 2026)
+    sem = asyncio.Semaphore(100)
+    years = range(2010, 2026)
+    # years = range(2025, 2026)
+
+    # 各サービスのレートリミッターを作成（全体で共有）
+    limiters = {
+        LIMITER_KEY_DBLP: DBLPRepository.create_limiter(),
+        LIMITER_KEY_SEMANTIC_SCHOLAR: SemanticScholarRepository.create_limiter(),
+        LIMITER_KEY_UNPAYWALL: UnpaywallRepository.create_limiter(),
+        LIMITER_KEY_ARXIV: ArxivRepository.create_limiter(),
+    }
 
     logger.info(f"Starting crawl for years: {years}")
-    tasks = []
-    async with asyncio.TaskGroup() as tg:
-        for year in years:
-            tasks.append(tg.create_task(recsys_crawl(headers=headers, year=year, semaphore=sem)))
-    enriched_papers = [paper for task in tasks for paper in task.result()]
+
+    # 共有HTTPクライアントを作成
+    async with create_http_client(headers=headers) as client:
+        # 各リポジトリを初期化
+        dblp_repo = DBLPRepository(client, limiter=limiters[LIMITER_KEY_DBLP])
+        await dblp_repo.setup()
+        ss_repo = SemanticScholarRepository(client, limiter=limiters[LIMITER_KEY_SEMANTIC_SCHOLAR])
+        unpaywall_repo = UnpaywallRepository(client, limiter=limiters[LIMITER_KEY_UNPAYWALL])
+        arxiv_repo = ArxivRepository(client, limiter=limiters[LIMITER_KEY_ARXIV])
+        # ユースケースの初期化
+        usecase = FetchRecSysPapers(
+            paper_retriever=dblp_repo,
+            paper_enrichers=[ss_repo, unpaywall_repo, arxiv_repo],
+        )
+
+        tasks = []
+        async with asyncio.TaskGroup() as tg:
+            for year in years:
+                tasks.append(tg.create_task(run_crawl_task(usecase, year, sem)))
+        enriched_papers = [paper for task in tasks for paper in task.result()]
+
     logger.info(f"Total enriched papers: {len(enriched_papers)}")
 
 

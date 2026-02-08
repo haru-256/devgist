@@ -197,3 +197,7 @@ class SemanticScholarRepository:
             return resp.status_code == 200
         except Exception:
             return False
+
+    @staticmethod
+    def create_limiter() -> AsyncLimiter:
+        return AsyncLimiter(1, SemanticScholarRepository.DEFAULT_SLEEP_SECONDS)

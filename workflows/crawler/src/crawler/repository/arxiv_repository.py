@@ -188,3 +188,7 @@ class ArxivRepository:
             abstract=summary,
             pdf_url=pdf_url,
         )
+
+    @staticmethod
+    def create_limiter() -> AsyncLimiter:
+        return AsyncLimiter(1, ArxivRepository.DEFAULT_SLEEP_SECONDS)
