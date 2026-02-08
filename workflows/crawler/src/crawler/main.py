@@ -19,6 +19,11 @@ from crawler.usecase.fetch_papers import FetchRecSysPapers
 from crawler.utils.http_client import create_http_client
 from crawler.utils.log import setup_logger
 
+LIMITER_KEY_DBLP = "dblp"
+LIMITER_KEY_SEMANTIC_SCHOLAR = "semantic_scholar"
+LIMITER_KEY_UNPAYWALL = "unpaywall"
+LIMITER_KEY_ARXIV = "arxiv"
+
 
 async def run_crawl_task(
     usecase: FetchRecSysPapers,
@@ -63,10 +68,10 @@ async def main() -> None:
 
     # 各サービスのレートリミッターを作成（全体で共有）
     limiters = {
-        "dblp": DBLPRepository.create_limiter(),
-        "semantic_scholar": SemanticScholarRepository.create_limiter(),
-        "unpaywall": UnpaywallRepository.create_limiter(),
-        "arxiv": ArxivRepository.create_limiter(),
+        LIMITER_KEY_DBLP: DBLPRepository.create_limiter(),
+        LIMITER_KEY_SEMANTIC_SCHOLAR: SemanticScholarRepository.create_limiter(),
+        LIMITER_KEY_UNPAYWALL: UnpaywallRepository.create_limiter(),
+        LIMITER_KEY_ARXIV: ArxivRepository.create_limiter(),
     }
 
     logger.info(f"Starting crawl for years: {years}")
@@ -74,11 +79,11 @@ async def main() -> None:
     # 共有HTTPクライアントを作成
     async with create_http_client(headers=headers) as client:
         # 各リポジトリを初期化
-        dblp_repo = DBLPRepository(client, limiter=limiters["dblp"])
+        dblp_repo = DBLPRepository(client, limiter=limiters[LIMITER_KEY_DBLP])
         await dblp_repo.setup()
-        ss_repo = SemanticScholarRepository(client, limiter=limiters["semantic_scholar"])
-        unpaywall_repo = UnpaywallRepository(client, limiter=limiters["unpaywall"])
-        arxiv_repo = ArxivRepository(client, limiter=limiters["arxiv"])
+        ss_repo = SemanticScholarRepository(client, limiter=limiters[LIMITER_KEY_SEMANTIC_SCHOLAR])
+        unpaywall_repo = UnpaywallRepository(client, limiter=limiters[LIMITER_KEY_UNPAYWALL])
+        arxiv_repo = ArxivRepository(client, limiter=limiters[LIMITER_KEY_ARXIV])
         # ユースケースの初期化
         usecase = FetchRecSysPapers(
             paper_retriever=dblp_repo,
@@ -92,8 +97,6 @@ async def main() -> None:
         enriched_papers = [paper for task in tasks for paper in task.result()]
 
     logger.info(f"Total enriched papers: {len(enriched_papers)}")
-
-    breakpoint()
 
 
 if __name__ == "__main__":
