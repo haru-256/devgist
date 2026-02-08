@@ -2,7 +2,7 @@
 
 学術論文のメタデータを収集し、充実させるWebクローラー。
 
-DBLP Computer Science Bibliographyから主要な推薦システム・データマイニング系カンファレンスの論文情報を取得し、Semantic Scholar APIを使用して要約やPDF URLを付加します。
+DBLP Computer Science Bibliographyから主要な推薦システム・データマイニング系カンファレンスの論文情報を取得し、Semantic Scholar・Unpaywall・arXivの各APIで要約やPDF URLを付加します。
 
 ## 対象カンファレンス
 
@@ -145,21 +145,35 @@ uv run python src/crawler/main.py
 
 ```python
 import asyncio
-from crawler.repository import DBLPRepository, SemanticScholarRepository
+from crawler.repository import (
+    ArxivRepository,
+    DBLPRepository,
+    SemanticScholarRepository,
+    UnpaywallRepository,
+)
 from crawler.usecase.fetch_papers import FetchRecSysPapers
+from crawler.utils.http_client import create_http_client
 
 async def fetch_papers():
     headers = {"User-Agent": "YourBot/1.0"}
     sem = asyncio.Semaphore(5)
 
-    async with DBLPRepository(headers) as dblp_repo, \
-               SemanticScholarRepository(headers) as ss_repo:
-        
+    async with create_http_client(headers=headers) as client:
+        dblp_repo = DBLPRepository(client, limiter=DBLPRepository.create_limiter())
+        await dblp_repo.setup()
+        ss_repo = SemanticScholarRepository(
+            client, limiter=SemanticScholarRepository.create_limiter()
+        )
+        unpaywall_repo = UnpaywallRepository(
+            client, limiter=UnpaywallRepository.create_limiter()
+        )
+        arxiv_repo = ArxivRepository(client, limiter=ArxivRepository.create_limiter())
+
         usecase = FetchRecSysPapers(
             paper_retriever=dblp_repo,
-            paper_enrichers=[ss_repo]
+            paper_enrichers=[ss_repo, unpaywall_repo, arxiv_repo],
         )
-        
+
         papers = await usecase.execute(year=2025, semaphore=sem)
         return papers
 
@@ -189,10 +203,11 @@ uv run mypy .
 uv run ruff check .
 ```
 
-### すべてのチェックを一度に実行
+### Makefileターゲット
 
 ```bash
-make check
+make lint
+make test
 ```
 
 ## アーキテクチャの特徴
@@ -207,9 +222,10 @@ make check
 
 全てのHTTP通信は`httpx`の非同期クライアントを使用し、効率的な並列処理を実現。
 
-### コンテキストマネージャー
+### 共有HTTPクライアントとリソース管理
 
-APIクライアントは非同期コンテキストマネージャーとして実装され、リソースリークを防止。
+HTTPクライアントはエントリーポイントで1つだけ生成し、各リポジトリに注入して共有します。
+これによりリソース管理が一箇所に集約され、全体の並列実行でも安全に再利用できます。
 
 ### テスト駆動
 
@@ -223,9 +239,9 @@ APIクライアントは非同期コンテキストマネージャーとして�
 
 ### レート制限
 
-- 同時接続数: 最大100
-- Keep-Alive接続: 最大20
-- タイムアウト: 30秒
+- 全体の並列数は `asyncio.Semaphore` で制御（デフォルト: 最大100）
+- 外部サービスごとの制限は `aiolimiter.AsyncLimiter` で適用（サービス別に設定）
+- HTTP接続設定: Keep-Alive最大20、タイムアウト30秒（共通クライアント設定）
 
 ### User-Agent
 
