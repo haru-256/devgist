@@ -1,0 +1,39 @@
+name: Terraform Lint
+on:
+  pull_request:
+    paths:
+      - "infra/terraform/**"
+  push:
+    branches:
+      - "main"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  terraform-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.61.0
+          cache: true
+      - name: Init TFLint
+        run: tflint --init
+        working-directory: infra/terraform
+        env:
+          # https://github.com/terraform-linters/tflint/blob/master/docs/user-guide/plugins.md#avoiding-rate-limiting
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Lint with tflint
+        run: tflint --recursive --config "${GITHUB_WORKSPACE}/infra/terraform/.tflint.hcl" -f compact
+        working-directory: infra/terraform
+      - name: Scan Terraform with Trivy
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: config
+          scan-ref: infra/terraform
+          exit-code: 1
+          severity: HIGH,CRITICAL
+          format: table
