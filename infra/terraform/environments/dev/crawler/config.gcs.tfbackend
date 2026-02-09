@@ -1,1 +1,1 @@
-bucket = "haru256-archilog-crawler-dev" # 環境に応じたバケット名
+bucket = "haru256-archilog-crawler-dev-tfstate"

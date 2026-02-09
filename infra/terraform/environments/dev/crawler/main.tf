@@ -5,6 +5,11 @@ locals {
   ]
 }
 
+# google cloud project
+data "google_project" "project" {
+  project_id = var.gcp_project_id
+}
+
 # 必要なAPIをすべて有効化し待機
 module "required_project_services" {
   source = "../../../modules/google_project_services"
@@ -12,11 +17,6 @@ module "required_project_services" {
   project_id        = var.gcp_project_id
   required_services = local.required_services
   wait_seconds      = 30
-}
-
-# google cloud project
-data "google_project" "project" {
-  project_id = var.gcp_project_id
 }
 
 # create the bucket for terraform state
