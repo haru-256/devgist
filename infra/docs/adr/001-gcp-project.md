@@ -47,7 +47,7 @@ Option A（データ分離型）を採用し、以下の5プロジェクト構�
 | :--- | :--- | :--- |
 | Prod | `haru256-devgist-data-prod` | `haru256-devgist-app-prod` |
 | Dev | `haru256-devgist-data-dev` | `haru256-devgist-app-dev` |
-| Mgmt | `haru256-devgist-tf` (Terraform State管理用) | - |
+| Mgmt | `haru256-devgist-tf` (Terraform State管理用) | 該当なし |
 
 ### 2. アーキテクチャ原則
 - Data Project: 「DevGist共通データ基盤」として定義。Cloud SQL, GCS, Vertex AI Search等を配置。他アプリからの参照も許容する設計とする。
