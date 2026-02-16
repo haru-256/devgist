@@ -18,7 +18,7 @@ data "google_project" "project" {
 module "required_project_services" {
   source = "../../../modules/google_project_services"
 
-  project_id        = var.gcp_project_id
+  project_id        = data.google_project.project
   required_services = local.required_services
   wait_seconds      = 30
 }
