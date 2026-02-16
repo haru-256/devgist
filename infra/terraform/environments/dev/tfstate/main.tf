@@ -3,10 +3,6 @@ locals {
   required_services = [
     "storage.googleapis.com", # GCSモジュール用
   ]
-  # tfstateの管理対象プロジェクトIDのリスト
-  tfstate_gcp_project_ids = [
-    "haru256-devgist-tf",
-  ]
 }
 
 # google cloud project
@@ -25,7 +21,7 @@ module "required_project_services" {
 
 # create the bucket for terraform state
 module "tfstate_bucket" {
-  for_each = toset(local.tfstate_gcp_project_ids)
+  for_each = toset(var.tfstate_gcp_project_ids)
 
   source                 = "../../../modules/tfstate_gcs_bucket"
   bucket_gcp_project_id  = var.gcp_project_id
