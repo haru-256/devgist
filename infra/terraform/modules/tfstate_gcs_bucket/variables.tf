@@ -1,6 +1,11 @@
-variable "gcp_project_id" {
+variable "bucket_gcp_project_id" {
   type        = string
-  description = "The ID for your GCP project"
+  description = "The ID of the GCP project where the GCS bucket for tfstate will be created."
+}
+
+variable "tfstate_gcp_project_id" {
+  type        = string
+  description = "The ID of the GCP project to be managed by Terraform."
 }
 
 variable "bucket_location" {

@@ -1,5 +1,6 @@
 resource "google_storage_bucket" "tfstate_bucket" {
-  name                        = "${var.gcp_project_id}-tfstate"
+  project                     = var.bucket_gcp_project_id
+  name                        = "${var.tfstate_gcp_project_id}-tfstate"
   location                    = var.bucket_location
   force_destroy               = false
   storage_class               = "STANDARD"
