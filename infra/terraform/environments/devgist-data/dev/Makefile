@@ -1,4 +1,5 @@
 .DEFAULT_GOAL := help
+TFLINT_CONFIG := ../../../.tflint.hcl
 include ../../../scripts/common.mk
 
 .PHONY: init

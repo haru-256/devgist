@@ -14,17 +14,16 @@ data "google_project" "project" {
 module "required_project_services" {
   source = "../../../modules/google_project_services"
 
-  project_id        = data.google_project.project
+  project_id        = data.google_project.project.project_id
   required_services = local.required_services
   wait_seconds      = 30
 }
 
-# create the bucket for terraform state
-module "tfstate_bucket" {
-  for_each = toset(var.tfstate_gcp_project_ids)
+# data platform
+module "data_platform" {
+  source = "../../../modules/data_platform"
 
-  source                 = "../../../modules/tfstate_gcs_bucket"
-  bucket_gcp_project_id  = var.gcp_project_id
-  tfstate_gcp_project_id = each.value
-  depends_on             = [module.required_project_services]
+  gcp_project_id           = data.google_project.project.project_id
+  datalake_bucket_location = var.gcp_default_region
+  depends_on               = [module.required_project_services]
 }
