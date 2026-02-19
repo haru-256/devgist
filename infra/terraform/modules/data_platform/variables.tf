@@ -5,6 +5,6 @@ variable "gcp_project_id" {
 
 variable "datalake_bucket_location" {
   type        = string
-  description = "The location of the GCS bucket for tfstate."
+  description = "The location of the GCS bucket for the datalake."
   default     = "US"
 }
