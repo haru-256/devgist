@@ -40,9 +40,9 @@ DevGist の **Data Layer（OLAP/基盤系）** を担当するモジュールで
 
 | Name | Description | Type |
 |------|-------------|------|
-| `bucket_name` | ダイク GCS バケット名 | `string` |
-| `bucket_id` | ダイク GCS バケットID | `string` |
-| `bucket_self_link` | ダイク GCS バケット self link | `string` |
+| `bucket_name` | データレイク GCS バケット名 | `string` |
+| `bucket_id` | データレイク GCS バケットID | `string` |
+| `bucket_self_link` | データレイク GCS バケット self link | `string` |
 
 ## 実装上のポイント
 
