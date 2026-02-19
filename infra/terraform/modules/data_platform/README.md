@@ -73,7 +73,8 @@ module "data_platform" {
 ```hcl
 output "datalake_bucket_name" {
   description = "Name of the crawler datalake bucket"
-  value      テクチャ
+  value       = module.data_platform.bucket_name
+}
 - **Datalake バケット**: Crawler の出力データ → 処理 → BigQuery への流れを想定
 - Kafka/Pub-Sub を追加する場合は本モジュール内に統合予定
 
