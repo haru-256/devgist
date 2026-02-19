@@ -89,7 +89,7 @@ module "data_platform" {
 }
 
 output "datalake_bucket_name" {
-  value = module.data_platform.bucket_name
+  value = module.data_platform.datalake_bucket_name
 }
 ```
 
