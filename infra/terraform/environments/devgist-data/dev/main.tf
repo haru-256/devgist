@@ -1,7 +1,7 @@
 locals {
   # このTerraform構成で必要な全APIをリスト化
   required_services = [
-    "storage.googleapis.com", # GCSモジュール用
+    "storage.googleapis.com", # GCS
   ]
 }
 
