@@ -1,7 +1,52 @@
 # tfstate_gcs_bucket
 
-Terraform の state 管理用 GCS バケットを作成するモジュールです。  
-`google_storage_bucket` を作成し、バージョニング・ライフサイクル・Autoclass を設定します。
+`tfstate_gcs_bucket` は、**Terraform の state を保管するための GCS バケットだけを管理する専用モジュール**です。  
+最終構成（Bootstrap / Data / App 分離）における責務は、**Bootstrap レイヤーの state 基盤提供**です。
+
+## このモジュールの責務（Role in Target Architecture）
+
+このモジュールは次の 1 点に責務を限定します。
+
+- Terraform backend（`gcs`）で利用する **state 保管バケットの作成と保護設定**
+
+対象アーキテクチャ上の位置づけ:
+
+- `bootstrap/`（例: `haru256-devgist-tf`）から呼び出す
+- `envs/dev/data`, `envs/dev/app`, `envs/prod/data`, `envs/prod/app` の state 保存先を提供する
+
+> 重要:  
+> このモジュールは **アプリデータ（Rawデータ、業務データ、ログ）を保管しません**。  
+> それらは `data_platform` など別モジュールの責務です。
+
+## 何を作るモジュールか（What it stores）
+
+このモジュールが作成するバケットに保存されるもの:
+
+- Terraform の state ファイル（`.tfstate`）
+- Terraform の state の世代（versioning）
+- 必要に応じた state lock 関連メタデータ（backend 実行時）
+
+保存しないもの:
+
+- クローラの収集データ
+- 分析データ
+- アプリ本体のアップロードファイル
+- DBバックアップ本体
+
+## Resource Summary
+
+- `google_storage_bucket.tfstate_bucket`
+
+主な設定:
+
+- `name = "${var.tfstate_gcp_project_id}-tfstate"`
+- `force_destroy = false`
+- `uniform_bucket_level_access = true`
+- `versioning { enabled = true }`
+- `lifecycle_rule` で古い世代を削除（`num_newer_versions = 3`）
+- `autoclass` 有効化（`terminal_storage_class = "NEARLINE"`）
+
+## Input / Output
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
@@ -43,40 +88,21 @@ No modules.
 | <a name="output_tfstate_gcs_bucket_id"></a> [tfstate\_gcs\_bucket\_id](#output\_tfstate\_gcs\_bucket\_id) | The ID of the bucket used to store terraform state |
 <!-- END_TF_DOCS -->
 
-## 機能
-
-- **バージョニング**: 複数世代の state を保持し、ロールバック時に対応可能
-- **ライフサイクル管理**: 古いバージョン（3 世代以上前）は自動削除
-- **Autoclass**: アクセスパターンに基づいて自動的にストレージクラスを最適化
-
-## 使用例
-
-### 単一プロジェクトの場合
+## 使い方（Bootstrap から呼び出す想定）
 
 ```hcl
 module "tfstate_bucket" {
   source = "../../../modules/tfstate_gcs_bucket"
 
-  bucket_gcp_project_id  = var.gcp_project_id
-  tfstate_gcp_project_id = "my-project-id"
+  bucket_gcp_project_id  = "haru256-devgist-tf"
+  tfstate_gcp_project_id = "haru256-devgist-tf"
   bucket_location        = "US"
-}
-
-output "tfstate_bucket_id" {
-  value = module.tfstate_bucket.tfstate_gcs_bucket_id
 }
 ```
 
-### 複数プロジェクトを管理する場合（for_each）
+複数の対象プロジェクトを管理する場合（`for_each`）:
 
 ```hcl
-locals {
-  tfstate_gcp_project_ids = [
-    "project-a-id",
-    "project-b-id",
-  ]
-}
-
 module "tfstate_bucket" {
   for_each = toset(local.tfstate_gcp_project_ids)
 
@@ -84,41 +110,39 @@ module "tfstate_bucket" {
 
   bucket_gcp_project_id  = var.gcp_project_id
   tfstate_gcp_project_id = each.value
-  bucket_location        = "US"
-}
-
-# 複数バケットの ID を list で出力
-output "tfstate_bucket_ids" {
-  value = [for key, bucket in module.tfstate_bucket : bucket.tfstate_gcs_bucket_id]
-}
-
-# より詳しい情報を出力する場合
-output "tfstate_buckets" {
-  value = [for key, bucket in module.tfstate_bucket : {
-    project_id = key
-    bucket_id  = bucket.tfstate_gcs_bucket_id
-  }]
 }
 ```
 
-## 注意事項
-
-- Storage API（`storage.googleapis.com`）を有効化してからバケットを作成します。
-- バケット名は `${tfstate_gcp_project_id}-tfstate` で自動生成されます。
-- バージョニングは有効化され、古いバージョンは一定数を超えると削除されます。
-- `force_destroy = false` で、バケット削除時の誤削除を防止しています。
-- `uniform_bucket_level_access = true` で、バケットレベルのアクセス制御を統一しています。
-
-## バックエンド設定例
-
-作成したバケットを Terraform backend として使う場合：
+`for_each` 利用時の output 例（list）:
 
 ```hcl
-# backend.tf
+output "tfstate_bucket_ids" {
+  value       = [for _, m in module.tfstate_bucket : m.tfstate_gcs_bucket_id]
+  description = "List of tfstate bucket IDs"
+}
+```
+
+## Backend 設定例（各 env から参照）
+
+```hcl
 terraform {
   backend "gcs" {
-    bucket = "my-project-id-tfstate"
-    prefix = "terraform/state"
+    bucket = "haru256-devgist-tf-tfstate"
+    prefix = "terraform/dev/data"
   }
 }
 ```
+
+`prefix` は環境・役割ごとに分離します（例）:
+
+- `terraform/dev/data`
+- `terraform/dev/app`
+- `terraform/prod/data`
+- `terraform/prod/app`
+
+## 運用上の注意
+
+- 先に Storage API（`storage.googleapis.com`）を有効化してから作成する
+- state バケットは削除事故の影響が大きいため、`force_destroy = false` を維持する
+- バケット名はグローバル一意制約があるため、命名衝突に注意する
+- このモジュールは state 専用。データレイク用途のバケットとは分離する
