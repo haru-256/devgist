@@ -1,12 +1,13 @@
 import asyncio
-from typing import Any
 
 import httpx
 import pytest
 from pytest_mock import MockerFixture
 
-from crawler.domain.paper import Paper
-from crawler.repository.semantic_scholar_repository import SemanticScholarRepository
+from crawler.domain.models.paper import Paper
+from crawler.infrastructure.repositories.semantic_scholar_repository import (
+    SemanticScholarRepository,
+)
 
 
 @pytest.fixture
@@ -98,7 +99,7 @@ async def test_enrich_papers_merge_logic(
     )
 
     # fetch_papers_batchをモック
-    mocker.patch.object(repo, "fetch_papers_batch", return_value=[fetched_paper])
+    mocker.patch.object(repo, "fetch_papers_batch", return_value=[fetched_paper], autospec=True)
 
     # overwrite=False: 元のTitleは保持され、欠損項目は埋まるはず
     await repo.enrich_papers([paper], semaphore=semaphore, overwrite=False)
@@ -122,13 +123,11 @@ async def test_fetch_call_args(
     """fetch_papers_batchが正しく引数を渡しているか確認する"""
     mock_response = httpx.Response(200, json=[], request=httpx.Request("POST", "http://test"))
 
-    async def mock_post_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
-        return mock_response
-
     # Patch crawler.repository.semantic_scholar_repository.post_with_retry
     mock_func = mocker.patch(
-        "crawler.repository.semantic_scholar_repository.post_with_retry",
-        side_effect=mock_post_with_retry,
+        "crawler.infrastructure.repositories.semantic_scholar_repository.post_with_retry",
+        return_value=mock_response,
+        autospec=True,
     )
 
     repo = SemanticScholarRepository(mock_client)

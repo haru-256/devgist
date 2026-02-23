@@ -2,7 +2,7 @@ import sys
 
 from loguru import logger
 
-from crawler.configs import LOG_LEVEL
+from crawler.infrastructure.configs import config
 
 
 def setup_logger() -> None:
@@ -12,4 +12,4 @@ def setup_logger() -> None:
     """
     # 一度デフォルトの設定を消してから再設定
     logger.remove()
-    logger.add(sys.stderr, level=LOG_LEVEL)
+    logger.add(sys.stderr, level=config.log_level)

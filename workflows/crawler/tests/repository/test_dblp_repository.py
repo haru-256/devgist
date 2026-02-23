@@ -5,7 +5,8 @@ import httpx
 import pytest
 from pytest_mock import MockerFixture
 
-from crawler.repository.dblp_repository import DBLPRepository
+from crawler.domain.enums import ConferenceName
+from crawler.infrastructure.repositories.dblp_repository import DBLPRepository
 
 
 @pytest.fixture
@@ -126,24 +127,23 @@ async def test_fetch_papers_integration_mock(
         200, json=mock_dblp_response_data, request=httpx.Request("GET", "http://test")
     )
 
-    async def mock_get_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
-        return mock_api_response
-
     # Initialize needs to be mocked or handled
     # DBLPRepository.initialize calls robot_guard.load()
     # We can mock robot_guard.load to do nothing
     from crawler.utils import RobotGuard
 
-    mocker.patch.object(RobotGuard, "load", return_value=None)
-    mocker.patch.object(RobotGuard, "can_fetch", return_value=True)
+    mocker.patch.object(RobotGuard, "load", return_value=None, autospec=True)
+    mocker.patch.object(RobotGuard, "can_fetch", return_value=True, autospec=True)
 
     mocker.patch(
-        "crawler.repository.dblp_repository.get_with_retry", side_effect=mock_get_with_retry
+        "crawler.infrastructure.repositories.dblp_repository.get_with_retry",
+        return_value=mock_api_response,
+        autospec=True,
     )
 
     repo = DBLPRepository(mock_client)
     await repo.setup()
-    papers = await repo.fetch_papers(conf="recsys", year=2025, semaphore=semaphore)
+    papers = await repo.fetch_papers(conf=ConferenceName.RECSYS, year=2025, semaphore=semaphore)
 
     assert len(papers) == 2
     assert papers[0].title == "Test Paper 1"
@@ -160,21 +160,20 @@ async def test_fetch_call_args(
         200, json=mock_dblp_response_data, request=httpx.Request("GET", "http://test")
     )
 
-    async def mock_get_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
-        return mock_api_response
-
     from crawler.utils import RobotGuard
 
-    mocker.patch.object(RobotGuard, "load", return_value=None)
-    mocker.patch.object(RobotGuard, "can_fetch", return_value=True)
+    mocker.patch.object(RobotGuard, "load", return_value=None, autospec=True)
+    mocker.patch.object(RobotGuard, "can_fetch", return_value=True, autospec=True)
 
     mock_func = mocker.patch(
-        "crawler.repository.dblp_repository.get_with_retry", side_effect=mock_get_with_retry
+        "crawler.infrastructure.repositories.dblp_repository.get_with_retry",
+        return_value=mock_api_response,
+        autospec=True,
     )
 
     repo = DBLPRepository(mock_client)
     await repo.setup()
-    await repo.fetch_papers(conf="recsys", year=2025, semaphore=semaphore)
+    await repo.fetch_papers(conf=ConferenceName.RECSYS, year=2025, semaphore=semaphore)
 
     assert mock_func.call_count == 1
     call_args = mock_func.call_args

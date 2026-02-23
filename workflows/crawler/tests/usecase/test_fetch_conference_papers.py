@@ -4,8 +4,10 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from crawler.domain.paper import Paper
-from crawler.usecase.fetch_papers import FetchRecSysPapers
+from crawler.application.usecases.fetch_conference_papers import FetchConferencePapers
+from crawler.domain.enums import ConferenceName
+from crawler.domain.models.paper import Paper
+from crawler.domain.repositories.repository import PaperEnricher, PaperRetriever
 
 
 @pytest.fixture
@@ -15,28 +17,28 @@ def semaphore() -> asyncio.Semaphore:
 
 @pytest.fixture
 def mock_dblp_repo(mocker: MockerFixture) -> MagicMock:
-    repo = mocker.MagicMock()
+    repo = mocker.MagicMock(spec=PaperRetriever)
     repo.fetch_papers = mocker.AsyncMock()
     return repo
 
 
 @pytest.fixture
 def mock_semantic_scholar_repo(mocker: MockerFixture) -> MagicMock:
-    repo = mocker.MagicMock()
+    repo = mocker.MagicMock(spec=PaperEnricher)
     repo.enrich_papers = mocker.AsyncMock()
     return repo
 
 
 @pytest.fixture
 def mock_unpaywall_repo(mocker: MockerFixture) -> MagicMock:
-    repo = mocker.MagicMock()
+    repo = mocker.MagicMock(spec=PaperEnricher)
     repo.enrich_papers = mocker.AsyncMock()
     return repo
 
 
 @pytest.fixture
 def mock_arxiv_repo(mocker: MockerFixture) -> MagicMock:
-    repo = mocker.MagicMock()
+    repo = mocker.MagicMock(spec=PaperEnricher)
     repo.enrich_papers = mocker.AsyncMock()
     return repo
 
@@ -77,7 +79,8 @@ async def test_execute_flow(
     arxiv_enriched = unpaywall_enriched
     mock_arxiv_repo.enrich_papers.return_value = arxiv_enriched
 
-    usecase = FetchRecSysPapers(
+    usecase = FetchConferencePapers(
+        conf_name=ConferenceName.RECSYS,
         paper_retriever=mock_dblp_repo,
         paper_enrichers=[
             mock_semantic_scholar_repo,

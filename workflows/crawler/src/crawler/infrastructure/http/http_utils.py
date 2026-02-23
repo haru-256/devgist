@@ -10,6 +10,8 @@ from tenacity import (
     wait_random_exponential,
 )
 
+from crawler.infrastructure.configs import config
+
 
 def is_rate_limit(resp: httpx.Response) -> bool:
     """レスポンスがRate Limitエラー(429)かどうか判定します。"""
@@ -80,7 +82,7 @@ def wait_retry_after(retry_state: RetryCallState) -> float:
 
 
 @retry(
-    stop=stop_after_attempt(5),
+    stop=stop_after_attempt(config.max_retry_count),
     wait=wait_retry_after,
     retry=retry_if_result(is_rate_limit),
     before=before_log,
@@ -119,7 +121,7 @@ async def post_with_retry(
 
 
 @retry(
-    stop=stop_after_attempt(5),
+    stop=stop_after_attempt(config.max_retry_count),
     wait=wait_retry_after,
     retry=retry_if_result(is_rate_limit),
     before=before_log,

@@ -8,15 +8,16 @@ import asyncio
 
 from loguru import logger
 
-from crawler.domain.paper import Paper
-from crawler.repository import (
+from crawler.application.usecases.fetch_conference_papers import FetchConferencePapers
+from crawler.domain.models.paper import Paper
+from crawler.infrastructure.configs import config
+from crawler.infrastructure.http.http_client import create_http_client
+from crawler.infrastructure.repositories import (
     ArxivRepository,
     DBLPRepository,
     SemanticScholarRepository,
     UnpaywallRepository,
 )
-from crawler.usecase.fetch_papers import FetchRecSysPapers
-from crawler.utils.http_client import create_http_client
 from crawler.utils.log import setup_logger
 
 LIMITER_KEY_DBLP = "dblp"
@@ -26,7 +27,7 @@ LIMITER_KEY_ARXIV = "arxiv"
 
 
 async def run_crawl_task(
-    usecase: FetchRecSysPapers,
+    usecase: FetchConferencePapers,
     year: int,
     semaphore: asyncio.Semaphore,
 ) -> list[Paper]:
@@ -48,7 +49,7 @@ async def run_crawl_task(
         abs_pass_cnt = sum(p.abstract is not None for p in enriched_papers)
         pdf_pass_cnt = sum(p.pdf_url is not None for p in enriched_papers)
         logger.info(
-            f"RecSys {year}, Total papers: {total_papers_count}, "
+            f"{usecase.conf_name.upper()} {year}, Total papers: {total_papers_count}, "
             f"Abstract pass rate: {abs_pass_cnt / total_papers_count:.4f} ({abs_pass_cnt}/{total_papers_count}), "
             f"PDF pass rate: {pdf_pass_cnt / total_papers_count:.4f} ({pdf_pass_cnt}/{total_papers_count})"
         )
@@ -62,9 +63,8 @@ async def main() -> None:
     ログメッセージを出力後、RecSysのクロール処理を実行します。
     """
     headers = {"User-Agent": "ArchilogBot/1.0"}
-    sem = asyncio.Semaphore(100)
-    years = range(2010, 2026)
-    # years = range(2025, 2026)
+    sem = asyncio.Semaphore(config.semaphore_size)
+    years = config.years
 
     # 各サービスのレートリミッターを作成（全体で共有）
     limiters = {
@@ -84,16 +84,17 @@ async def main() -> None:
         ss_repo = SemanticScholarRepository(client, limiter=limiters[LIMITER_KEY_SEMANTIC_SCHOLAR])
         unpaywall_repo = UnpaywallRepository(client, limiter=limiters[LIMITER_KEY_UNPAYWALL])
         arxiv_repo = ArxivRepository(client, limiter=limiters[LIMITER_KEY_ARXIV])
-        # ユースケースの初期化
-        usecase = FetchRecSysPapers(
-            paper_retriever=dblp_repo,
-            paper_enrichers=[ss_repo, unpaywall_repo, arxiv_repo],
-        )
 
         tasks = []
         async with asyncio.TaskGroup() as tg:
-            for year in years:
-                tasks.append(tg.create_task(run_crawl_task(usecase, year, sem)))
+            for conf_name in config.conference_names:
+                usecase = FetchConferencePapers(
+                    conf_name=conf_name,
+                    paper_retriever=dblp_repo,
+                    paper_enrichers=[ss_repo, unpaywall_repo, arxiv_repo],
+                )
+                for year in years:
+                    tasks.append(tg.create_task(run_crawl_task(usecase, year, sem)))
         enriched_papers = [paper for task in tasks for paper in task.result()]
 
     logger.info(f"Total enriched papers: {len(enriched_papers)}")

@@ -3,8 +3,9 @@ from typing import NoReturn
 import httpx
 import pytest
 from pytest_mock import MockerFixture
+from tenacity import stop_after_attempt
 
-from crawler.utils.http_utils import get_with_retry, is_rate_limit, post_with_retry
+from crawler.infrastructure.http.http_utils import get_with_retry, is_rate_limit, post_with_retry
 
 
 @pytest.mark.asyncio
@@ -85,12 +86,16 @@ async def test_post_with_retry_exhausted(mocker: MockerFixture) -> None:
 
     mock_client.post.return_value = resp_429
 
+    # Override the retry condition temporarily for this test
+    # tenacity evaluates decorators at import time, so we must mock the retry object itself
+    mocker.patch.object(post_with_retry.retry, "stop", stop_after_attempt(2))  # type: ignore
+
     # Expect HTTPStatusError after retries exhausted (from log_and_raise_final_error)
     with pytest.raises(httpx.HTTPStatusError):
         await post_with_retry(mock_client, "http://test.com", {}, {})
 
-    # Should stop after 5 attempts as per configured stop_after_attempt(5)
-    assert mock_client.post.call_count == 5
+    # Should stop after 2 attempts
+    assert mock_client.post.call_count == 2
 
 
 @pytest.mark.asyncio

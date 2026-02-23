@@ -1,5 +1,4 @@
 import asyncio
-from typing import Any
 from unittest.mock import Mock
 
 import httpx
@@ -7,7 +6,7 @@ import pytest
 from aiolimiter import AsyncLimiter
 from pytest_mock import MockerFixture
 
-from crawler.repository.arxiv_repository import ArxivRepository
+from crawler.infrastructure.repositories.arxiv_repository import ArxivRepository
 
 
 @pytest.fixture
@@ -88,12 +87,10 @@ async def test_fetch_call_args(mock_client: httpx.AsyncClient, mocker: MockerFix
 <feed xmlns="http://www.w3.org/2005/Atom"></feed>"""
     mock_response.raise_for_status = Mock()
 
-    # AsyncMock for the return value of get_with_retry
-    async def mock_get_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
-        return mock_response
-
     mock_func = mocker.patch(
-        "crawler.repository.arxiv_repository.get_with_retry", side_effect=mock_get_with_retry
+        "crawler.infrastructure.repositories.arxiv_repository.get_with_retry",
+        return_value=mock_response,
+        autospec=True,
     )
 
     await repo.fetch_by_title("Test Title", sem)
@@ -147,7 +144,9 @@ async def test_arxiv_rate_limit(
         call_times.append(asyncio.get_running_loop().time())
         return httpx.Response(200, text=xml)
 
-    monkeypatch.setattr("crawler.repository.arxiv_repository.get_with_retry", fake_get_with_retry)
+    monkeypatch.setattr(
+        "crawler.infrastructure.repositories.arxiv_repository.get_with_retry", fake_get_with_retry
+    )
 
     sem = asyncio.Semaphore(10)
     await asyncio.gather(

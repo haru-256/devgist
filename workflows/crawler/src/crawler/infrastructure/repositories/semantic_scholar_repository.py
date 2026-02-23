@@ -5,8 +5,8 @@ import httpx
 from aiolimiter import AsyncLimiter
 from loguru import logger
 
-from crawler.domain.paper import Paper
-from crawler.utils.http_utils import post_with_retry
+from crawler.domain.models.paper import Paper
+from crawler.infrastructure.http.http_utils import post_with_retry
 
 
 class SemanticScholarRepository:
@@ -169,8 +169,8 @@ class SemanticScholarRepository:
             pdf_url = open_access_pdf.get("url")
 
         title = item.get("title", "")
-        year = item.get("year") or 0
-        venue = item.get("venue") or ""
+        year = item.get("year", 0)
+        venue = item.get("venue", "")
 
         authors = []
         for author in item.get("authors", []):

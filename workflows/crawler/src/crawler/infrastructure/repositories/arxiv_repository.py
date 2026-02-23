@@ -5,8 +5,8 @@ import httpx
 from aiolimiter import AsyncLimiter
 from loguru import logger
 
-from crawler.domain.paper import Paper
-from crawler.utils.http_utils import get_with_retry
+from crawler.domain.models.paper import Paper
+from crawler.infrastructure.http.http_utils import get_with_retry
 
 
 class ArxivRepository:

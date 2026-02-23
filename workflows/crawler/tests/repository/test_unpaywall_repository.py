@@ -5,6 +5,8 @@ import httpx
 import pytest
 from pytest_mock import MockerFixture
 
+from crawler.infrastructure.repositories.unpaywall_repository import UnpaywallRepository
+
 
 @pytest.fixture
 def semaphore() -> asyncio.Semaphore:
@@ -33,8 +35,6 @@ class TestUnpaywallRepository:
 
     async def test_init(self, mock_client: httpx.AsyncClient) -> None:
         """初期化時にclientが設定されること。"""
-        from crawler.repository.unpaywall_repository import UnpaywallRepository
-
         repo = UnpaywallRepository(mock_client)
         assert repo.client == mock_client
 
@@ -46,22 +46,16 @@ class TestUnpaywallRepository:
         mocker: MockerFixture,
     ) -> None:
         """DOIで論文データが正常に取得できること。"""
-        from crawler.repository.unpaywall_repository import UnpaywallRepository
-
-        # Use real Response object needed for json() to work synchronously
         mock_response = httpx.Response(
             200,
             json=mock_unpaywall_response,
             request=httpx.Request("GET", "https://api.unpaywall.org/v2/10.1145/test"),
         )
 
-        async def mock_get_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
-            return mock_response
-
-        # Mock get_with_retry to avoid actual network call
         mocker.patch(
-            "crawler.repository.unpaywall_repository.get_with_retry",
-            side_effect=mock_get_with_retry,
+            "crawler.infrastructure.repositories.unpaywall_repository.get_with_retry",
+            return_value=mock_response,
+            autospec=True,
         )
 
         repo = UnpaywallRepository(mock_client)
@@ -78,20 +72,21 @@ class TestUnpaywallRepository:
         mocker: MockerFixture,
     ) -> None:
         """404エラーの場合、Noneが返されること。"""
-        from crawler.repository.unpaywall_repository import UnpaywallRepository
-
         mock_response = httpx.Response(404, request=httpx.Request("GET", "http://test"))
 
-        async def mock_get_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
-            raise httpx.HTTPStatusError(
-                "Not Found", request=httpx.Request("GET", "http://test"), response=mock_response
-            )
-
         mocker.patch(
-            "crawler.repository.unpaywall_repository.get_with_retry",
-            side_effect=mock_get_with_retry,
+            "crawler.infrastructure.repositories.unpaywall_repository.get_with_retry",
+            side_effect=httpx.HTTPStatusError(
+                "Not Found",
+                request=httpx.Request("GET", "http://test"),
+                response=mock_response,
+            ),
+            autospec=True,
         )
-        mock_logger = mocker.patch("crawler.repository.unpaywall_repository.logger.debug")
+        mock_logger = mocker.patch(
+            "crawler.infrastructure.repositories.unpaywall_repository.logger.debug",
+            autospec=True,
+        )
 
         repo = UnpaywallRepository(mock_client)
         result = await repo.fetch_by_doi("10.1145/notfound", semaphore)
@@ -108,20 +103,21 @@ class TestUnpaywallRepository:
         mocker: MockerFixture,
     ) -> None:
         """HTTPエラーの場合、Noneが返されること。"""
-        from crawler.repository.unpaywall_repository import UnpaywallRepository
-
         mock_response = httpx.Response(500, request=httpx.Request("GET", "http://test"))
 
-        async def mock_get_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
-            raise httpx.HTTPStatusError(
-                "Server Error", request=httpx.Request("GET", "http://test"), response=mock_response
-            )
-
         mocker.patch(
-            "crawler.repository.unpaywall_repository.get_with_retry",
-            side_effect=mock_get_with_retry,
+            "crawler.infrastructure.repositories.unpaywall_repository.get_with_retry",
+            side_effect=httpx.HTTPStatusError(
+                "Server Error",
+                request=httpx.Request("GET", "http://test"),
+                response=mock_response,
+            ),
+            autospec=True,
         )
-        mock_logger = mocker.patch("crawler.repository.unpaywall_repository.logger.warning")
+        mock_logger = mocker.patch(
+            "crawler.infrastructure.repositories.unpaywall_repository.logger.warning",
+            autospec=True,
+        )
 
         repo = UnpaywallRepository(mock_client)
         result = await repo.fetch_by_doi("10.1145/test", semaphore)
@@ -137,21 +133,16 @@ class TestUnpaywallRepository:
         mocker: MockerFixture,
     ) -> None:
         """fetch_by_doiが正しく引数を渡しているか確認する"""
-        from crawler.repository.unpaywall_repository import UnpaywallRepository
-
-        # Use real Response object needed for json() to work synchronously
         mock_response = httpx.Response(
             200,
             json=mock_unpaywall_response,
             request=httpx.Request("GET", "https://api.unpaywall.org/v2/10.1145/test"),
         )
 
-        async def mock_get_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
-            return mock_response
-
         mock_func = mocker.patch(
-            "crawler.repository.unpaywall_repository.get_with_retry",
-            side_effect=mock_get_with_retry,
+            "crawler.infrastructure.repositories.unpaywall_repository.get_with_retry",
+            return_value=mock_response,
+            autospec=True,
         )
 
         repo = UnpaywallRepository(mock_client)

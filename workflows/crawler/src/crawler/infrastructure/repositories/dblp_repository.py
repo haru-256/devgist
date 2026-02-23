@@ -1,13 +1,14 @@
 import asyncio
-from typing import Any, Literal
+from typing import Any
 
 import httpx
 from aiolimiter import AsyncLimiter
 from loguru import logger
 
-from crawler.domain.paper import Paper
+from crawler.domain.enums import ConferenceName
+from crawler.domain.models.paper import Paper
+from crawler.infrastructure.http.http_utils import get_with_retry
 from crawler.utils import RobotGuard
-from crawler.utils.http_utils import get_with_retry
 
 
 class DBLPRepository:
@@ -15,7 +16,7 @@ class DBLPRepository:
 
     BASE_URL = "https://dblp.org"
     SEARCH_API = "https://dblp.org/search/publ/api"
-    DEFAULT_SLEEP_SECONDS = 0.1
+    DEFAULT_SLEEP_SECONDS = 1
 
     def __init__(self, client: httpx.AsyncClient, limiter: AsyncLimiter | None = None) -> None:
         """DBLPRepositoryインスタンスを初期化します。
@@ -40,7 +41,7 @@ class DBLPRepository:
 
     async def fetch_papers(
         self,
-        conf: Literal["recsys", "kdd", "wsdm", "www", "sigir", "cikm"],
+        conf: ConferenceName,
         year: int,
         semaphore: asyncio.Semaphore,
         h: int = 1000,

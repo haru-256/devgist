@@ -5,9 +5,10 @@
 """
 
 import asyncio
-from typing import Literal, Protocol
+from typing import Protocol
 
-from .paper import Paper
+from crawler.domain.enums import ConferenceName
+from crawler.domain.models.paper import Paper
 
 
 class PaperRetriever(Protocol):
@@ -15,7 +16,7 @@ class PaperRetriever(Protocol):
 
     async def fetch_papers(
         self,
-        conf: Literal["recsys", "kdd", "wsdm", "www", "sigir", "cikm"],
+        conf: ConferenceName,
         year: int,
         semaphore: asyncio.Semaphore,
         h: int = 1000,
@@ -31,3 +32,9 @@ class PaperEnricher(Protocol):
         semaphore: asyncio.Semaphore,
         overwrite: bool = False,
     ) -> list[Paper]: ...
+
+
+class PaperDatalake(Protocol):
+    """論文データを保存するリポジトリのプロトコル。"""
+
+    async def save_papers(self, papers: list[Paper], semaphore: asyncio.Semaphore) -> None: ...

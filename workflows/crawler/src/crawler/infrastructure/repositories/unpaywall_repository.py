@@ -5,9 +5,9 @@ import httpx
 from aiolimiter import AsyncLimiter
 from loguru import logger
 
-from crawler.configs import EMAIL
-from crawler.domain.paper import Paper
-from crawler.utils.http_utils import get_with_retry
+from crawler.domain.models.paper import Paper
+from crawler.infrastructure.configs import config
+from crawler.infrastructure.http.http_utils import get_with_retry
 
 
 class UnpaywallRepository:
@@ -90,7 +90,7 @@ class UnpaywallRepository:
 
         try:
             async with sem, self.limiter:
-                resp = await get_with_retry(self.client, url, params={"email": EMAIL})
+                resp = await get_with_retry(self.client, url, params={"email": config.email})
             resp.raise_for_status()
             data = resp.json()
             return self._parse_paper(data)
