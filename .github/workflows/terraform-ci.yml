@@ -30,7 +30,7 @@ jobs:
         run: tflint --recursive --config "${GITHUB_WORKSPACE}/infra/terraform/.tflint.hcl" -f compact
         working-directory: infra/terraform
       - name: Scan Terraform with Trivy
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@0.34.1
         with:
           scan-type: config
           scan-ref: infra/terraform
