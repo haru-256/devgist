@@ -1,5 +1,4 @@
 # TODO: GCS Datalakeのテストコードを実装する
-import asyncio
 import re
 from unittest.mock import MagicMock, call
 
@@ -74,9 +73,7 @@ async def test_save_papers(
     )
 
     # save_papersを呼び出す
-    results = await datalake.save_papers(
-        papers, semaphore=asyncio.Semaphore(2), papers_rep_name="test"
-    )
+    results = await datalake.save_papers(papers, papers_rep_name="test")
 
     # バケットとblobの呼び出しを検証
     # ファイル名には timestamp と UUID が含まれるため正規表現で検証する
@@ -90,14 +87,19 @@ async def test_save_papers(
     # upload_from_string の呼び出しを検証（内容は固定値なので完全一致）
     expected_calls = [
         call(
-            papers[0].model_dump_json(ensure_ascii=False, indent=4),
+            papers[0].model_dump_json(ensure_ascii=False),
             content_type="application/x-ndjson",
         ),
         call(
-            papers[1].model_dump_json(ensure_ascii=False, indent=4),
+            papers[1].model_dump_json(ensure_ascii=False),
             content_type="application/x-ndjson",
         ),
     ]
     mock_blob.upload_from_string.assert_has_calls(expected_calls, any_order=True)
+
+    # 各JSONレコードは1行にシリアライズされること（JSONLの前提）
+    for upload_call in mock_blob.upload_from_string.call_args_list:
+        payload = upload_call.args[0]
+        assert "\n" not in payload
 
     assert len(results) == 2

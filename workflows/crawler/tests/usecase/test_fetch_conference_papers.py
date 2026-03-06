@@ -1,18 +1,12 @@
-import asyncio
 from unittest.mock import MagicMock
 
 import pytest
 from pytest_mock import MockerFixture
 
-from crawler.application.usecases.fetch_conference_papers import FetchConferencePapers
+from crawler.application.usecases.crawl_conference_papers import CrawlConferencePapers
 from crawler.domain.enums import ConferenceName
 from crawler.domain.models.paper import Paper
-from crawler.domain.repositories.repository import PaperEnricher, PaperRetriever
-
-
-@pytest.fixture
-def semaphore() -> asyncio.Semaphore:
-    return asyncio.Semaphore(5)
+from crawler.domain.repositories.repository import PaperDatalake, PaperEnricher, PaperRetriever
 
 
 @pytest.fixture
@@ -43,13 +37,20 @@ def mock_arxiv_repo(mocker: MockerFixture) -> MagicMock:
     return repo
 
 
+@pytest.fixture
+def mock_datalake(mocker: MockerFixture) -> MagicMock:
+    datalake = mocker.MagicMock(spec=PaperDatalake)
+    datalake.save_papers = mocker.AsyncMock(return_value=[])
+    return datalake
+
+
 @pytest.mark.asyncio
 async def test_execute_flow(
     mock_dblp_repo: MagicMock,
     mock_semantic_scholar_repo: MagicMock,
     mock_unpaywall_repo: MagicMock,
     mock_arxiv_repo: MagicMock,
-    semaphore: asyncio.Semaphore,
+    mock_datalake: MagicMock,
 ) -> None:
     """RecSysの論文取得フローが正しく実行されることを検証"""
 
@@ -79,7 +80,7 @@ async def test_execute_flow(
     arxiv_enriched = unpaywall_enriched
     mock_arxiv_repo.enrich_papers.return_value = arxiv_enriched
 
-    usecase = FetchConferencePapers(
+    usecase = CrawlConferencePapers(
         conf_name=ConferenceName.RECSYS,
         paper_retriever=mock_dblp_repo,
         paper_enrichers=[
@@ -87,18 +88,17 @@ async def test_execute_flow(
             mock_unpaywall_repo,
             mock_arxiv_repo,
         ],
+        paper_datalake=mock_datalake,
     )
 
     year = 2024
 
-    result = await usecase.execute(year, semaphore)
+    result = await usecase.execute(year)
 
     # 検証
 
     # 1. DBLP Fetch (conf="recsys", year=2024, h=1000)
-    mock_dblp_repo.fetch_papers.assert_called_once_with(
-        conf="recsys", year=2024, h=1000, semaphore=semaphore
-    )
+    mock_dblp_repo.fetch_papers.assert_called_once_with(conf="recsys", year=2024, h=1000)
 
     # 中間でDOIがない論文はフィルタリングされるべき (main.pyのロジックを踏襲)
     # initial_papers[1] has no DOI, so likely filtered out before enrichment
@@ -108,7 +108,6 @@ async def test_execute_flow(
     mock_semantic_scholar_repo.enrich_papers.assert_called_once()
     args, kwargs = mock_semantic_scholar_repo.enrich_papers.call_args
     assert args[0] == expected_papers_for_enrich
-    assert kwargs["semaphore"] == semaphore
     assert kwargs["overwrite"] is False
 
     # 3. Unpaywall Enrich
@@ -118,6 +117,12 @@ async def test_execute_flow(
     # 4. Arxiv Enrich
     mock_arxiv_repo.enrich_papers.assert_called_once()
     assert mock_arxiv_repo.enrich_papers.call_args[0][0] == unpaywall_enriched
+
+    # 5. Datalake save_papers（最終的なenrich済み論文が保存されること）
+    mock_datalake.save_papers.assert_called_once_with(
+        arxiv_enriched,
+        papers_rep_name="recsys",
+    )
 
     # Result should be the final enriched papers
     assert result == arxiv_enriched

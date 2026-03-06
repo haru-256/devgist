@@ -1,4 +1,7 @@
+"""arXiv API との通信を担当するリポジトリモジュール。"""
+
 import asyncio
+from xml.etree.ElementTree import ParseError as StdParseError
 
 import defusedxml.ElementTree as ET
 import httpx
@@ -6,7 +9,11 @@ from aiolimiter import AsyncLimiter
 from loguru import logger
 
 from crawler.domain.models.paper import Paper
-from crawler.infrastructure.http.http_utils import get_with_retry
+from crawler.infrastructure.http.http_retry_client import HttpRetryClient
+
+
+class ArxivXMLParseError(Exception):
+    """arXiv API レスポンスの XML パース失敗を表す例外。"""
 
 
 class ArxivRepository:
@@ -20,56 +27,85 @@ class ArxivRepository:
         "arxiv": "http://arxiv.org/schemas/atom",
     }
 
-    DEFAULT_SLEEP_SECONDS = 1.0
+    DEFAULT_SLEEP_SECONDS = 5
 
-    def __init__(self, client: httpx.AsyncClient, limiter: AsyncLimiter | None = None) -> None:
+    def __init__(self, http: HttpRetryClient) -> None:
         """ArxivRepositoryインスタンスを初期化します。
 
         Args:
-            client: HTTPリクエストに使用するAsyncClientインスタンス
-            limiter: レート制限を行うAsyncLimiterインスタンス。省略時はデフォルト設定を使用。
+            http: HTTPリクエストに使用するHttpRetryClientインスタンス。
         """
-        self.client = client
-        # arXivのレート制限（1リクエスト/秒）を管理するリミッター
-        if limiter:
-            self.limiter = limiter
-        else:
-            self.limiter = AsyncLimiter(1, self.DEFAULT_SLEEP_SECONDS)
+        self.http = http
+
+    @classmethod
+    def from_client(
+        cls,
+        client: httpx.AsyncClient,
+        max_retry_count: int = 10,
+    ) -> "ArxivRepository":
+        """Arxiv API用に設定されたHttpRetryClientを持つリポジトリを生成します。
+
+        Args:
+            client: 基本となるAsyncClient
+            max_retry_count: HTTP リクエストの最大リトライ回数。
+
+        Returns:
+            レート制限とリトライ機能を持つArxivRepositoryインスタンス
+        """
+        # arXivのレート制限（1リクエスト/3秒）と同時接続数1を管理する
+        http_client = HttpRetryClient(
+            client=client,
+            max_retry_count=max_retry_count,
+            limiter=AsyncLimiter(1, cls.DEFAULT_SLEEP_SECONDS),
+            semaphore=asyncio.Semaphore(1),
+        )
+        return cls(http=http_client)
 
     async def enrich_papers(
         self,
         papers: list[Paper],
-        semaphore: asyncio.Semaphore,
         overwrite: bool = False,
     ) -> list[Paper]:
         """論文リストにarXivのデータ（Abstract, PDF URL）を付与します。
 
         DOI検索を試し、失敗した場合はタイトル検索を試みます。
+        並列タスク数を抑制するため、BATCH_SIZE 件ずつ処理します。
 
         Args:
-            papers: 更新対象の論文リスト
-            semaphore: 並列実行数を制限するセマフォ
-            overwrite: 既存のデータを上書きするかどうか
+            papers: 更新対象の論文リスト。
+            overwrite: 既存のデータを上書きするかどうか。
 
         Returns:
-            更新された論文リスト
+            更新された論文リスト。
         """
-        async with asyncio.TaskGroup() as tg:
-            for paper in papers:
-                tg.create_task(self._enrich_single_paper(paper, semaphore, overwrite))
+        # arXiv は 1 リクエスト / 5 秒のレート制限があり、全件を一括で TaskGroup に
+        # 投入するとタスクオブジェクトがメモリを圧迫しスケジューリングコストも増大する。
+        # BATCH_SIZE 件ずつ TaskGroup を区切ることで同時生成タスク数を抑制しつつ、
+        # 内側の limiter / semaphore によるレート制限は引き続き有効に機能する。
+        BATCH_SIZE = 50
+        for i in range(0, len(papers), BATCH_SIZE):
+            batch = papers[i : i + BATCH_SIZE]
+            async with asyncio.TaskGroup() as tg:
+                for paper in batch:
+                    tg.create_task(self._enrich_single_paper(paper, overwrite))
+            logger.debug(
+                f"arXiv enrichment progress: {min(i + BATCH_SIZE, len(papers))}/{len(papers)}"
+            )
         return papers
 
-    async def _enrich_single_paper(
-        self, paper: Paper, sem: asyncio.Semaphore, overwrite: bool
-    ) -> None:
-        """単一の論文をarXivデータで更新します。"""
-        # 1. DOIで検索、ヒットしなければタイトルで検索を試みる
+    async def _enrich_single_paper(self, paper: Paper, overwrite: bool) -> None:
+        """単一の論文をarXivデータで更新します。
+
+        Args:
+            paper: 更新対象の論文オブジェクト。
+            overwrite: 既存のデータを上書きするかどうか。
+        """
         fetched_paper = None
         if paper.doi:
-            fetched_paper = await self.fetch_by_doi(paper.doi, sem)
+            fetched_paper = await self.fetch_by_doi(paper.doi)
 
         if not fetched_paper and paper.title:
-            fetched_paper = await self.fetch_by_title(paper.title, sem)
+            fetched_paper = await self.fetch_by_title(paper.title)
 
         if fetched_paper:
             # Abstract
@@ -79,64 +115,115 @@ class ArxivRepository:
             if fetched_paper.pdf_url and (not paper.pdf_url or overwrite):
                 paper.pdf_url = fetched_paper.pdf_url
 
-    async def fetch_by_doi(self, doi: str, sem: asyncio.Semaphore) -> Paper | None:
+    async def fetch_by_doi(self, doi: str) -> Paper | None:
         """DOIを使用してarXiv APIから論文データを取得します。
 
         Args:
-            doi: 論文のDOI
-            sem: 並列実行数を制限するセマフォ
+            doi: 論文のDOI。
 
         Returns:
             Paperオブジェクト（pdf_url, abstractなどの詳細を含む）。取得失敗時はNone。
         """
-        return await self._fetch(f"doi:{doi}", sem)
+        return await self._fetch(f"doi:{doi}", context={"doi": doi})
 
-    async def fetch_by_title(self, title: str, sem: asyncio.Semaphore) -> Paper | None:
+    async def fetch_by_title(self, title: str) -> Paper | None:
         """タイトルを使用してarXiv APIから論文データを取得します。
 
         Args:
-            title: 論文のタイトル
-            sem: 並列実行数を制限するセマフォ
+            title: 論文のタイトル。
 
         Returns:
             Paperオブジェクト（pdf_url, abstractなどの詳細を含む）。取得失敗時はNone。
         """
         # タイトルに含まれるダブルクォートをエスケープ
         escaped_title = title.replace('"', "")
-        return await self._fetch(f'ti:"{escaped_title}"', sem)
+        return await self._fetch(f'ti:"{escaped_title}"', context={"title": title})
 
-    async def _fetch(self, query: str, sem: asyncio.Semaphore) -> Paper | None:
-        """arXiv APIを叩き、最初のヒット結果を返します。
+    async def _fetch(self, query: str, context: dict[str, str] | None = None) -> Paper | None:
+        """arXiv API を呼び出し、最初のヒット結果を返します。
+
+        例外を HTTP エラー・XML パースエラー・想定外エラーの3種類に分類して
+        ログ出力し、いずれの場合も None を返して後続処理を継続させます。
 
         Args:
-            query: arXiv APIクエリ文字列
-            sem: セマフォ
+            query: arXiv API クエリ文字列（例: ``doi:10.xxx`` や ``ti:"title"``）。
+            context: ログ出力に含めるコンテキスト情報（例: ``{"doi": "10.xxx"}``）。
 
         Returns:
-            パースされたPaperオブジェクト。取得失敗やヒットなしの場合はNone。
-
+            パースされた Paper オブジェクト。取得失敗またはヒットなしの場合は None。
         """
+        ctx = context or {}
         params = {"search_query": query, "start": 0, "max_results": 1}
         try:
-            async with sem, self.limiter:
-                resp = await get_with_retry(
-                    self.client,
-                    f"{self.BASE_URL}/api/query",
-                    params=params,
-                    headers={"Accept": "application/atom+xml"},
-                )
+            resp = await self.http.get(
+                f"{self.BASE_URL}/api/query",
+                params=params,
+                headers={"Accept": "application/atom+xml"},
+            )
             resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            logger.warning(
+                "arXiv HTTP error: status={status} query={query} context={ctx}",
+                status=e.response.status_code,
+                query=query,
+                ctx=ctx,
+            )
+            return None
+        except httpx.TimeoutException as e:
+            logger.warning(
+                "arXiv request timeout: query={query} context={ctx} error={error}",
+                query=query,
+                ctx=ctx,
+                error=repr(e),
+            )
+            return None
+        except httpx.RequestError as e:
+            logger.warning(
+                "arXiv network error: query={query} context={ctx} error={error}",
+                query=query,
+                ctx=ctx,
+                error=repr(e),
+            )
+            return None
+
+        try:
             return self._parse_xml(resp.text)
+        except ArxivXMLParseError as e:
+            logger.warning(
+                "arXiv XML parse error: query={query} context={ctx} error={error}",
+                query=query,
+                ctx=ctx,
+                error=repr(e),
+            )
+            return None
         except Exception as e:
-            logger.warning(f"arXiv fetch error for {query}: {e}")
+            logger.error(
+                "arXiv unexpected error during parse: query={query} context={ctx} "
+                "error_type={error_type} error={error}",
+                query=query,
+                ctx=ctx,
+                error_type=type(e).__name__,
+                error=repr(e),
+            )
             return None
 
     def _parse_xml(self, xml_text: str) -> Paper | None:
-        """arXivのAtomリプライ(XML)を解析し、Paperオブジェクトを生成します。
+        """arXiv API レスポンスから Paper オブジェクトを生成します。
 
-        注意: 取得できる情報は部分的なもの（主にabstractとpdf_url）です。
+        Args:
+            xml_text: arXiv API から返された Atom 形式の XML 文字列。
+
+        Returns:
+            パースされた Paper オブジェクト。エントリが存在しない場合は None。
+
+        Raises:
+            ArxivXMLParseError: XML の構造が不正でパースに失敗した場合。
         """
-        root = ET.fromstring(xml_text)
+        try:
+            root = ET.fromstring(xml_text)
+        except (StdParseError, Exception) as e:
+            raise ArxivXMLParseError(f"Failed to parse arXiv XML response: {e}") from e
+
         entry = root.find("atom:entry", self.NAMESPACES)
         if entry is None:
             return None
@@ -166,9 +253,9 @@ class ArxivRepository:
                 published_year = int(published_tag.text[:4])
             except ValueError as exc:
                 logger.warning(
-                    "Failed to parse published year from arXiv entry: text={!r}, error={!r}",
-                    published_tag.text,
-                    exc,
+                    "Failed to parse published year from arXiv entry: text={text!r} error={error!r}",
+                    text=published_tag.text,
+                    error=exc,
                 )
 
         # PDFリンク
@@ -178,8 +265,6 @@ class ArxivRepository:
                 pdf_url = link.attrib.get("href")
                 break
 
-        # Paperオブジェクトの生成
-        # 注意: 元のPaperデータとマージするために使用される一時的なオブジェクト
         return Paper(
             title=title,
             authors=authors,
@@ -188,7 +273,3 @@ class ArxivRepository:
             abstract=summary,
             pdf_url=pdf_url,
         )
-
-    @staticmethod
-    def create_limiter() -> AsyncLimiter:
-        return AsyncLimiter(1, ArxivRepository.DEFAULT_SLEEP_SECONDS)

@@ -7,7 +7,7 @@ from loguru import logger
 
 from crawler.domain.enums import ConferenceName
 from crawler.domain.models.paper import Paper
-from crawler.infrastructure.http.http_utils import get_with_retry
+from crawler.infrastructure.http.http_retry_client import HttpRetryClient
 from crawler.utils import RobotGuard
 
 
@@ -17,53 +17,71 @@ class DBLPRepository:
     BASE_URL = "https://dblp.org"
     SEARCH_API = "https://dblp.org/search/publ/api"
     DEFAULT_SLEEP_SECONDS = 1
+    DEFAULT_CONCURRENCY = 5
+    RETRY_STATUSES = frozenset({429, 500})
+    RETRY_EXCEPTIONS = (
+        httpx.ReadError,
+        httpx.RequestError,
+        httpx.ReadTimeout,
+        httpx.ConnectTimeout,
+    )
 
-    def __init__(self, client: httpx.AsyncClient, limiter: AsyncLimiter | None = None) -> None:
+    def __init__(self, http: HttpRetryClient) -> None:
         """DBLPRepositoryインスタンスを初期化します。
 
         Args:
-            client: HTTPリクエストに使用するAsyncClientインスタンス
-            limiter: レート制限を行うAsyncLimiterインスタンス。省略時はデフォルト設定を使用。
+            http: HTTPリクエストに使用するHttpRetryClientインスタンス。
         """
-        self.client = client
+        self.http = http
         self.robot_guard = RobotGuard(self.BASE_URL, user_agent="ArchilogBot")
-        if limiter:
-            self.limiter = limiter
-        else:
-            self.limiter = AsyncLimiter(1, self.DEFAULT_SLEEP_SECONDS)
 
-    async def setup(self) -> None:
+    @classmethod
+    def from_client(
+        cls,
+        client: httpx.AsyncClient,
+        max_retry_count: int = 10,
+    ) -> "DBLPRepository":
+        """DBLP API用に設定されたHttpRetryClientを持つリポジトリを生成します。"""
+        http_client = HttpRetryClient(
+            client,
+            retry_statuses=cls.RETRY_STATUSES,
+            retry_exceptions=cls.RETRY_EXCEPTIONS,
+            max_retry_count=max_retry_count,
+            limiter=AsyncLimiter(1, cls.DEFAULT_SLEEP_SECONDS),
+            semaphore=asyncio.Semaphore(cls.DEFAULT_CONCURRENCY),
+        )
+        return cls(http=http_client)
+
+    async def setup(self, client: httpx.AsyncClient) -> None:
         """リポジトリの初期化処理を実行します。
 
-        robots.txtをロードします。この関数は使用前に一度呼び出す必要があります。
+        robots.txt をロードします。この関数は使用前に一度呼び出す必要があります。
         """
-        await self.robot_guard.load(client=self.client)
+        await self.robot_guard.load(client=client)
 
     async def fetch_papers(
         self,
         conf: ConferenceName,
         year: int,
-        semaphore: asyncio.Semaphore,
         h: int = 1000,
     ) -> list[Paper]:
         """指定されたカンファレンスと年度の論文情報を取得します。
 
         Args:
-            conf: 対象カンファレンス名
-            year: 対象年度
-            semaphore: 並列実行数を制限するセマフォ
-            h: 取得する最大論文数（デフォルト: 1000）
+            conf: 対象カンファレンス名。
+            year: 対象年度。
+            h: 取得する最大論文数。デフォルトは 1000。
 
         Returns:
-            Paperオブジェクトのリスト
+            取得した Paper オブジェクトのリスト。
 
         Raises:
-            RuntimeError: クライアントが初期化されていない場合
-            PermissionError: robots.txtでクロールが拒否されている場合
-            httpx.HTTPStatusError: APIリクエストが失敗した場合
+            PermissionError: robots.txt でクロールが拒否されている場合。
+            httpx.HTTPStatusError: API リクエストが失敗した場合。
+            httpx.RequestError: ネットワークレベルのエラーが発生した場合。
         """
         if not self.robot_guard.loaded:
-            await self.robot_guard.load(client=self.client)
+            raise RuntimeError("DBLPRepository.setup() must be called before using the repository")
 
         # robots.txtのチェック
         if not self.robot_guard.can_fetch(self.SEARCH_API):
@@ -78,9 +96,7 @@ class DBLPRepository:
         }
 
         try:
-            # セマフォを使用してリクエスト並列数を制御
-            async with semaphore, self.limiter:
-                resp = await get_with_retry(self.client, self.SEARCH_API, params=params)
+            resp = await self.http.get(self.SEARCH_API, params=params)
 
             resp.raise_for_status()
             data = resp.json()
@@ -94,7 +110,14 @@ class DBLPRepository:
             raise
 
     def _parse_papers(self, data: dict[str, Any]) -> list[Paper]:
-        """APIレスポンスからPaperオブジェクトのリストを生成します。"""
+        """API レスポンスから Paper リストを生成します。
+
+        Args:
+            data: DBLP Search API のレスポンス（JSON デコード済み）。
+
+        Returns:
+            Paper オブジェクトのリスト。
+        """
         try:
             hits_container = data["result"]["hits"]
             total = int(hits_container["@total"])
@@ -114,7 +137,14 @@ class DBLPRepository:
             return []
 
     def _parse_single_paper(self, hit: dict[str, Any]) -> Paper | None:
-        """単一の論文データをパースしてPaperオブジェクトを生成します。"""
+        """DBLP hit エントリから Paper オブジェクトを生成します。
+
+        Args:
+            hit: DBLP API レスポンスの hit 要素。
+
+        Returns:
+            生成された Paper オブジェクト。パース失敗時は None。
+        """
         try:
             info = hit["info"]
 
@@ -149,7 +179,14 @@ class DBLPRepository:
             return None
 
     def _parse_authors(self, authors_data: Any) -> list[str]:
-        """著者データをパースしてリスト化します。"""
+        """著者データから著者名リストを抽出します。
+
+        Args:
+            authors_data: DBLP レスポンスの ``authors`` フィールド値。
+
+        Returns:
+            著者名の文字列リスト。
+        """
         if not authors_data:
             return []
 
@@ -172,7 +209,3 @@ class DBLPRepository:
                 return [text] if text else []
 
         return []
-
-    @staticmethod
-    def create_limiter() -> AsyncLimiter:
-        return AsyncLimiter(1, DBLPRepository.DEFAULT_SLEEP_SECONDS)

@@ -1,4 +1,3 @@
-import asyncio
 from typing import Any
 
 import httpx
@@ -7,11 +6,6 @@ from pytest_mock import MockerFixture
 
 from crawler.domain.enums import ConferenceName
 from crawler.infrastructure.repositories.dblp_repository import DBLPRepository
-
-
-@pytest.fixture
-def semaphore() -> asyncio.Semaphore:
-    return asyncio.Semaphore(1)
 
 
 @pytest.fixture
@@ -66,7 +60,7 @@ def test_parse_papers_valid(
     mock_client: httpx.AsyncClient, mock_dblp_response_data: dict[str, Any]
 ) -> None:
     """正常系: パース処理のテスト"""
-    repo = DBLPRepository(mock_client)
+    repo = DBLPRepository.from_client(mock_client)
     papers = repo._parse_papers(mock_dblp_response_data)
 
     assert len(papers) == 2
@@ -83,7 +77,7 @@ def test_parse_papers_valid(
 
 def test_parse_papers_no_hits(mock_client: httpx.AsyncClient) -> None:
     """ヒットなしの場合のパーステスト"""
-    repo = DBLPRepository(mock_client)
+    repo = DBLPRepository.from_client(mock_client)
     data = {"result": {"hits": {"@total": "0"}}}
     papers = repo._parse_papers(data)
     assert papers == []
@@ -91,7 +85,7 @@ def test_parse_papers_no_hits(mock_client: httpx.AsyncClient) -> None:
 
 def test_parse_papers_invalid_data(mock_client: httpx.AsyncClient) -> None:
     """不正なデータのパーステスト"""
-    repo = DBLPRepository(mock_client)
+    repo = DBLPRepository.from_client(mock_client)
     data = {"invalid": "data"}
     papers = repo._parse_papers(data)
     assert papers == []
@@ -99,7 +93,7 @@ def test_parse_papers_invalid_data(mock_client: httpx.AsyncClient) -> None:
 
 def test_parse_authors(mock_client: httpx.AsyncClient) -> None:
     """著者情報のパーステスト"""
-    repo = DBLPRepository(mock_client)
+    repo = DBLPRepository.from_client(mock_client)
 
     # リスト形式
     data_list = {"author": [{"text": "A"}, {"text": "B"}]}
@@ -119,31 +113,24 @@ def test_parse_authors(mock_client: httpx.AsyncClient) -> None:
 async def test_fetch_papers_integration_mock(
     mock_client: httpx.AsyncClient,
     mock_dblp_response_data: dict[str, Any],
-    semaphore: asyncio.Semaphore,
     mocker: MockerFixture,
 ) -> None:
-    """fetch_papersメソッドの統合的テスト（get_with_retryモック）"""
+    """fetch_papersメソッドの統合的テスト（http.get モック）"""
     mock_api_response = httpx.Response(
         200, json=mock_dblp_response_data, request=httpx.Request("GET", "http://test")
     )
 
-    # Initialize needs to be mocked or handled
-    # DBLPRepository.initialize calls robot_guard.load()
-    # We can mock robot_guard.load to do nothing
     from crawler.utils import RobotGuard
 
     mocker.patch.object(RobotGuard, "load", return_value=None, autospec=True)
     mocker.patch.object(RobotGuard, "can_fetch", return_value=True, autospec=True)
 
-    mocker.patch(
-        "crawler.infrastructure.repositories.dblp_repository.get_with_retry",
-        return_value=mock_api_response,
-        autospec=True,
-    )
+    repo = DBLPRepository.from_client(mock_client)
+    mocker.patch.object(repo.http, "get", return_value=mock_api_response)
 
-    repo = DBLPRepository(mock_client)
-    await repo.setup()
-    papers = await repo.fetch_papers(conf=ConferenceName.RECSYS, year=2025, semaphore=semaphore)
+    await repo.setup(mock_client)
+    repo.robot_guard.loaded = True
+    papers = await repo.fetch_papers(conf=ConferenceName.RECSYS, year=2025)
 
     assert len(papers) == 2
     assert papers[0].title == "Test Paper 1"
@@ -152,7 +139,6 @@ async def test_fetch_papers_integration_mock(
 async def test_fetch_call_args(
     mock_client: httpx.AsyncClient,
     mock_dblp_response_data: dict[str, Any],
-    semaphore: asyncio.Semaphore,
     mocker: MockerFixture,
 ) -> None:
     """fetch_papersが正しく引数を渡しているか確認する"""
@@ -165,20 +151,16 @@ async def test_fetch_call_args(
     mocker.patch.object(RobotGuard, "load", return_value=None, autospec=True)
     mocker.patch.object(RobotGuard, "can_fetch", return_value=True, autospec=True)
 
-    mock_func = mocker.patch(
-        "crawler.infrastructure.repositories.dblp_repository.get_with_retry",
-        return_value=mock_api_response,
-        autospec=True,
-    )
+    repo = DBLPRepository.from_client(mock_client)
+    mock_get = mocker.patch.object(repo.http, "get", return_value=mock_api_response)
 
-    repo = DBLPRepository(mock_client)
-    await repo.setup()
-    await repo.fetch_papers(conf=ConferenceName.RECSYS, year=2025, semaphore=semaphore)
+    await repo.setup(mock_client)
+    repo.robot_guard.loaded = True
+    await repo.fetch_papers(conf=ConferenceName.RECSYS, year=2025)
 
-    assert mock_func.call_count == 1
-    call_args = mock_func.call_args
-    # call_args[0] is positional args: (client, url)
-    assert call_args[0][0] == mock_client
-    # call_args[1] is keyword args: params, headers
-    # headers is NOT passed
+    assert mock_get.call_count == 1
+    call_args = mock_get.call_args
+    # url は第1位置引数
+    assert call_args[0][0] == DBLPRepository.SEARCH_API
+    # headers は渡さない
     assert "headers" not in call_args[1]
