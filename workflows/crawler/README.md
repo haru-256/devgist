@@ -159,7 +159,7 @@ papers = await usecase.execute(year=2024)
 
 DBLP Search APIから論文の基本情報を取得する。
 
-- `from_client(client)` でリポジトリを生成
+- `from_client(client, max_retry_count=...)` でリポジトリを生成
 - 使用前に `await repo.setup(client)` で robots.txt をロードする必要あり
 - リトライ対象: `429`, `500`
 
@@ -167,6 +167,7 @@ DBLP Search APIから論文の基本情報を取得する。
 
 Semantic Scholar Graph APIから論文の詳細情報をバッチ取得する。
 
+- `from_client(client, max_retry_count=...)` でリポジトリを生成
 - バッチサイズ最大500件
 - 取得フィールド: `externalIds`, `abstract`, `openAccessPdf`, `title`, `year`, `venue`, `authors`, `url`
 
@@ -174,12 +175,15 @@ Semantic Scholar Graph APIから論文の詳細情報をバッチ取得する。
 
 Unpaywall APIからオープンアクセスな PDF URL を取得する。
 
-- `EMAIL` 環境変数（`config.email`）をクエリパラメータとして使用
+- `from_client(client, email=..., max_retry_count=...)` で初期化
+- `email` をクエリパラメータとして使用（デフォルト: `crawler@haru256.dev`）
 - 50件ごとのバッチで並列制御
 
 #### `ArxivRepository` (`src/crawler/infrastructure/repositories/arxiv_repository.py`)
 
 arXiv APIから論文情報を取得する。
+`from_client(client, max_retry_count=...)` でリポジトリを生成
+-
 
 - DOI検索 → 失敗した場合タイトル検索にフォールバック
 - 50件ごとのバッチで並列制御（arXiv の1リクエスト/5秒制限と併用）
@@ -194,8 +198,11 @@ arXiv APIから論文情報を取得する。
 
 #### `HttpRetryClient` (`src/crawler/infrastructure/http/http_retry_client.py`)
 
-tenacity ベースのリトライ・レート制限付き HTTP クライアントラッパー。
+teコンストラクタで `max_retry_count` を受け取り、リトライ回数を制御
 
+- `Retry-After` ヘッダーがあればそれを待機時間に使用、なければ指数バックオフ
+- `GET` / `POST` をサポート
+- `retry_statuses`（デフォルト: `{429}`）と `retry_exceptions`（デフォルト: `RequestError`, `ReadError`）をカスタマイズ可能
 - `Retry-After` ヘッダーがあればそれを待機時間に使用、なければ指数バックオフ
 - `GET` / `POST` をサポート
 
@@ -251,6 +258,7 @@ from google.cloud import storage
 
 from crawler.application.usecases.crawl_conference_papers import CrawlConferencePapers
 from crawler.domain.enums import ConferenceName
+from crawler.infrastructure.configs import load_config
 from crawler.infrastructure.http.http_client import create_http_client
 from crawler.infrastructure.repositories import (
     ArxivRepository,
@@ -262,21 +270,28 @@ from crawler.infrastructure.repositories.gcs_datalake import GCSDatalake
 
 
 async def fetch_papers() -> None:
+    # 設定を読み込み
+    cfg = load_config()
+    
     headers = {"User-Agent": "DevGistBot/1.0"}
 
     async with create_http_client(headers=headers) as client:
-        # リポジトリ初期化
-        dblp_repo = DBLPRepository.from_client(client)
+        # リポジトリ初期化（設定値を注入）
+        dblp_repo = DBLPRepository.from_client(client, max_retry_count=cfg.max_retry_count)
         await dblp_repo.setup(client)  # robots.txt のロードが必要
-        ss_repo = SemanticScholarRepository.from_client(client)
-        unpaywall_repo = UnpaywallRepository.from_client(client)
-        arxiv_repo = ArxivRepository.from_client(client)
+        ss_repo = SemanticScholarRepository.from_client(client, max_retry_count=cfg.max_retry_count)
+        unpaywall_repo = UnpaywallRepository.from_client(
+            client, 
+            email=cfg.email,
+            max_retry_count=cfg.max_retry_count,
+        )
+        arxiv_repo = ArxivRepository.from_client(client, max_retry_count=cfg.max_retry_count)
 
         # GCS Datalake 初期化
-        storage_client = storage.Client(project="your-gcp-project")
+        storage_client = storage.Client(project=cfg.gcp_project_id)
         datalake = GCSDatalake(
             storage_client=storage_client,
-            bucket_name="your-bucket-name",
+            bucket_name=cfg.gcs_bucket_name,
         )
 
         # ユースケース実行
@@ -358,9 +373,14 @@ enrich_papers(papers)
 
 ### 共有HTTPクライアントとリソース管理
 
-`httpx.AsyncClient` はエントリーポイント（`main.py`）で1つだけ生成し、
-各リポジトリに注入して共有します。リソース管理が一箇所に集約されます。
+設定値（`max_retry_count`、`email` など）は composition root（`main.py`）で
+`Config` から取得し、各コンポーネントに明示的に注入します（Dependency Injection）。
 
+```python
+cfg = load_config()
+async with create_http_client(headers=headers) as client:
+    dblp_repo  = DBLPRepository.from_client(client, max_retry_count=cfg.max_retry_count)
+    ss_repo    = SemanticScholarRepository.from_client(client, max_retry_count=cfg.max_retry_cou
 ```python
 async with create_http_client(headers=headers) as client:
     dblp_repo  = DBLPRepository.from_client(client)
