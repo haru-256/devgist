@@ -94,9 +94,7 @@ class ArxivRepository:
             )
         return enrichments
 
-    async def _fetch_single_paper_enrichment(
-        self, paper: Paper
-    ) -> FetchedPaperEnrichment | None:
+    async def _fetch_single_paper_enrichment(self, paper: Paper) -> FetchedPaperEnrichment | None:
         """単一の論文に対する arXiv 補完情報を取得します。
 
         Args:

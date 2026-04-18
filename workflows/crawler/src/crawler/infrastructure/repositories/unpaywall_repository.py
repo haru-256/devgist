@@ -82,9 +82,7 @@ class UnpaywallRepository:
 
         return enrichments
 
-    async def _fetch_single_paper_enrichment(
-        self, paper: Paper
-    ) -> FetchedPaperEnrichment | None:
+    async def _fetch_single_paper_enrichment(self, paper: Paper) -> FetchedPaperEnrichment | None:
         """単一の論文に対する Unpaywall 補完情報を取得します。
 
         DOI で Unpaywall を検索し、取得できた PDF URL を論文オブジェクトに反映します。
@@ -93,12 +91,12 @@ class UnpaywallRepository:
             paper: 更新対象の論文オブジェクト。
         """
         if not paper.doi:
-            return
+            return None
 
         enrichment = await self.fetch_by_doi(paper.doi)
         if not enrichment:
             logger.debug(f"Unpaywall: no data found for doi={paper.doi!r}")
-            return
+            return None
 
         return FetchedPaperEnrichment(doi=paper.doi, enrichment=enrichment)
 
@@ -179,12 +177,10 @@ class UnpaywallRepository:
                     pdf_url = url
                     break
 
-        doi = data.get("doi")
-        if doi is None:
+        if data.get("doi") is None:
             logger.warning(f"Unpaywall response is missing 'doi' field. Response data: {data}")
             return None
 
         return PaperEnrichment(
-            doi=doi,
             pdf_url=pdf_url,
         )
