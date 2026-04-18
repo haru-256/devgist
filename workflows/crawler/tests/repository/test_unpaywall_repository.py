@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pytest_mock import MockerFixture
 
-from crawler.domain.models.paper import Paper
+from crawler.domain.models.paper import FetchedPaperEnrichment, Paper, PaperEnrichment
 from crawler.infrastructure.http.http_retry_client import HttpRetryClient
 from crawler.infrastructure.repositories.unpaywall_repository import UnpaywallRepository
 
@@ -54,8 +54,8 @@ class TestUnpaywallRepository:
         result = await repo.fetch_by_doi("10.1145/test")
 
         assert result is not None
-        assert result.doi == "10.1145/test"
         assert result.pdf_url == "https://example.com/paper.pdf"
+        assert isinstance(result, PaperEnrichment)
 
     async def test_fetch_paper_not_found(
         self,
@@ -179,12 +179,12 @@ class TestUnpaywallRepository:
         # headers は渡さない
         assert "headers" not in call_args[1]
 
-    async def test_enrich_papers_runs_in_batches(
+    async def test_fetch_enrichments_runs_in_batches(
         self,
         mock_client: httpx.AsyncClient,
         mocker: MockerFixture,
     ) -> None:
-        """enrich_papers がバッチ処理でも DOI あり論文を全件処理すること。"""
+        """fetch_enrichments がバッチ処理でも DOI あり論文を全件処理すること。"""
         repo = UnpaywallRepository.from_client(mock_client)
 
         papers = [
@@ -193,10 +193,17 @@ class TestUnpaywallRepository:
         ]
         papers.append(Paper(title="no-doi", authors=[], year=2024, venue="v", doi=None))
 
-        mock_enrich = mocker.patch.object(repo, "_enrich_single_paper", return_value=None)
+        mock_enrich = mocker.patch.object(
+            repo,
+            "_fetch_single_paper_enrichment",
+            return_value=FetchedPaperEnrichment(
+                doi="10.1000/x",
+                enrichment=PaperEnrichment(pdf_url="https://example.com/x.pdf"),
+            ),
+        )
 
-        result = await repo.enrich_papers(papers, overwrite=False)
+        result = await repo.fetch_enrichments(papers)
 
-        assert result is papers
+        assert len(result) == 120
         # DOI あり 120 件のみ対象
         assert mock_enrich.call_count == 120

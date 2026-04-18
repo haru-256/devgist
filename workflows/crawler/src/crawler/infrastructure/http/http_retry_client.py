@@ -2,7 +2,7 @@
 
 import asyncio
 from contextlib import AsyncExitStack
-from typing import Any
+from typing import Any, Literal, TypeAlias
 
 import httpx
 from aiolimiter import AsyncLimiter
@@ -19,6 +19,8 @@ from crawler.infrastructure.http.http_utils import (
     log_and_raise_final_error,
     wait_retry_after,
 )
+
+HttpMethod: TypeAlias = Literal["GET", "POST", "HEAD"]
 
 
 class HttpRetryClient:
@@ -70,54 +72,22 @@ class HttpRetryClient:
 
         # バインド済みメソッドをリトライデコレータでラップし、プライベート変数に保持する。
         # これにより呼び出しごとのクロージャ再生成を避けつつ、メソッドの上書きを防ぐ。
-        self._get_with_retry = retry_dec(self._get_impl)
-        self._post_with_retry = retry_dec(self._post_impl)
+        self._request_with_retry = retry_dec(self._request_impl)
 
-    async def _get_impl(
+    async def _request_impl(
         self,
-        url: str,
-        params: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-    ) -> httpx.Response:
-        """GET リクエストの実装（リトライなし）。
-
-        ステータスコードが許可リストにない場合は raise_for_status() を呼び出します。
-
-        Args:
-            url: リクエスト先 URL。
-            params: クエリパラメータ。
-            headers: 追加リクエストヘッダー。
-
-        Returns:
-            HTTP レスポンス。
-
-        Raises:
-            httpx.HTTPStatusError: ステータスコードが許可リストにない場合。
-            httpx.RequestError: ネットワークレベルのエラー。
-        """
-        async with AsyncExitStack() as stack:
-            if self._semaphore:
-                await stack.enter_async_context(self._semaphore)
-            if self._limiter:
-                await stack.enter_async_context(self._limiter)
-            logger.debug(f"In Semaphore and Limiter, GET request to URL: {url}")
-            response = await self._client.get(url, params=params, headers=headers)
-        if response.status_code not in self._allowed:
-            response.raise_for_status()
-        return response
-
-    async def _post_impl(
-        self,
+        method: HttpMethod,
         url: str,
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
     ) -> httpx.Response:
-        """POST リクエストの実装（リトライなし）。
+        """HTTP リクエストの実装（リトライなし）。
 
         ステータスコードが許可リストにない場合は raise_for_status() を呼び出します。
 
         Args:
+            method: HTTP メソッド。指定可能な値は ``"GET"``, ``"POST"``, ``"HEAD"``。
             url: リクエスト先 URL。
             params: クエリパラメータ。
             json: リクエストボディ。
@@ -135,11 +105,64 @@ class HttpRetryClient:
                 await stack.enter_async_context(self._semaphore)
             if self._limiter:
                 await stack.enter_async_context(self._limiter)
-            logger.debug(f"In Semaphore and Limiter, POST request to URL: {url}")
-            response = await self._client.post(url, params=params, json=json, headers=headers)
+            logger.debug(f"In Semaphore and Limiter, {method} request to URL: {url}")
+            match method:
+                case "GET":
+                    response = await self._client.get(
+                        url,
+                        params=params,
+                        headers=headers,
+                    )
+                case "POST":
+                    response = await self._client.post(
+                        url,
+                        params=params,
+                        json=json,
+                        headers=headers,
+                    )
+                case "HEAD":
+                    response = await self._client.head(
+                        url,
+                        params=params,
+                        headers=headers,
+                    )
+                case _:
+                    raise ValueError(f"Unsupported HTTP method: {method}")
         if response.status_code not in self._allowed:
             response.raise_for_status()
         return response
+
+    async def request(
+        self,
+        method: HttpMethod,
+        url: str,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        """リトライ付きで HTTP リクエストを送信します。
+
+        Args:
+            method: HTTP メソッド。指定可能な値は ``"GET"``, ``"POST"``, ``"HEAD"``。
+            url: リクエスト先 URL。
+            params: クエリパラメータ。
+            json: リクエストボディ。
+            headers: 追加リクエストヘッダー。
+        """
+        logger.debug(
+            f"Starting {method} request to URL: {url}, params: {params}, json: {json}, headers: {headers}"
+        )
+        res = await self._request_with_retry(
+            method,
+            url,
+            params=params,
+            json=json,
+            headers=headers,
+        )
+        logger.debug(
+            f"Finished {method} request to URL: {url}, params: {params}, json: {json}, headers: {headers}"
+        )
+        return res
 
     async def get(
         self,
@@ -161,10 +184,7 @@ class HttpRetryClient:
             httpx.HTTPStatusError: HTTP エラーが発生した場合。
             BaseException: リトライ上限到達後も例外が発生し続けた場合。
         """
-        logger.debug(f"Starting GET request to URL: {url}, params: {params}, headers: {headers}")
-        res = await self._get_with_retry(url, params=params, headers=headers)
-        logger.debug(f"Finished GET request to URL: {url}, params: {params}, headers: {headers}")
-        return res
+        return await self.request("GET", url, params=params, headers=headers)
 
     async def post(
         self,
@@ -188,11 +208,13 @@ class HttpRetryClient:
             httpx.HTTPStatusError: HTTP エラーが発生した場合。
             BaseException: リトライ上限到達後も例外が発生し続けた場合。
         """
-        logger.debug(
-            f"Starting POST request to URL: {url}, params: {params}, json: {json}, headers: {headers}"
-        )
-        res = await self._post_with_retry(url, params=params, json=json, headers=headers)
-        logger.debug(
-            f"Finished POST request to URL: {url}, params: {params}, json: {json}, headers: {headers}"
-        )
-        return res
+        return await self.request("POST", url, params=params, json=json, headers=headers)
+
+    async def head(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        """リトライ付きで HEAD リクエストを送信します。"""
+        return await self.request("HEAD", url, params=params, headers=headers)

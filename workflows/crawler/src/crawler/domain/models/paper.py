@@ -1,6 +1,17 @@
 from pydantic import BaseModel
 
 
+class PaperEnrichment(BaseModel):
+    """外部ソースから得た論文補完情報を表す値オブジェクト。"""
+
+    abstract: str | None = None
+    pdf_url: str | None = None
+
+    def is_empty(self) -> bool:
+        """補完可能な情報を一切持たない場合に True を返します。"""
+        return self.abstract is None and self.pdf_url is None
+
+
 class Paper(BaseModel):
     """学術論文のメタデータを表すドメインモデル。
 
@@ -29,3 +40,22 @@ class Paper(BaseModel):
     ee: str | None = None
     pdf_url: str | None = None
     abstract: str | None = None
+
+    def apply_enrichment(
+        self,
+        enrichment: PaperEnrichment,
+        overwrite: bool = False,
+    ) -> None:
+        """補完情報を現在の論文へ反映します。"""
+        if enrichment.abstract and (self.abstract is None or overwrite):
+            self.abstract = enrichment.abstract
+
+        if enrichment.pdf_url and (self.pdf_url is None or overwrite):
+            self.pdf_url = enrichment.pdf_url
+
+
+class FetchedPaperEnrichment(BaseModel):
+    """論文識別子と補完情報を組にした取得結果。"""
+
+    doi: str
+    enrichment: PaperEnrichment

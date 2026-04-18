@@ -5,8 +5,12 @@ from pytest_mock import MockerFixture
 
 from crawler.application.usecases.crawl_conference_papers import CrawlConferencePapers
 from crawler.domain.enums import ConferenceName
-from crawler.domain.models.paper import Paper
-from crawler.domain.repositories.repository import PaperDatalake, PaperEnricher, PaperRetriever
+from crawler.domain.models.paper import FetchedPaperEnrichment, Paper, PaperEnrichment
+from crawler.domain.repositories.repository import (
+    PaperDatalake,
+    PaperEnrichmentProvider,
+    PaperRetriever,
+)
 
 
 @pytest.fixture
@@ -18,22 +22,22 @@ def mock_dblp_repo(mocker: MockerFixture) -> MagicMock:
 
 @pytest.fixture
 def mock_semantic_scholar_repo(mocker: MockerFixture) -> MagicMock:
-    repo = mocker.MagicMock(spec=PaperEnricher)
-    repo.enrich_papers = mocker.AsyncMock()
+    repo = mocker.MagicMock(spec=PaperEnrichmentProvider)
+    repo.fetch_enrichments = mocker.AsyncMock()
     return repo
 
 
 @pytest.fixture
 def mock_unpaywall_repo(mocker: MockerFixture) -> MagicMock:
-    repo = mocker.MagicMock(spec=PaperEnricher)
-    repo.enrich_papers = mocker.AsyncMock()
+    repo = mocker.MagicMock(spec=PaperEnrichmentProvider)
+    repo.fetch_enrichments = mocker.AsyncMock()
     return repo
 
 
 @pytest.fixture
 def mock_arxiv_repo(mocker: MockerFixture) -> MagicMock:
-    repo = mocker.MagicMock(spec=PaperEnricher)
-    repo.enrich_papers = mocker.AsyncMock()
+    repo = mocker.MagicMock(spec=PaperEnrichmentProvider)
+    repo.fetch_enrichments = mocker.AsyncMock()
     return repo
 
 
@@ -67,18 +71,19 @@ async def test_execute_flow(
     ]
     mock_dblp_repo.fetch_papers.return_value = initial_papers
 
-    # 2. Enrich後の期待値 (モックが加工するわけではないが、フローの確認)
-    # S2 Enrichment
-    s2_enriched = [initial_papers[0]]  # DOIがあるものだけ処理される想定
-    mock_semantic_scholar_repo.enrich_papers.return_value = s2_enriched
-
-    # Unpaywall Enrichment
-    unpaywall_enriched = s2_enriched
-    mock_unpaywall_repo.enrich_papers.return_value = unpaywall_enriched
-
-    # Arxiv Enrichment
-    arxiv_enriched = unpaywall_enriched
-    mock_arxiv_repo.enrich_papers.return_value = arxiv_enriched
+    mock_semantic_scholar_repo.fetch_enrichments.return_value = [
+        FetchedPaperEnrichment(
+            doi="10.1145/1",
+            enrichment=PaperEnrichment(abstract="Abstract from S2"),
+        )
+    ]
+    mock_unpaywall_repo.fetch_enrichments.return_value = [
+        FetchedPaperEnrichment(
+            doi="10.1145/1",
+            enrichment=PaperEnrichment(pdf_url="https://example.com/p1.pdf"),
+        )
+    ]
+    mock_arxiv_repo.fetch_enrichments.return_value = []
 
     usecase = CrawlConferencePapers(
         conf_name=ConferenceName.RECSYS,
@@ -103,26 +108,17 @@ async def test_execute_flow(
     # 中間でDOIがない論文はフィルタリングされるべき (main.pyのロジックを踏襲)
     # initial_papers[1] has no DOI, so likely filtered out before enrichment
 
-    # 2. Semantic Scholar Enrich (filtered papers only)
     expected_papers_for_enrich = [initial_papers[0]]
-    mock_semantic_scholar_repo.enrich_papers.assert_called_once()
-    args, kwargs = mock_semantic_scholar_repo.enrich_papers.call_args
-    assert args[0] == expected_papers_for_enrich
-    assert kwargs["overwrite"] is False
-
-    # 3. Unpaywall Enrich
-    mock_unpaywall_repo.enrich_papers.assert_called_once()
-    assert mock_unpaywall_repo.enrich_papers.call_args[0][0] == s2_enriched
-
-    # 4. Arxiv Enrich
-    mock_arxiv_repo.enrich_papers.assert_called_once()
-    assert mock_arxiv_repo.enrich_papers.call_args[0][0] == unpaywall_enriched
+    mock_semantic_scholar_repo.fetch_enrichments.assert_called_once_with(expected_papers_for_enrich)
+    mock_unpaywall_repo.fetch_enrichments.assert_called_once_with(expected_papers_for_enrich)
+    mock_arxiv_repo.fetch_enrichments.assert_called_once_with(expected_papers_for_enrich)
 
     # 5. Datalake save_papers（最終的なenrich済み論文が保存されること）
     mock_datalake.save_papers.assert_called_once_with(
-        arxiv_enriched,
+        [initial_papers[0]],
         papers_rep_name="recsys",
     )
 
-    # Result should be the final enriched papers
-    assert result == arxiv_enriched
+    assert result == [initial_papers[0]]
+    assert initial_papers[0].abstract == "Abstract from S2"
+    assert initial_papers[0].pdf_url == "https://example.com/p1.pdf"

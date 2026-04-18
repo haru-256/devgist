@@ -7,7 +7,7 @@ import pytest
 from aiolimiter import AsyncLimiter
 from pytest_mock import MockerFixture
 
-from crawler.domain.models.paper import Paper
+from crawler.domain.models.paper import FetchedPaperEnrichment, Paper, PaperEnrichment
 from crawler.infrastructure.repositories.arxiv_repository import ArxivRepository, ArxivXMLParseError
 
 
@@ -23,7 +23,7 @@ def mock_client(mocker: MockerFixture) -> httpx.AsyncClient:
 
 
 def test_parse_xml_valid(mock_client: httpx.AsyncClient) -> None:
-    """正常なXMLのパーステスト"""
+    """正常なXMLから補完情報をパースできることをテスト"""
     repo = ArxivRepository.from_client(mock_client)
     xml = """<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom">
@@ -42,11 +42,9 @@ def test_parse_xml_valid(mock_client: httpx.AsyncClient) -> None:
 """
     paper = repo._parse_xml(xml)
     assert paper is not None
-    assert paper.title == "Attention Is All You Need"
     assert paper.abstract == "The dominant sequence transduction models..."
     assert paper.pdf_url == "http://arxiv.org/pdf/1706.03762v5"
-    assert paper.year == 2017
-    assert paper.authors == ["Vaswani"]
+    assert isinstance(paper, PaperEnrichment)
 
 
 def test_parse_xml_no_entry(mock_client: httpx.AsyncClient) -> None:
@@ -73,7 +71,6 @@ def test_parse_xml_missing_fields(mock_client: httpx.AsyncClient) -> None:
     paper = repo._parse_xml(xml)
     assert paper is not None
     # 欠けているフィールドはデフォルト値またはNone
-    assert paper.title == ""
     assert paper.abstract is None
     assert paper.pdf_url is None
 
@@ -229,10 +226,10 @@ async def test_fetch_handles_unexpected_parse_error(
     assert result is None
 
 
-async def test_enrich_papers_runs_in_batches(
+async def test_fetch_enrichments_runs_in_batches(
     mock_client: httpx.AsyncClient, mocker: MockerFixture
 ) -> None:
-    """enrich_papers がバッチ処理されても全件処理されること。"""
+    """fetch_enrichments がバッチ処理されても全件処理されること。"""
     repo = ArxivRepository.from_client(mock_client)
 
     papers = [
@@ -240,9 +237,16 @@ async def test_enrich_papers_runs_in_batches(
         for i in range(120)
     ]
 
-    mock_enrich = mocker.patch.object(repo, "_enrich_single_paper", return_value=None)
+    mock_enrich = mocker.patch.object(
+        repo,
+        "_fetch_single_paper_enrichment",
+        return_value=FetchedPaperEnrichment(
+            doi="10.1000/x",
+            enrichment=PaperEnrichment(pdf_url="https://example.com/x.pdf"),
+        ),
+    )
 
-    result = await repo.enrich_papers(papers, overwrite=False)
+    result = await repo.fetch_enrichments(papers)
 
-    assert result is papers
+    assert len(result) == 120
     assert mock_enrich.call_count == 120

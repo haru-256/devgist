@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from crawler.domain.enums import ConferenceName
-from crawler.domain.models.paper import Paper
+from crawler.domain.models.paper import FetchedPaperEnrichment, Paper
 
 
 class PaperRetriever(Protocol):
@@ -37,26 +37,21 @@ class PaperRetriever(Protocol):
         ...
 
 
-class PaperEnricher(Protocol):
-    """論文データを補完・拡張するリポジトリのプロトコル。
+class PaperEnrichmentProvider(Protocol):
+    """論文補完情報を取得するリポジトリのプロトコル。
 
-    既に取得した論文データに対して、外部ソースから追加情報を
-    取得して論文オブジェクトを拡張するインターフェースを定義します。
+    既に取得した論文データに対して、外部ソースから追加情報を取得し、
+    論文識別子と補完情報の組として返すインターフェースを定義します。
     """
 
-    async def enrich_papers(
-        self,
-        papers: list[Paper],
-        overwrite: bool = False,
-    ) -> list[Paper]:
-        """論文データを補完・拡張します。
+    async def fetch_enrichments(self, papers: list[Paper]) -> list[FetchedPaperEnrichment]:
+        """論文データに対する補完情報を取得します。
 
         Args:
             papers: 補完対象の論文オブジェクトのリスト。
-            overwrite: 既存の情報を上書きするかどうか（デフォルト: False）。
 
         Returns:
-            補完・拡張された論文オブジェクトのリスト。
+            論文識別子と補完情報の取得結果リスト。
         """
         ...
 

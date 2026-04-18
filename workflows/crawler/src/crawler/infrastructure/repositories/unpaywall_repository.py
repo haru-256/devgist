@@ -5,7 +5,7 @@ import httpx
 from aiolimiter import AsyncLimiter
 from loguru import logger
 
-from crawler.domain.models.paper import Paper
+from crawler.domain.models.paper import FetchedPaperEnrichment, Paper, PaperEnrichment
 from crawler.infrastructure.http.http_retry_client import HttpRetryClient
 
 
@@ -53,74 +53,63 @@ class UnpaywallRepository:
         )
         return cls(http=http_client, email=email)
 
-    async def enrich_papers(
-        self,
-        papers: list[Paper],
-        overwrite: bool = False,
-    ) -> list[Paper]:
-        """論文リストにUnpaywallのデータを付与します。
-
-        DOIを持つ論文のみが処理対象となります。
-
-        Args:
-            papers: 更新対象の論文リスト。
-            overwrite: 既存のデータを上書きするかどうか。
-
-        Returns:
-            更新された論文リスト。
-        """
+    async def fetch_enrichments(self, papers: list[Paper]) -> list[FetchedPaperEnrichment]:
+        """論文リストに対応する Unpaywall 補完情報を取得します。"""
         # DOIを持つ論文のみ対象
         target_papers = [p for p in papers if p.doi]
         if not target_papers:
-            return papers
+            return []
 
         # 全件を一括で TaskGroup に投入するとタスクオブジェクトがメモリを圧迫し
         # スケジューリングコストも増大する。BATCH_SIZE 件ずつ TaskGroup を区切ることで
         # 同時生成タスク数を抑制しつつ、内側の limiter / semaphore によるレート制限は
         # 引き続き有効に機能する。
         BATCH_SIZE = 50
+        enrichments: list[FetchedPaperEnrichment] = []
         for i in range(0, len(target_papers), BATCH_SIZE):
             batch = target_papers[i : i + BATCH_SIZE]
+            tasks: list[asyncio.Task[FetchedPaperEnrichment | None]] = []
             async with asyncio.TaskGroup() as tg:
                 for paper in batch:
-                    tg.create_task(self._enrich_single_paper(paper, overwrite))
+                    tasks.append(tg.create_task(self._fetch_single_paper_enrichment(paper)))
+            for task in tasks:
+                result = task.result()
+                if result is not None:
+                    enrichments.append(result)
             logger.debug(
                 f"Unpaywall enrichment progress: {min(i + BATCH_SIZE, len(target_papers))}/{len(target_papers)}"
             )
 
-        return papers
+        return enrichments
 
-    async def _enrich_single_paper(self, paper: Paper, overwrite: bool) -> None:
-        """単一の論文を Unpaywall データで更新します。
+    async def _fetch_single_paper_enrichment(
+        self, paper: Paper
+    ) -> FetchedPaperEnrichment | None:
+        """単一の論文に対する Unpaywall 補完情報を取得します。
 
         DOI で Unpaywall を検索し、取得できた PDF URL を論文オブジェクトに反映します。
 
         Args:
             paper: 更新対象の論文オブジェクト。
-            overwrite: 既存の PDF URL を上書きするかどうか。
         """
         if not paper.doi:
             return
 
-        fetched_paper = await self.fetch_by_doi(paper.doi)
-        if not fetched_paper:
+        enrichment = await self.fetch_by_doi(paper.doi)
+        if not enrichment:
             logger.debug(f"Unpaywall: no data found for doi={paper.doi!r}")
             return
 
-        # PDF URLの更新
-        new_url = fetched_paper.pdf_url
-        if new_url:
-            if not paper.pdf_url or overwrite:
-                paper.pdf_url = new_url
+        return FetchedPaperEnrichment(doi=paper.doi, enrichment=enrichment)
 
-    async def fetch_by_doi(self, doi: str) -> Paper | None:
-        """DOI を使用して Unpaywall API から論文データを取得します。
+    async def fetch_by_doi(self, doi: str) -> PaperEnrichment | None:
+        """DOI を使用して Unpaywall API から論文補完情報を取得します。
 
         Args:
             doi: 論文の DOI。
 
         Returns:
-            取得した PDF URL などを含む Paper オブジェクト。取得失敗時は None。
+            取得した PDF URL などを含む PaperEnrichment オブジェクト。取得失敗時は None。
         """
         url = f"{self.BASE_URL}/{self.PAPER_SEARCH_PATH}/{doi}"
 
@@ -164,14 +153,14 @@ class UnpaywallRepository:
             )
             return None
 
-    def _parse_paper(self, data: dict[str, Any]) -> Paper | None:
-        """Unpaywall API レスポンスから Paper オブジェクトを生成します。
+    def _parse_paper(self, data: dict[str, Any]) -> PaperEnrichment | None:
+        """Unpaywall API レスポンスから PaperEnrichment を生成します。
 
         Args:
             data: Unpaywall API レスポンス。
 
         Returns:
-            Paper オブジェクト。パース失敗時は None。
+            PaperEnrichment オブジェクト。パース失敗時は None。
         """
         if not data:
             return None
@@ -190,18 +179,12 @@ class UnpaywallRepository:
                     pdf_url = url
                     break
 
-        # Paperオブジェクトの生成 (部分データ)
         doi = data.get("doi")
         if doi is None:
             logger.warning(f"Unpaywall response is missing 'doi' field. Response data: {data}")
             return None
 
-        # Unpaywallからは主にPDF URLを取得する
-        return Paper(
-            title=str(data.get("title", "")),
-            authors=[],  # Unpaywallのauthor構造は複雑なので今回は省略
-            year=0,  # yearも取得可能だが省略
-            venue="",  # venueも取得可能だが省略
+        return PaperEnrichment(
             doi=doi,
             pdf_url=pdf_url,
         )

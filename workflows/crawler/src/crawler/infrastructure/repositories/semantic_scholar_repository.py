@@ -7,7 +7,7 @@ import httpx
 from aiolimiter import AsyncLimiter
 from loguru import logger
 
-from crawler.domain.models.paper import Paper
+from crawler.domain.models.paper import FetchedPaperEnrichment, Paper, PaperEnrichment
 from crawler.infrastructure.http.http_retry_client import HttpRetryClient
 
 
@@ -53,78 +53,46 @@ class SemanticScholarRepository:
         )
         return cls(http=http_client)
 
-    async def enrich_papers(
-        self,
-        papers: list[Paper],
-        overwrite: bool = False,
-    ) -> list[Paper]:
-        """論文リストにSemantic Scholarのデータ（Abstract と PDF URL）を付与します。
-
-        DOIを持つ論文のみが処理対象となります。
-
-        Args:
-            papers: 更新対象の論文リスト。
-            overwrite: 既存のデータを上書きするかどうか。
-
-        Returns:
-            更新された論文リスト。
-        """
-        # DOIを持つ論文を抽出
+    async def fetch_enrichments(self, papers: list[Paper]) -> list[FetchedPaperEnrichment]:
         doi_map = {p.doi: p for p in papers if p.doi}
         if not doi_map:
-            return papers
+            return []
+        return await self.fetch_papers_batch(list(doi_map))
 
-        dois = list(doi_map.keys())
-        fetched_papers = await self.fetch_papers_batch(dois)
-        fetched_map = {p.doi: p for p in fetched_papers if p.doi}
-
-        for doi, paper in doi_map.items():
-            fetched_paper = fetched_map.get(doi)
-            if not fetched_paper:
-                continue
-
-            # Abstract
-            if fetched_paper.abstract and (not paper.abstract or overwrite):
-                paper.abstract = fetched_paper.abstract
-
-            # PDF URL
-            if fetched_paper.pdf_url and (not paper.pdf_url or overwrite):
-                paper.pdf_url = fetched_paper.pdf_url
-
-        return papers
-
-    async def fetch_papers_batch(self, dois: list[str]) -> list[Paper]:
-        """Semantic Scholar APIからバッチで論文データを取得します。
+    async def fetch_papers_batch(self, dois: list[str]) -> list[FetchedPaperEnrichment]:
+        """Semantic Scholar APIからバッチで論文補完情報を取得します。
 
         Args:
             dois: DOIのリスト。
 
         Returns:
-            Paperオブジェクトのリスト（取得できたもののみ）。
+            論文識別子と補完情報の取得結果リスト。
         """
         # バッチサイズごとに分割
-        tasks: list[asyncio.Task[list[Paper] | None]] = []
+        tasks: list[asyncio.Task[list[FetchedPaperEnrichment] | None]] = []
         async with asyncio.TaskGroup() as tg:
             for i in range(0, len(dois), self.BATCH_SIZE):
                 batch = dois[i : i + self.BATCH_SIZE]
                 tasks.append(tg.create_task(self._fetch_single_batch(batch)))
 
         # 結果をフラット化
-        papers: list[Paper] = []
+        enrichments: list[FetchedPaperEnrichment] = []
         for task in tasks:
             result = task.result()
             if result is not None:
-                papers.extend(result)
-        return papers
+                enrichments.extend(result)
+        return enrichments
 
-    async def _fetch_single_batch(self, batch_dois: list[str]) -> list[Paper] | None:
-        """Semantic Scholar APIからバッチでデータを取得します。
+    async def _fetch_single_batch(
+        self, batch_dois: list[str]
+    ) -> list[FetchedPaperEnrichment] | None:
+        """Semantic Scholar APIからバッチで補完情報を取得します。
 
         Args:
             batch_dois: DOI リスト。
 
         Returns:
-            Paper オブジェクトのリスト。エラー時は None。
+            論文識別子と補完情報の取得結果リスト。エラー時は None。
         """
         try:
             payload = {"ids": [f"DOI:{doi}" for doi in batch_dois]}
@@ -138,13 +106,13 @@ class SemanticScholarRepository:
             data = resp.json()
 
             # レスポンスのパース
-            papers = []
+            enrichments = []
             for item in data:
                 if item:  # item自体がNoneの場合がある（API仕様）
-                    paper = self._parse_single_paper(item)
-                    if paper:
-                        papers.append(paper)
-            return papers
+                    fetched = self._parse_single_paper(item)
+                    if fetched:
+                        enrichments.append(fetched)
+            return enrichments
 
         except httpx.HTTPStatusError as e:
             # 404 Not Foundは論文が存在しないケースとして扱う
@@ -184,14 +152,14 @@ class SemanticScholarRepository:
             )
             return None
 
-    def _parse_single_paper(self, item: dict[str, Any]) -> Paper | None:
-        """Semantic Scholar API レスポンスから Paper オブジェクトを生成します。
+    def _parse_single_paper(self, item: dict[str, Any]) -> FetchedPaperEnrichment | None:
+        """Semantic Scholar API レスポンスから補完取得結果を生成します。
 
         Args:
             item: Semantic Scholar API レスポンスの論文データ。
 
         Returns:
-            生成された Paper オブジェクト。パース失敗時は None。
+            生成された補完取得結果。パース失敗時は None。
         """
         if not item:
             return None
@@ -208,25 +176,15 @@ class SemanticScholarRepository:
         if open_access_pdf:
             pdf_url = open_access_pdf.get("url")
 
-        title = item.get("title", "")
-        year = item.get("year", 0)
-        venue = item.get("venue", "")
+        if doi is None:
+            return None
 
-        authors = []
-        for author in item.get("authors", []):
-            name = author.get("name")
-            if name:
-                authors.append(name)
-
-        # Paperオブジェクトの生成 (部分データ)
-        return Paper(
-            title=title,
-            authors=authors,
-            year=year,
-            venue=venue,
+        return FetchedPaperEnrichment(
             doi=doi,
-            abstract=abstract,
-            pdf_url=pdf_url,
+            enrichment=PaperEnrichment(
+                abstract=abstract,
+                pdf_url=pdf_url,
+            ),
         )
 
     async def check_url_exists(self, url: str) -> bool:
@@ -239,7 +197,7 @@ class SemanticScholarRepository:
             ステータスコードが 200 の場合は True、それ以外または例外発生時は False。
         """
         try:
-            resp = await self.http._client.head(url)
+            resp = await self.http.head(url)
             return resp.status_code == 200
         except Exception:
             return False

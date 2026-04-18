@@ -292,6 +292,21 @@ async def test_get_no_retry_on_non_retry_exception(mocker: MockerFixture) -> Non
     assert mock_client.get.call_count == 1
 
 
+@pytest.mark.asyncio
+async def test_head_success(mocker: MockerFixture) -> None:
+    """HEAD リクエストが AsyncClient.head に委譲されること。"""
+    mock_client = mocker.AsyncMock(spec=httpx.AsyncClient)
+    mock_response = mocker.Mock(spec=httpx.Response)
+    mock_response.status_code = 200
+    mock_client.head.return_value = mock_response
+
+    http = HttpRetryClient(mock_client)
+    response = await http.head("http://test.com")
+
+    assert response.status_code == 200
+    assert mock_client.head.call_count == 1
+
+
 # ---------------------------------------------------------------------------
 # Retry-After ヘッダー準拠 / 指数バックオフ
 # ---------------------------------------------------------------------------

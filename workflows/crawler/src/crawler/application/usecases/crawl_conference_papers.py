@@ -8,8 +8,12 @@
 from loguru import logger
 
 from crawler.domain.enums import ConferenceName
-from crawler.domain.models.paper import Paper
-from crawler.domain.repositories.repository import PaperDatalake, PaperEnricher, PaperRetriever
+from crawler.domain.models.paper import FetchedPaperEnrichment, Paper
+from crawler.domain.repositories.repository import (
+    PaperDatalake,
+    PaperEnrichmentProvider,
+    PaperRetriever,
+)
 
 
 class CrawlConferencePapers:
@@ -36,7 +40,7 @@ class CrawlConferencePapers:
         self,
         conf_name: ConferenceName,
         paper_retriever: PaperRetriever,
-        paper_enrichers: list[PaperEnricher],
+        paper_enrichers: list[PaperEnrichmentProvider],
         paper_datalake: PaperDatalake,
     ) -> None:
         """CrawlConferencePapers インスタンスを初期化します。
@@ -44,7 +48,7 @@ class CrawlConferencePapers:
         Args:
             conf_name: 対象学会を表す ConferenceName 列挙値。
             paper_retriever: 論文一覧を第一情報源から取得するリポジトリ。
-            paper_enrichers: 論文情報を段階的に補完するリポジトリのリスト。
+            paper_enrichers: 論文補完情報を段階的に取得するリポジトリのリスト。
                 空リストの場合、補完処理はスキップされる。
             paper_datalake: 最終的な論文データを外部ストレージに保存するリポジトリ。
         """
@@ -52,6 +56,18 @@ class CrawlConferencePapers:
         self.paper_retriever = paper_retriever
         self.paper_enrichers = paper_enrichers
         self.paper_datalake = paper_datalake
+
+    def _apply_enrichments(
+        self,
+        papers: list[Paper],
+        fetched_enrichments: list[FetchedPaperEnrichment],
+    ) -> None:
+        paper_by_doi = {paper.doi: paper for paper in papers if paper.doi}
+        for fetched in fetched_enrichments:
+            paper = paper_by_doi.get(fetched.doi)
+            if paper is None:
+                continue
+            paper.apply_enrichment(fetched.enrichment, overwrite=False)
 
     async def execute(self, year: int) -> list[Paper]:
         """指定された学会の指定年度の論文を取得・補完・保存します。
@@ -90,7 +106,8 @@ class CrawlConferencePapers:
         for paper_enricher in self.paper_enrichers:
             enricher_name = paper_enricher.__class__.__name__
             logger.info(f"Enriching {self.conf_name.upper()} {year} papers with {enricher_name}...")
-            papers = await paper_enricher.enrich_papers(papers, overwrite=False)
+            fetched_enrichments = await paper_enricher.fetch_enrichments(papers)
+            self._apply_enrichments(papers, fetched_enrichments)
             logger.debug(f"Enrichment by {enricher_name} completed.")
 
         # 4. 補完された論文をデータレイクに保存

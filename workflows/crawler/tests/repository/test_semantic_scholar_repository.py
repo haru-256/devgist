@@ -2,7 +2,7 @@ import httpx
 import pytest
 from pytest_mock import MockerFixture
 
-from crawler.domain.models.paper import Paper
+from crawler.domain.models.paper import FetchedPaperEnrichment, Paper, PaperEnrichment
 from crawler.infrastructure.http.http_retry_client import HttpRetryClient
 from crawler.infrastructure.repositories.semantic_scholar_repository import (
     SemanticScholarRepository,
@@ -16,7 +16,7 @@ def mock_client(mocker: MockerFixture) -> httpx.AsyncClient:
 
 
 def test_parse_single_paper(mock_client: httpx.AsyncClient) -> None:
-    """単一の論文レスポンスのパーステスト"""
+    """単一の論文レスポンスから補完情報をパースできることをテスト"""
     repo = SemanticScholarRepository.from_client(mock_client)
 
     item = {
@@ -36,24 +36,21 @@ def test_parse_single_paper(mock_client: httpx.AsyncClient) -> None:
     paper = repo._parse_single_paper(item)
     assert paper is not None
     assert paper.doi == "10.1234/test"
-    assert paper.abstract == "Test Abstract"
-    assert paper.pdf_url == "http://example.com/pdf"
-    assert paper.title == "Test Title"
-    assert paper.year == 2024
-    assert paper.venue == "Test Venue"
-    assert paper.authors == ["Author One", "Author Two"]
+    assert paper.enrichment.abstract == "Test Abstract"
+    assert paper.enrichment.pdf_url == "http://example.com/pdf"
+    assert isinstance(paper, FetchedPaperEnrichment)
 
 
 def test_parse_single_paper_minimal(mock_client: httpx.AsyncClient) -> None:
-    """最小限のフィールドでのパーステスト"""
+    """最小限のフィールドで補完情報をパースできることをテスト"""
     repo = SemanticScholarRepository.from_client(mock_client)
     item = {"externalIds": {"DOI": "10.1234/test"}}
 
     paper = repo._parse_single_paper(item)
     assert paper is not None
     assert paper.doi == "10.1234/test"
-    assert paper.abstract is None
-    assert paper.pdf_url is None
+    assert paper.enrichment.abstract is None
+    assert paper.enrichment.pdf_url is None
 
 
 def test_parse_single_paper_none(mock_client: httpx.AsyncClient) -> None:
@@ -81,28 +78,26 @@ async def test_enrich_papers_merge_logic(
     )
 
     # APIから取得される論文（情報あり）
-    fetched_paper = Paper(
-        title="New Title",
-        authors=["Author A"],
-        year=2024,
-        venue="New Venue",
+    fetched_paper = FetchedPaperEnrichment(
         doi="10.1234/test",
-        abstract="New Abstract",
-        pdf_url="http://new.pdf",
+        enrichment=PaperEnrichment(
+            abstract="New Abstract",
+            pdf_url="http://new.pdf",
+        ),
     )
 
-    # fetch_papers_batchをモック
     mocker.patch.object(repo, "fetch_papers_batch", return_value=[fetched_paper], autospec=True)
 
-    # overwrite=False: 元のTitleは保持され、欠損項目は埋まるはず
-    await repo.enrich_papers([paper], overwrite=False)
+    results = await repo.fetch_enrichments([paper])
+
+    assert results == [fetched_paper]
+    paper.apply_enrichment(fetched_paper.enrichment, overwrite=False)
 
     assert paper.title == "Original Title"  # 保持
     assert paper.abstract == "New Abstract"  # 更新
     assert paper.pdf_url == "http://new.pdf"  # 更新
 
-    # overwrite=True: 全て更新されるはず
-    await repo.enrich_papers([paper], overwrite=True)
+    paper.apply_enrichment(fetched_paper.enrichment, overwrite=True)
     assert paper.abstract == "New Abstract"  # overwriteされる
     assert paper.pdf_url == "http://new.pdf"  # overwriteされる
     assert paper.title == "Original Title"  # titleはoverwriteされない
@@ -129,3 +124,23 @@ async def test_fetch_call_args(
     assert SemanticScholarRepository.PAPER_BATCH_SEARCH_PATH in call_args[0][0]
     # headers は渡さない
     assert "headers" not in call_args[1]
+
+
+@pytest.mark.asyncio
+async def test_check_url_exists_uses_http_retry_client_head(
+    mock_client: httpx.AsyncClient,
+    mocker: MockerFixture,
+) -> None:
+    """URL 存在確認が生の AsyncClient ではなく HttpRetryClient を経由すること。"""
+    repo = SemanticScholarRepository.from_client(mock_client)
+    mock_head = mocker.patch.object(
+        repo.http,
+        "head",
+        return_value=httpx.Response(200, request=httpx.Request("HEAD", "http://test")),
+    )
+    mock_client.head.side_effect = AssertionError("raw client head should not be called")
+
+    result = await repo.check_url_exists("http://test")
+
+    assert result is True
+    mock_head.assert_awaited_once_with("http://test")
