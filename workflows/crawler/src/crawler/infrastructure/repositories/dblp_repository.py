@@ -33,7 +33,7 @@ class DBLPRepository:
             http: HTTPリクエストに使用するHttpRetryClientインスタンス。
         """
         self.http = http
-        self.robot_guard = RobotGuard(self.BASE_URL, user_agent="ArchilogBot")
+        self.robot_guard = RobotGuard(self.BASE_URL, user_agent="DevGistBot/1.0")
 
     @classmethod
     def from_client(

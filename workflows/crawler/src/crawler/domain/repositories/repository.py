@@ -26,7 +26,6 @@ class PaperRetriever(Protocol):
         """指定された学会の論文データを取得します。
 
         Args:
-            client: HTTPリクエストに使用するAsyncClientインスタンス。
             conf: 対象となる学会の名前。
             year: 取得対象の年度。
             h: APIの検索結果の最大件数（デフォルト: 1000）。

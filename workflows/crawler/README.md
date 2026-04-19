@@ -183,7 +183,6 @@ Unpaywall APIからオープンアクセスな PDF URL を取得する。
 
 arXiv APIから論文情報を取得する。
 `from_client(client, max_retry_count=...)` でリポジトリを生成
--
 
 - DOI検索 → 失敗した場合タイトル検索にフォールバック
 - 50件ごとのバッチで並列制御（arXiv の1リクエスト/5秒制限と併用）
@@ -198,13 +197,11 @@ arXiv APIから論文情報を取得する。
 
 #### `HttpRetryClient` (`src/crawler/infrastructure/http/http_retry_client.py`)
 
-teコンストラクタで `max_retry_count` を受け取り、リトライ回数を制御
+コンストラクタで `max_retry_count` を受け取り、リトライ回数を制御する。
 
 - `Retry-After` ヘッダーがあればそれを待機時間に使用、なければ指数バックオフ
-- `GET` / `POST` をサポート
+- `GET` / `POST` / `HEAD` をサポート
 - `retry_statuses`（デフォルト: `{429}`）と `retry_exceptions`（デフォルト: `RequestError`, `ReadError`）をカスタマイズ可能
-- `Retry-After` ヘッダーがあればそれを待機時間に使用、なければ指数バックオフ
-- `GET` / `POST` をサポート
 
 ## セットアップ
 
@@ -240,7 +237,13 @@ uv run python src/crawler/main.py
 | `MAX_RETRY_COUNT` | 任意 | `10` | HTTP リクエストの最大リトライ回数 |
 | `LOG_LEVEL` | 任意 | `DEBUG` | ログ出力レベル |
 
-ローカル開発では `.env.local` に設定を記述します:
+ローカル開発では `.env.example` をコピーして `.env.local` を作成します:
+
+```bash
+cp .env.example .env.local
+```
+
+`.env.local` の例:
 
 ```bash
 GCS_BUCKET_NAME=your-bucket-name
@@ -380,11 +383,13 @@ enrich_papers(papers)
 cfg = load_config()
 async with create_http_client(headers=headers) as client:
     dblp_repo  = DBLPRepository.from_client(client, max_retry_count=cfg.max_retry_count)
-    ss_repo    = SemanticScholarRepository.from_client(client, max_retry_count=cfg.max_retry_cou
-```python
-async with create_http_client(headers=headers) as client:
-    dblp_repo  = DBLPRepository.from_client(client)
-    ss_repo    = SemanticScholarRepository.from_client(client)
+    ss_repo    = SemanticScholarRepository.from_client(client, max_retry_count=cfg.max_retry_count)
+    unpaywall_repo = UnpaywallRepository.from_client(
+        client,
+        email=cfg.email,
+        max_retry_count=cfg.max_retry_count,
+    )
+    arxiv_repo = ArxivRepository.from_client(client, max_retry_count=cfg.max_retry_count)
     ...
 ```
 
@@ -451,7 +456,7 @@ uv add --group dev package-name
 ### 新しいリポジトリの追加
 
 1. `src/crawler/infrastructure/repositories/` に実装クラスを追加
-2. `PaperEnricher` または `PaperRetriever` プロトコルに準拠させる
+2. `PaperEnrichmentProvider` または `PaperRetriever` プロトコルに準拠させる
 3. `src/crawler/infrastructure/repositories/__init__.py` に export を追加
 4. `tests/repository/` にユニットテストを追加
 

@@ -139,9 +139,7 @@ async def test_check_url_exists_uses_http_retry_client_head(
         return_value=httpx.Response(200, request=httpx.Request("HEAD", "http://test")),
     )
     mocker.patch.object(
-        mock_client,
-        "head",
-        side_effect=AssertionError("raw client head should not be called")
+        mock_client, "head", side_effect=AssertionError("raw client head should not be called")
     )
 
     result = await repo.check_url_exists("http://test")

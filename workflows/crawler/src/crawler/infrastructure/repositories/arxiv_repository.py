@@ -52,7 +52,7 @@ class ArxivRepository:
         Returns:
             レート制限とリトライ機能を持つArxivRepositoryインスタンス
         """
-        # arXivのレート制限（1リクエスト/3秒）と同時接続数1を管理する
+        # arXiv の公式制限より保守的に、1リクエスト/5秒・同時接続数1で管理する
         http_client = HttpRetryClient(
             client=client,
             max_retry_count=max_retry_count,

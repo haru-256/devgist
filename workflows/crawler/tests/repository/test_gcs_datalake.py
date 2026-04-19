@@ -1,4 +1,3 @@
-# TODO: GCS Datalakeのテストコードを実装する
 import re
 from unittest.mock import MagicMock, call
 
