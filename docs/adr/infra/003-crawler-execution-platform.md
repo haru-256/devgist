@@ -213,4 +213,4 @@ DevGist の `workers/crawler` の実行基盤として、**Cloud Run Jobs を採
 - [INFRA-ADR-002] Terraform構成: ドメイン駆動モジュールとマルチプロジェクト戦略の採用
 - [ADR運用ガイド](../../../docs/adr/README.md)
 - [ADRテンプレート](../../../docs/adr/_template.md)
-- `docs/design_doc.md`
+- [design_doc.md](../../../docs/design_doc.md)
