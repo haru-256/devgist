@@ -112,7 +112,7 @@ DevGistプロジェクトのPhase 1（Deep Search）および将来のPhase 2（
   resource "google_cloud_run_service" "backend" {
     # ... 
     environment_variables = {
-      DB_HOST = data.terraform_remote_state.data.outputs.cloud_sql_private_ip_address
+      DB_SOCKET_PATH = "/cloudsql/${data.terraform_remote_state.data.outputs.cloud_sql_connection_name}"
     }
   }
   ```
