@@ -1,46 +1,84 @@
-"""DBLPクローラーのメインエントリーポイント。
-
-このモジュールは、DBLP APIを使用して学術論文情報を収集するクローラーの
-実行エントリーポイントを提供します。
-"""
+"""クローラーのメインエントリーポイント。"""
 
 import asyncio
+from dataclasses import dataclass
 
+import httpx
+from google.cloud import storage
 from loguru import logger
 
-from crawler.domain.paper import Paper
-from crawler.repository import (
+from crawler.application.usecases.crawl_conference_papers import CrawlConferencePapers
+from crawler.domain.models.paper import Paper
+from crawler.infrastructure.configs import Config, load_config
+from crawler.infrastructure.http.http_client import create_http_client
+from crawler.infrastructure.repositories import (
     ArxivRepository,
     DBLPRepository,
     SemanticScholarRepository,
     UnpaywallRepository,
 )
-from crawler.usecase.fetch_papers import FetchRecSysPapers
-from crawler.utils.http_client import create_http_client
+from crawler.infrastructure.repositories.gcs_datalake import GCSDatalake
 from crawler.utils.log import setup_logger
 
-LIMITER_KEY_DBLP = "dblp"
-LIMITER_KEY_SEMANTIC_SCHOLAR = "semantic_scholar"
-LIMITER_KEY_UNPAYWALL = "unpaywall"
-LIMITER_KEY_ARXIV = "arxiv"
+
+@dataclass(frozen=True)
+class CrawlerDependencies:
+    """クロール実行に必要な依存オブジェクト群。"""
+
+    usecases: list[CrawlConferencePapers]
+
+
+async def build_dependencies(client: httpx.AsyncClient, cfg: Config) -> CrawlerDependencies:
+    """実行時依存を組み立てます。"""
+    dblp_repo = DBLPRepository.from_client(client, max_retry_count=cfg.max_retry_count)
+    await dblp_repo.setup(client)
+    ss_repo = SemanticScholarRepository.from_client(client, max_retry_count=cfg.max_retry_count)
+    unpaywall_repo = UnpaywallRepository.from_client(
+        client,
+        email=cfg.email,
+        max_retry_count=cfg.max_retry_count,
+    )
+    arxiv_repo = ArxivRepository.from_client(client, max_retry_count=cfg.max_retry_count)
+
+    storage_client = storage.Client(project=cfg.gcp_project_id)
+    datalake = GCSDatalake(
+        storage_client=storage_client,
+        bucket_name=cfg.gcs_bucket_name,
+    )
+
+    usecases = [
+        CrawlConferencePapers(
+            conf_name=conf_name,
+            paper_retriever=dblp_repo,
+            paper_enrichers=[ss_repo, unpaywall_repo, arxiv_repo],
+            paper_datalake=datalake,
+        )
+        for conf_name in cfg.conference_names
+    ]
+    return CrawlerDependencies(usecases=usecases)
 
 
 async def run_crawl_task(
-    usecase: FetchRecSysPapers,
+    usecase: CrawlConferencePapers,
     year: int,
-    semaphore: asyncio.Semaphore,
 ) -> list[Paper]:
-    """指定された年のクロールタスクを実行し、結果をログ出力します。
+    """指定された年のクロールタスクを実行します。
 
     Args:
-        usecase: 実行するユースケース
-        year: 対象年
-        semaphore: 並列実行制限用セマフォ
+        usecase: 実行するユースケース。
+        year: 対象年。
 
     Returns:
-        取得・補完された論文リスト
+        取得・補完された論文リスト。
     """
-    enriched_papers = await usecase.execute(year, semaphore)
+    try:
+        enriched_papers = await usecase.execute(year)
+    except Exception as e:
+        # 1タスク失敗で全体停止しないよう、失敗タスクは空結果として継続する
+        logger.exception(
+            f"Crawl task failed for {usecase.conf_name.upper()} {year}: {type(e).__name__}: {e}"
+        )
+        return []
 
     # 統計情報のログ出力
     total_papers_count = len(enriched_papers)
@@ -48,7 +86,7 @@ async def run_crawl_task(
         abs_pass_cnt = sum(p.abstract is not None for p in enriched_papers)
         pdf_pass_cnt = sum(p.pdf_url is not None for p in enriched_papers)
         logger.info(
-            f"RecSys {year}, Total papers: {total_papers_count}, "
+            f"{usecase.conf_name.upper()} {year}, Total papers: {total_papers_count}, "
             f"Abstract pass rate: {abs_pass_cnt / total_papers_count:.4f} ({abs_pass_cnt}/{total_papers_count}), "
             f"PDF pass rate: {pdf_pass_cnt / total_papers_count:.4f} ({pdf_pass_cnt}/{total_papers_count})"
         )
@@ -56,49 +94,30 @@ async def run_crawl_task(
     return enriched_papers
 
 
-async def main() -> None:
-    """クローラーの非同期エントリーポイント。
+async def main(cfg: Config) -> None:
+    """クローラーを実行します。"""
+    logger.debug(f"Config: {cfg}")
 
-    ログメッセージを出力後、RecSysのクロール処理を実行します。
-    """
-    headers = {"User-Agent": "ArchilogBot/1.0"}
-    sem = asyncio.Semaphore(100)
-    years = range(2010, 2026)
-    # years = range(2025, 2026)
-
-    # 各サービスのレートリミッターを作成（全体で共有）
-    limiters = {
-        LIMITER_KEY_DBLP: DBLPRepository.create_limiter(),
-        LIMITER_KEY_SEMANTIC_SCHOLAR: SemanticScholarRepository.create_limiter(),
-        LIMITER_KEY_UNPAYWALL: UnpaywallRepository.create_limiter(),
-        LIMITER_KEY_ARXIV: ArxivRepository.create_limiter(),
-    }
+    headers = {"User-Agent": "DevGistBot/1.0"}
+    years = cfg.years
 
     logger.info(f"Starting crawl for years: {years}")
 
     # 共有HTTPクライアントを作成
     async with create_http_client(headers=headers) as client:
-        # 各リポジトリを初期化
-        dblp_repo = DBLPRepository(client, limiter=limiters[LIMITER_KEY_DBLP])
-        await dblp_repo.setup()
-        ss_repo = SemanticScholarRepository(client, limiter=limiters[LIMITER_KEY_SEMANTIC_SCHOLAR])
-        unpaywall_repo = UnpaywallRepository(client, limiter=limiters[LIMITER_KEY_UNPAYWALL])
-        arxiv_repo = ArxivRepository(client, limiter=limiters[LIMITER_KEY_ARXIV])
-        # ユースケースの初期化
-        usecase = FetchRecSysPapers(
-            paper_retriever=dblp_repo,
-            paper_enrichers=[ss_repo, unpaywall_repo, arxiv_repo],
-        )
+        dependencies = await build_dependencies(client, cfg)
 
         tasks = []
         async with asyncio.TaskGroup() as tg:
-            for year in years:
-                tasks.append(tg.create_task(run_crawl_task(usecase, year, sem)))
-        enriched_papers = [paper for task in tasks for paper in task.result()]
+            for usecase in dependencies.usecases:
+                for year in years:
+                    tasks.append(tg.create_task(run_crawl_task(usecase, year)))
+        enriched_papers: list[Paper] = [paper for task in tasks for paper in task.result()]
 
     logger.info(f"Total enriched papers: {len(enriched_papers)}")
 
 
 if __name__ == "__main__":
-    setup_logger()
-    asyncio.run(main())
+    cfg = load_config()
+    setup_logger(cfg.log_level)
+    asyncio.run(main(cfg))

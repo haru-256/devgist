@@ -1,17 +1,12 @@
-import asyncio
-from typing import Any
-
 import httpx
 import pytest
 from pytest_mock import MockerFixture
 
-from crawler.domain.paper import Paper
-from crawler.repository.semantic_scholar_repository import SemanticScholarRepository
-
-
-@pytest.fixture
-def semaphore() -> asyncio.Semaphore:
-    return asyncio.Semaphore(1)
+from crawler.domain.models.paper import FetchedPaperEnrichment, Paper, PaperEnrichment
+from crawler.infrastructure.http.http_retry_client import HttpRetryClient
+from crawler.infrastructure.repositories.semantic_scholar_repository import (
+    SemanticScholarRepository,
+)
 
 
 @pytest.fixture
@@ -21,8 +16,8 @@ def mock_client(mocker: MockerFixture) -> httpx.AsyncClient:
 
 
 def test_parse_single_paper(mock_client: httpx.AsyncClient) -> None:
-    """単一の論文レスポンスのパーステスト"""
-    repo = SemanticScholarRepository(mock_client)
+    """単一の論文レスポンスから補完情報をパースできることをテスト"""
+    repo = SemanticScholarRepository.from_client(mock_client)
 
     item = {
         "externalIds": {"DOI": "10.1234/test"},
@@ -41,29 +36,26 @@ def test_parse_single_paper(mock_client: httpx.AsyncClient) -> None:
     paper = repo._parse_single_paper(item)
     assert paper is not None
     assert paper.doi == "10.1234/test"
-    assert paper.abstract == "Test Abstract"
-    assert paper.pdf_url == "http://example.com/pdf"
-    assert paper.title == "Test Title"
-    assert paper.year == 2024
-    assert paper.venue == "Test Venue"
-    assert paper.authors == ["Author One", "Author Two"]
+    assert paper.enrichment.abstract == "Test Abstract"
+    assert paper.enrichment.pdf_url == "http://example.com/pdf"
+    assert isinstance(paper, FetchedPaperEnrichment)
 
 
 def test_parse_single_paper_minimal(mock_client: httpx.AsyncClient) -> None:
-    """最小限のフィールドでのパーステスト"""
-    repo = SemanticScholarRepository(mock_client)
+    """最小限のフィールドで補完情報をパースできることをテスト"""
+    repo = SemanticScholarRepository.from_client(mock_client)
     item = {"externalIds": {"DOI": "10.1234/test"}}
 
     paper = repo._parse_single_paper(item)
     assert paper is not None
     assert paper.doi == "10.1234/test"
-    assert paper.abstract is None
-    assert paper.pdf_url is None
+    assert paper.enrichment.abstract is None
+    assert paper.enrichment.pdf_url is None
 
 
 def test_parse_single_paper_none(mock_client: httpx.AsyncClient) -> None:
     """Noneのパーステスト"""
-    repo = SemanticScholarRepository(mock_client)
+    repo = SemanticScholarRepository.from_client(mock_client)
     paper = repo._parse_single_paper({})  # Empty dict
     assert paper is None
 
@@ -71,11 +63,10 @@ def test_parse_single_paper_none(mock_client: httpx.AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_enrich_papers_merge_logic(
     mock_client: httpx.AsyncClient,
-    semaphore: asyncio.Semaphore,
     mocker: MockerFixture,
 ) -> None:
     """enrich_papersの結合ロジックテスト"""
-    repo = SemanticScholarRepository(mock_client)
+    repo = SemanticScholarRepository.from_client(mock_client)
 
     # 既存の論文（一部情報不足）
     paper = Paper(
@@ -87,28 +78,26 @@ async def test_enrich_papers_merge_logic(
     )
 
     # APIから取得される論文（情報あり）
-    fetched_paper = Paper(
-        title="New Title",
-        authors=["Author A"],
-        year=2024,
-        venue="New Venue",
+    fetched_paper = FetchedPaperEnrichment(
         doi="10.1234/test",
-        abstract="New Abstract",
-        pdf_url="http://new.pdf",
+        enrichment=PaperEnrichment(
+            abstract="New Abstract",
+            pdf_url="http://new.pdf",
+        ),
     )
 
-    # fetch_papers_batchをモック
-    mocker.patch.object(repo, "fetch_papers_batch", return_value=[fetched_paper])
+    mocker.patch.object(repo, "fetch_papers_batch", return_value=[fetched_paper], autospec=True)
 
-    # overwrite=False: 元のTitleは保持され、欠損項目は埋まるはず
-    await repo.enrich_papers([paper], semaphore=semaphore, overwrite=False)
+    results = await repo.fetch_enrichments([paper])
+
+    assert results == [fetched_paper]
+    paper.apply_enrichment(fetched_paper.enrichment, overwrite=False)
 
     assert paper.title == "Original Title"  # 保持
     assert paper.abstract == "New Abstract"  # 更新
     assert paper.pdf_url == "http://new.pdf"  # 更新
 
-    # overwrite=True: 全て更新されるはず
-    await repo.enrich_papers([paper], semaphore=semaphore, overwrite=True)
+    paper.apply_enrichment(fetched_paper.enrichment, overwrite=True)
     assert paper.abstract == "New Abstract"  # overwriteされる
     assert paper.pdf_url == "http://new.pdf"  # overwriteされる
     assert paper.title == "Original Title"  # titleはoverwriteされない
@@ -116,35 +105,44 @@ async def test_enrich_papers_merge_logic(
 
 async def test_fetch_call_args(
     mock_client: httpx.AsyncClient,
-    semaphore: asyncio.Semaphore,
     mocker: MockerFixture,
 ) -> None:
     """fetch_papers_batchが正しく引数を渡しているか確認する"""
     mock_response = httpx.Response(200, json=[], request=httpx.Request("POST", "http://test"))
 
-    async def mock_post_with_retry(*args: Any, **kwargs: Any) -> httpx.Response:
-        return mock_response
+    repo = SemanticScholarRepository.from_client(mock_client)
+    assert isinstance(repo.http, HttpRetryClient)
 
-    # Patch crawler.repository.semantic_scholar_repository.post_with_retry
-    mock_func = mocker.patch(
-        "crawler.repository.semantic_scholar_repository.post_with_retry",
-        side_effect=mock_post_with_retry,
+    mock_post = mocker.patch.object(repo.http, "post", return_value=mock_response)
+
+    dois = ["10.1234/test"]
+    await repo.fetch_papers_batch(dois)
+
+    assert mock_post.call_count == 1
+    call_args = mock_post.call_args
+    # url は第1位置引数
+    assert SemanticScholarRepository.PAPER_BATCH_SEARCH_PATH in call_args[0][0]
+    # headers は渡さない
+    assert "headers" not in call_args[1]
+
+
+@pytest.mark.asyncio
+async def test_check_url_exists_uses_http_retry_client_head(
+    mock_client: httpx.AsyncClient,
+    mocker: MockerFixture,
+) -> None:
+    """URL 存在確認が生の AsyncClient ではなく HttpRetryClient を経由すること。"""
+    repo = SemanticScholarRepository.from_client(mock_client)
+    mock_head = mocker.patch.object(
+        repo.http,
+        "head",
+        return_value=httpx.Response(200, request=httpx.Request("HEAD", "http://test")),
+    )
+    mocker.patch.object(
+        mock_client, "head", side_effect=AssertionError("raw client head should not be called")
     )
 
-    repo = SemanticScholarRepository(mock_client)
+    result = await repo.check_url_exists("http://test")
 
-    # Create dummy papers to trigger a fetch
-    papers = [Paper(title="Test", authors=[], year=2024, venue="", doi="10.1234/test")]
-
-    # fetch_papers_batch expects list[str] (DOIs)
-    # The test was passing papers list which is incorrect
-    dois = [p.doi for p in papers if p.doi]
-    await repo.fetch_papers_batch(dois, semaphore)
-
-    assert mock_func.call_count == 1
-    call_args = mock_func.call_args
-    # call_args[0] is positional args: (client, url)
-    assert call_args[0][0] == mock_client
-    # call_args[1] is keyword args: params, json, headers
-    # headers is NOT passed
-    assert "headers" not in call_args[1]
+    assert result is True
+    mock_head.assert_awaited_once_with("http://test")

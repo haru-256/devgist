@@ -2,14 +2,13 @@ import sys
 
 from loguru import logger
 
-from crawler.configs import LOG_LEVEL
 
-
-def setup_logger() -> None:
+def setup_logger(log_level: str = "DEBUG") -> None:
     """ロガーの初期設定を行います。
 
-    デフォルトのロガー設定をリセットし、標準エラー出力に LOG_LEVEL 設定に基づいたログレベルでログを出力するように設定します（デフォルトは DEBUG）。
+    デフォルトの設定をリセットし、標準エラー出力へ環境変数 ``LOG_LEVEL``
+    に基づいたレベルでログを出力するよう再設定します。
     """
     # 一度デフォルトの設定を消してから再設定
     logger.remove()
-    logger.add(sys.stderr, level=LOG_LEVEL)
+    logger.add(sys.stderr, level=log_level)

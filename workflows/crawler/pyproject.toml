@@ -14,6 +14,7 @@ dependencies = [
   "tenacity~=9.1.2",
   "defusedxml~=0.7.1",
   "aiolimiter~=1.2.1",
+  "google-cloud-storage~=3.9.0",
 ]
 
 [dependency-groups]
@@ -25,7 +26,13 @@ test = [
   "pytest-mock>=3.15.1",
   "pytest-xdist>=3.8.0",
 ]
-lint = ["ruff~=0.14.7", "mypy~=1.19.0", "types-defusedxml~=0.7.0.20250822"]
+lint = [
+  "ruff~=0.15.5",
+  "mypy~=1.19.0",
+  "types-defusedxml~=0.7.0.20250822",
+  "ty~=0.0.21",
+  "pyrefly",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.26,<0.10.0"]
@@ -51,6 +58,10 @@ disallow_untyped_defs = true
 # init_forbid_extra = true
 # init_typed = true
 # warn_required_dynamic_aliases = true
+
+[[tool.mypy.overrides]]
+module = ["google", "google.*", "google.cloud", "google.cloud.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

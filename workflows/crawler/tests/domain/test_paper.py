@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from crawler.domain.paper import Paper
+from crawler.domain.models.paper import FetchedPaperEnrichment, Paper, PaperEnrichment
 
 
 def test_paper_creation_with_all_fields() -> None:
@@ -238,6 +238,65 @@ def test_paper_equality() -> None:
     )
 
     assert paper1 == paper2
+
+
+def test_paper_apply_enrichment_updates_missing_fields() -> None:
+    """PaperEnrichment で欠損フィールドを補完できることをテスト"""
+    paper = Paper(
+        title="Test",
+        authors=["A"],
+        year=2025,
+        venue="RecSys",
+    )
+    enrichment = PaperEnrichment(
+        abstract="Abstract from provider",
+        pdf_url="https://example.com/test.pdf",
+    )
+
+    paper.apply_enrichment(enrichment)
+
+    assert paper.abstract == "Abstract from provider"
+    assert paper.pdf_url == "https://example.com/test.pdf"
+
+
+def test_paper_apply_enrichment_respects_overwrite_flag() -> None:
+    """overwrite=False では既存値を保持し、True では上書きすることをテスト"""
+    paper = Paper(
+        title="Test",
+        authors=["A"],
+        year=2025,
+        venue="RecSys",
+        abstract="Original abstract",
+        pdf_url="https://example.com/original.pdf",
+    )
+    enrichment = PaperEnrichment(
+        abstract="Updated abstract",
+        pdf_url="https://example.com/updated.pdf",
+    )
+
+    paper.apply_enrichment(enrichment, overwrite=False)
+    assert paper.abstract == "Original abstract"
+    assert paper.pdf_url == "https://example.com/original.pdf"
+
+    paper.apply_enrichment(enrichment, overwrite=True)
+    assert paper.abstract == "Updated abstract"
+    assert paper.pdf_url == "https://example.com/updated.pdf"
+
+
+def test_paper_enrichment_is_empty() -> None:
+    """補完情報が空かどうかを判定できることをテスト"""
+    assert PaperEnrichment().is_empty() is True
+    assert PaperEnrichment(abstract="x").is_empty() is False
+
+
+def test_fetched_paper_enrichment_holds_identifier_and_enrichment() -> None:
+    fetched = FetchedPaperEnrichment(
+        doi="10.1145/test",
+        enrichment=PaperEnrichment(abstract="x"),
+    )
+
+    assert fetched.doi == "10.1145/test"
+    assert fetched.enrichment.abstract == "x"
 
 
 def test_paper_inequality() -> None:
