@@ -28,9 +28,9 @@
 
 設計判断を伴う変更では、ADR の要否を確認すること。
 
-- ADR の正本: `docs/adr/`
-- 詳細な進め方: `.agents/skills/adr-workflow/SKILL.md`
-- ADR 運用ガイド: `docs/adr/README.md`
-- ADR テンプレート: `docs/adr/_template.md`
+- ADR の正本: [`docs/adr/`](docs/adr/)
+- 詳細な進め方: [`.agents/skills/adr-workflow/SKILL.md`](.agents/skills/adr-workflow/SKILL.md)
+- ADR 運用ガイド: [`docs/adr/README.md`](docs/adr/README.md)
+- ADR テンプレート: [`docs/adr/_template.md`](docs/adr/_template.md)
 
 ADR の判断基準、相談の境界、記録ルールなどの詳細は skill を参照すること。
