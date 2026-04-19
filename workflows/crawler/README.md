@@ -4,6 +4,18 @@
 
 DBLP Computer Science Bibliographyから主要な推薦システム・データマイニング系カンファレンスの論文情報を取得し、Semantic Scholar・Unpaywall・arXivの各APIで要約やPDF URLを付加します。最終的にGoogle Cloud Storage（データレイク）へ保存します。
 
+## 関連 ADR
+
+crawler に関する Architecture Decision Record (ADR) は `docs/adr/` 配下で管理します。
+
+- 運用ガイド: `docs/adr/README.md`
+- テンプレート: `docs/adr/_template.md`
+- `INFRA-ADR-003`: `docs/adr/infra/003-crawler-execution-platform.md`
+- `CRAWLER-ADR-001`: `docs/adr/crawler/001-language-selection.md`
+- `CRAWLER-ADR-002`: `docs/adr/crawler/002-xml-parsing-security.md`
+
+このディレクトリ配下の `workflows/crawler/docs/adr/` は互換性維持のための参照パスであり、正本は `docs/adr/` 側です。
+
 ## 対象カンファレンス
 
 - RecSys (ACM Conference on Recommender Systems)
