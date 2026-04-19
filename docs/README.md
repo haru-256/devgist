@@ -4,9 +4,9 @@
 
 ## ADR
 
-Architecture Decision Record (ADR) は `docs/adr/` 配下で管理します。
+Architecture Decision Record (ADR) は [docs/adr/](adr/) 配下で管理します。
 
-- 運用ガイド: `docs/adr/README.md`
-- テンプレート: `docs/adr/_template.md`
+- 運用ガイド: [adr/README.md](adr/README.md)
+- テンプレート: [adr/_template.md](adr/_template.md)
 
-インフラや crawler などの設計判断は、各サブディレクトリではなく `docs/adr/` の正本を参照してください。
+インフラや crawler などの設計判断は、各サブディレクトリではなく [docs/adr/](adr/) の正本を参照してください。
