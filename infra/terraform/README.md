@@ -20,24 +20,51 @@ infra/terraform/
 ├── README.md
 ├── environments/
 │   ├── .gitignore
-│   └── dev/
-│       ├── crawler/
-│       │   ├── Makefile
-│       │   ├── backend.tf
-│       │   ├── main.tf
-│       │   ├── outputs.tf
-│       │   ├── providers.tf
-│       │   ├── terraform.tfstate
-│       │   ├── terraform.tfvars
-│       │   └── variables.tf
-│       └── tfstate/
-│           ├── backend.tf
-│           ├── main.tf
-│           ├── outputs.tf
-│           ├── providers.tf
-│           ├── variables.tf
-│           └── terraform.tfvars
+│   ├── devgist-app/
+│   │   └── dev/
+│   │       ├── Makefile
+│   │       ├── backend.tf
+│   │       ├── config.gcs.tfbackend
+│   │       ├── main.tf
+│   │       ├── outputs.tf
+│   │       ├── providers.tf
+│   │       ├── terraform.tfvars
+│   │       └── variables.tf
+│   ├── devgist-data/
+│   │   └── dev/
+│   │       ├── Makefile
+│   │       ├── backend.tf
+│   │       ├── config.gcs.tfbackend
+│   │       ├── main.tf
+│   │       ├── outputs.tf
+│   │       ├── providers.tf
+│   │       ├── terraform.tfvars
+│   │       └── variables.tf
+│   ├── devgist-ops/
+│   │   ├── Makefile
+│   │   ├── backend.tf
+│   │   ├── config.gcs.tfbackend
+│   │   ├── main.tf
+│   │   ├── outputs.tf
+│   │   ├── providers.tf
+│   │   ├── terraform.tfvars
+│   │   └── variables.tf
+│   └── devgist-tf/
+│       ├── Makefile
+│       ├── backend.tf
+│       ├── config.gcs.tfbackend
+│       ├── main.tf
+│       ├── outputs.tf
+│       ├── providers.tf
+│       ├── terraform.tfvars
+│       └── variables.tf
 ├── modules/
+│   ├── artifact_registry/
+│   │   ├── main.tf
+│   │   ├── outputs.tf
+│   │   ├── providers.tf
+│   │   ├── variables.tf
+│   │   └── README.md
 │   ├── datalake/
 │   │   ├── main.tf
 │   │   ├── outputs.tf
@@ -62,14 +89,17 @@ infra/terraform/
 
 ### `environments/`
 環境ごとの root module を配置します。  
-`dev/` 配下に環境別の構成を置き、さらにサービス単位で分割しています。
+GCP project ごとに root module を配置し、必要に応じて `dev/` などの環境サブディレクトリを切ります。
 
-- `dev/crawler/`: 開発環境の crawler 用 root module
-- `dev/tfstate/`: Terraform state 管理用インフラを構築する root module
+- `devgist-tf/`: Terraform state 管理用 project の root module
+- `devgist-ops/`: Artifact Registry などの共通運用基盤 project の root module
+- `devgist-data/dev/`: 開発環境の data project 用 root module
+- `devgist-app/dev/`: 開発環境の app project 用 root module
 
 ### `modules/`
 複数の環境で再利用する module を配置します。
 
+- `artifact_registry/`: Artifact Registry repository を作成する module
 - `datalake/`: GCP のデータレイク用 GCS バケットを作成する module
 - `google_project_services/`: GCP の API 有効化を行う module
 - `tfstate_gcs_bucket/`: Terraform の state 管理用 GCS バケットを作成する module
