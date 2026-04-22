@@ -153,7 +153,7 @@ DevGist の cross-project Terraform output 共有戦略として、`terraform_re
 
 ```hcl
 output "crawler_artifact_registry_repository_url" {
-  value       = module.crawler_artifact_registry.repository_url
+  value       = module.artifact_registries["crawler"].repository_url
   description = "The Docker repository URL for crawler images"
 }
 ```

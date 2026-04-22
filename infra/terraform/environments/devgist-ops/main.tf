@@ -3,6 +3,12 @@ locals {
   required_services = [
     "artifactregistry.googleapis.com", # Artifact Registry
   ]
+
+  artifact_registries = {
+    crawler = {
+      description = "Docker images for the crawler job"
+    }
+  }
 }
 
 data "google_project" "project" {
@@ -17,14 +23,21 @@ module "required_project_services" {
   wait_seconds      = 30
 }
 
-// crawler用のArtifact Registryを作成
-module "crawler_artifact_registry" {
+// project 内で利用する Docker 用 Artifact Registry を作成
+module "artifact_registries" {
+  for_each = local.artifact_registries
+
   source = "../../modules/artifact_registry"
 
   project_id    = data.google_project.project.project_id
   location      = var.gcp_default_region
-  repository_id = "crawler"
-  description   = "Docker images for the crawler job"
+  repository_id = each.key
+  description   = each.value.description
 
   depends_on = [module.required_project_services]
+}
+
+moved {
+  from = module.crawler_artifact_registry
+  to   = module.artifact_registries["crawler"]
 }

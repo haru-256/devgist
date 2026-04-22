@@ -18,9 +18,3 @@ variable "description" {
   description = "The description for the Artifact Registry repository."
   default     = ""
 }
-
-variable "format" {
-  type        = string
-  description = "The package format for the Artifact Registry repository."
-  default     = "DOCKER"
-}
