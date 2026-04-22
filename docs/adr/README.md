@@ -10,6 +10,9 @@
 | `INFRA-ADR-001` | `infra` | GCPプロジェクト構成と環境分離戦略 | Accepted | [docs/adr/infra/001-gcp-project-structure.md](infra/001-gcp-project-structure.md) |
 | `INFRA-ADR-002` | `infra` | Terraform構成: ドメイン駆動モジュールとマルチプロジェクト戦略の採用 | Accepted | [docs/adr/infra/002-terraform-module-structure.md](infra/002-terraform-module-structure.md) |
 | `INFRA-ADR-003` | `infra` | Crawler実行基盤として Cloud Run Jobs を採用する | Accepted | [docs/adr/infra/003-crawler-execution-platform.md](infra/003-crawler-execution-platform.md) |
+| `INFRA-ADR-004` | `infra` | Terraform State Project と Ops Project を分離する | Accepted | [docs/adr/infra/004-separate-tf-and-ops-projects.md](infra/004-separate-tf-and-ops-projects.md) |
+| `INFRA-ADR-005` | `infra` | Terraform environments は GCP project ごとに分割する | Accepted | [docs/adr/infra/005-terraform-environment-slicing.md](infra/005-terraform-environment-slicing.md) |
+| `INFRA-ADR-006` | `infra` | Cross-project Terraform output 共有戦略 | Accepted | [docs/adr/infra/006-cross-project-output-sharing.md](infra/006-cross-project-output-sharing.md) |
 | `CRAWLER-ADR-001` | `crawler` | 論文収集クローラーの実装言語としてPythonを採用 | Accepted | [docs/adr/crawler/001-language-selection.md](crawler/001-language-selection.md) |
 | `CRAWLER-ADR-002` | `crawler` | XMLパースにdefusedxmlを採用 | Accepted | [docs/adr/crawler/002-xml-parsing-security.md](crawler/002-xml-parsing-security.md) |
 

@@ -65,6 +65,32 @@ graph TD
 6. **GCS Datalakeへの保存**
    - 補完済み論文を JSONL 形式でバッチ分割してアップロード
 
+## GCP での実行構成
+
+`crawler` の実行基盤は、関連 ADR に合わせて `Cloud Run Jobs` を前提とします。初期運用では GitHub Actions でコンテナイメージをビルドして `Artifact Registry` に配置し、手動で `Cloud Run Jobs` を実行して、収集結果を `GCS` に保存します。
+
+```mermaid
+graph LR
+    Dev[Developer] --> GitHub[GitHub Repository]
+    GitHub --> GHA[GitHub Actions<br/>Manual workflow dispatch]
+    GHA --> Build[Build crawler image]
+    Build --> AR[Artifact Registry]
+    AR --> CRJ[Cloud Run Jobs<br/>crawler execution]
+    Operator[Operator / Manual trigger] --> CRJ
+    CRJ --> APIs[External source APIs<br/>DBLP / Semantic Scholar / Unpaywall / arXiv]
+    APIs --> CRJ
+    CRJ --> GCS[GCS Datalake<br/>JSONL]
+    CRJ --> Logs[Cloud Logging / Monitoring]
+```
+
+### 構成メモ
+
+- CI/CD は `GitHub Actions` の手動トリガー（`workflow_dispatch`）から開始する
+- コンテナイメージは `Artifact Registry` に保存し、`Cloud Run Jobs` から参照する
+- crawler は HTTP サービスではなく完了まで走るバッチなので、`Cloud Run Service` ではなく `Cloud Run Jobs` を使う
+- 収集データの保存先は `GCS` をデータレイクとして使う
+- 将来定期実行へ移行する場合は、`Cloud Scheduler` を `Cloud Run Jobs` の起動元として追加する
+
 ## ディレクトリ構成
 
 ```text
