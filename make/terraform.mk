@@ -5,8 +5,6 @@ TFLINT_CONFIG ?= $(TERRAFORM_ROOT)/.tflint.hcl
 BACKEND_CONFIG ?= config.gcs.tfbackend
 TRIVY_SEVERITY ?= HIGH,CRITICAL
 
-include $(MAKE_DIR)/help.mk
-
 .PHONY: fmt
 fmt: ## Format terraform recursively
 	terraform fmt -recursive
