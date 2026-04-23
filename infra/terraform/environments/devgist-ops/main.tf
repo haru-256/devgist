@@ -36,8 +36,3 @@ module "artifact_registries" {
 
   depends_on = [module.required_project_services]
 }
-
-moved {
-  from = module.crawler_artifact_registry
-  to   = module.artifact_registries["crawler"]
-}
