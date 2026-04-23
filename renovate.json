@@ -1,0 +1,59 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "timezone": "Asia/Tokyo",
+  "schedule": ["before 8am every 2 weeks on monday"],
+  "minimumReleaseAge": "14 days",
+  "labels": ["dependencies"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": false
+  },
+  "packageRules": [
+    {
+      "description": "crawler: minor/patch を1PRにまとめる",
+      "matchFileNames": ["workflows/crawler/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "crawler deps (minor/patch)"
+    },
+    {
+      "description": "terraform: 単層 environment は parentDir で一意になる",
+      "matchManagers": ["terraform"],
+      "matchFileNames": [
+        "infra/terraform/environments/devgist-tf/**",
+        "infra/terraform/environments/devgist-ops/**",
+        "infra/terraform/environments/crawler/**"
+      ],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "terraform/{{parentDir}} (minor/patch)"
+    },
+    {
+      "description": "terraform devgist-app: 環境 (dev/prod) ごとに分離",
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["infra/terraform/environments/devgist-app/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "terraform/devgist-app/{{parentDir}} (minor/patch)"
+    },
+    {
+      "description": "terraform devgist-data: 環境 (dev/prod) ごとに分離",
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["infra/terraform/environments/devgist-data/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "terraform/devgist-data/{{parentDir}} (minor/patch)"
+    },
+    {
+      "description": "terraform modules: minor/patch を1PRにまとめる",
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["infra/terraform/modules/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "terraform/modules (minor/patch)"
+    },
+    {
+      "description": "github-actions: minor/patch/pin/digest を1PRにまとめる",
+      "matchManagers": ["github-actions"],
+      "matchFileNames": [".github/workflows/**", ".github/actions/**"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "github-actions (minor/patch/pin/digest)"
+    }
+  ]
+}
