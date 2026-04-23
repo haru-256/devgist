@@ -10,10 +10,39 @@
       "groupName": "crawler deps (minor/patch)"
     },
     {
-      "description": "terraform: minor/patch を1PRにまとめる",
+      "description": "terraform devgist-tf: minor/patch を1PRにまとめる",
       "matchManagers": ["terraform"],
+      "matchFileNames": ["infra/terraform/environments/devgist-tf/**"],
       "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "terraform (minor/patch)"
+      "groupName": "terraform/devgist-tf (minor/patch)"
+    },
+    {
+      "description": "terraform devgist-ops: minor/patch を1PRにまとめる",
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["infra/terraform/environments/devgist-ops/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "terraform/devgist-ops (minor/patch)"
+    },
+    {
+      "description": "terraform devgist-data: minor/patch を1PRにまとめる",
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["infra/terraform/environments/devgist-data/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "terraform/devgist-data (minor/patch)"
+    },
+    {
+      "description": "terraform devgist-app: minor/patch を1PRにまとめる",
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["infra/terraform/environments/devgist-app/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "terraform/devgist-app (minor/patch)"
+    },
+    {
+      "description": "terraform crawler: minor/patch を1PRにまとめる",
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["infra/terraform/environments/crawler/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "terraform/crawler (minor/patch)"
     },
     {
       "description": "github-actions: minor/patch を1PRにまとめる",
