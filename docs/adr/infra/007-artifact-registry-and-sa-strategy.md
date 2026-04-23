@@ -189,8 +189,8 @@ api-prod-sa（devgist-app-prod）← 将来
 
 ## Related Documents
 
-- [INFRA-ADR-004] Terraform State Project と Ops Project を分離する
-- [INFRA-ADR-005] Terraform environments は GCP project ごとに分割する
-- [INFRA-ADR-006] Cross-project Terraform output 共有戦略
+- [[INFRA-ADR-004] Terraform State Project と Ops Project を分離する](./004-separate-tf-and-ops-projects.md)
+- [[INFRA-ADR-005] Terraform environments は GCP project ごとに分割する](./005-terraform-environment-slicing.md)
+- [[INFRA-ADR-006] Cross-project Terraform output 共有戦略](./006-cross-project-output-sharing.md)
 - [ADR運用ガイド](../../../docs/adr/README.md)
 - [Infrastructure README](../../../infra/README.md)
