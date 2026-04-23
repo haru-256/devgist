@@ -42,10 +42,18 @@
       "groupName": "terraform/devgist-data/{{parentDir}} (minor/patch)"
     },
     {
-      "description": "github-actions: minor/patch を1PRにまとめる",
-      "matchManagers": ["github-actions"],
+      "description": "terraform modules: minor/patch を1PRにまとめる",
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["infra/terraform/modules/**"],
       "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "github-actions (minor/patch)"
+      "groupName": "terraform/modules (minor/patch)"
+    },
+    {
+      "description": "github-actions: minor/patch/pin/digest を1PRにまとめる",
+      "matchManagers": ["github-actions"],
+      "matchFileNames": [".github/workflows/**", ".github/actions/**"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "github-actions (minor/patch/pin/digest)"
     }
   ]
 }
