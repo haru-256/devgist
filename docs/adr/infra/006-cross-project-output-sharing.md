@@ -248,5 +248,6 @@ def access_secret(project_id: str, secret_id: str, version: str = "latest") -> s
 
 - [INFRA-ADR-004] Terraform State Project と Ops Project を分離する
 - [INFRA-ADR-005] Terraform environments は GCP project ごとに分割する
+- [[INFRA-ADR-009] Cross-project IAM binding の ownership](./009-cross-project-iam-ownership.md)
 - [ADR運用ガイド](../../../docs/adr/README.md)
 - [Infrastructure README](../../../infra/README.md)
