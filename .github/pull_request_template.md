@@ -1,16 +1,16 @@
-## Summary
-<!-- Briefly describe what this PR does and why it is needed. -->
+## 概要
+<!-- この PR で何を変更したか、なぜ必要かを簡潔に記載してください。 -->
 
-## Related Issues
-<!-- Link any related issues (e.g., Fixes #123). -->
+## 関連 Issue
+<!-- 関連する Issue があれば記載してください（例: Fixes #123）。 -->
 
-## Changes
-<!-- List the main changes in this PR. -->
-- Change 1
-- Change 2
+## 変更内容
+<!-- 主な変更点を箇条書きで記載してください。 -->
+- 変更点 1
+- 変更点 2
 
-## How to Test
-<!-- Explain how to test the changes, if necessary. -->
+## 確認方法
+<!-- 必要に応じて、変更内容の確認方法を記載してください。 -->
 
-## Additional Context
-<!-- Add any other relevant information. -->
+## 補足
+<!-- その他、レビュー時に共有したい情報があれば記載してください。 -->
