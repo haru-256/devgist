@@ -10,7 +10,7 @@ locals {
 
   # project_roles は「各 SA が何をできるか」を表す。
   # upstream module の project_roles は全 SA 共通なので、SA ごとの差分はこの module で扱う。
-  project_role_bindings = flatten([
+  project_role_bindings = distinct(flatten([
     for sa_name, sa in var.service_accounts : [
       for binding in sa.project_roles : {
         key     = "${sa_name}-${binding.project}-${binding.role}"
@@ -19,11 +19,11 @@ locals {
         role    = binding.role
       }
     ]
-  ])
+  ]))
 
   # Service Account IAM は「誰がその SA を使えるか」を表す。
   # member は user:name@example.com のような IAM member 形式で渡す。
-  token_creator_bindings = flatten([
+  token_creator_bindings = distinct(flatten([
     for sa_name, sa in var.service_accounts : [
       for member in sa.token_creators : {
         key     = "${sa_name}-tokenCreator-${member}"
@@ -32,9 +32,9 @@ locals {
         member  = member
       }
     ]
-  ])
+  ]))
 
-  service_account_user_bindings = flatten([
+  service_account_user_bindings = distinct(flatten([
     for sa_name, sa in var.service_accounts : [
       for member in sa.service_account_users : {
         key     = "${sa_name}-serviceAccountUser-${member}"
@@ -43,7 +43,7 @@ locals {
         member  = member
       }
     ]
-  ])
+  ]))
 
   service_account_iam_bindings = concat(
     local.token_creator_bindings,
