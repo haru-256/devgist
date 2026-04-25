@@ -1,16 +1,25 @@
-## Summary
-<!-- Briefly describe what this PR does and why it is needed. -->
+## 概要
+<!-- この PR で何を変更したかを 2〜3 行で記載してください。 -->
 
-## Related Issues
-<!-- Link any related issues (e.g., Fixes #123). -->
+## Why
+<!-- なぜこの変更が必要か、どの課題・背景・設計判断に対応するかを記載してください。 -->
 
-## Changes
-<!-- List the main changes in this PR. -->
-- Change 1
-- Change 2
+## 関連 Issue
+<!-- 関連する Issue があれば記載してください（例: Fixes #123）。 -->
 
-## How to Test
-<!-- Explain how to test the changes, if necessary. -->
+## 変更内容
+<!-- 実装・設定・ドキュメントなど、主な変更点を箇条書きで記載してください。 -->
+- 変更点 1
+- 変更点 2
 
-## Additional Context
-<!-- Add any other relevant information. -->
+## 影響範囲
+<!-- ユーザー影響、運用影響、互換性、データ移行、権限/IAM 変更などを記載してください。該当なしの場合は「なし」。 -->
+
+## 確認方法
+<!-- 実行したテスト・lint・ビルド・手動確認を記載してください。未実行の確認があれば理由も書いてください。 -->
+
+## レビュー観点
+<!-- 特に見てほしい箇所、判断に迷った点、重点的に確認してほしいリスクを記載してください。 -->
+
+## 補足
+<!-- その他、レビュー時に共有したい情報があれば記載してください。 -->
