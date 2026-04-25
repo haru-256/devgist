@@ -56,6 +56,5 @@ module "service_accounts" {
 | Name | Description |
 |---|---|
 | `emails` | Service Account email by logical name |
-| `iam_emails` | `serviceAccount:<email>` member string by logical name |
-| `members` | `iam_emails` と同じ形式の互換 output |
+| `members` | `serviceAccount:<email>` IAM member string by logical name |
 | `names` | Full Service Account resource name by logical name |

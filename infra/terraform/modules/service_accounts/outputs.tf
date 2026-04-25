@@ -6,13 +6,7 @@ output "emails" {
   }
 }
 
-output "iam_emails" {
-  description = "Service account IAM member strings by logical name."
-  value = {
-    for name, sa in module.service_accounts.service_accounts_map :
-    name => "serviceAccount:${sa.email}"
-  }
-}
+
 
 output "members" {
   description = "Service account IAM member strings by logical name."

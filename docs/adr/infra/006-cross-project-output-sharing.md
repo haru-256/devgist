@@ -165,7 +165,6 @@ data "terraform_remote_state" "ops" {
   backend = "gcs"
   config = {
     bucket = "haru256-devgist-ops-tfstate"
-    prefix = "default"
   }
 }
 
@@ -182,7 +181,6 @@ data "terraform_remote_state" "data" {
   backend = "gcs"
   config = {
     bucket = "haru256-devgist-data-dev-tfstate"
-    prefix = "default"
   }
 }
 

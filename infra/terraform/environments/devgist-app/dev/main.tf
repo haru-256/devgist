@@ -14,12 +14,12 @@ data "google_project" "project" {
   project_id = var.gcp_project_id
 }
 
+// ops 環境の Terraform state から、ops 環境で作成したリソースの情報を参照するための data source
 data "terraform_remote_state" "ops" {
   backend = "gcs"
 
   config = {
     bucket = "haru256-devgist-ops-tfstate"
-    prefix = "default"
   }
 }
 

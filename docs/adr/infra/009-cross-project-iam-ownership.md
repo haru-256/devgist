@@ -155,7 +155,6 @@ data "terraform_remote_state" "ops" {
 
   config = {
     bucket = "haru256-devgist-ops-tfstate"
-    prefix = "default"
   }
 }
 

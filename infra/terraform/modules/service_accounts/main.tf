@@ -10,45 +10,48 @@ locals {
 
   # project_roles は「各 SA が何をできるか」を表す。
   # upstream module の project_roles は全 SA 共通なので、SA ごとの差分はこの module で扱う。
-  project_role_bindings = distinct(flatten([
-    for sa_name, sa in var.service_accounts : [
-      for binding in sa.project_roles : {
-        key     = "${sa_name}-${binding.project}-${binding.role}"
-        sa_name = sa_name
-        project = binding.project
-        role    = binding.role
-      }
-    ]
-  ]))
+  project_role_bindings = {
+    for binding in flatten([
+      for sa_name, sa in var.service_accounts : [
+        for role_binding in sa.project_roles : {
+          sa_name = sa_name
+          project = role_binding.project
+          role    = role_binding.role
+        }
+      ]
+    ]) :
+    "${binding.sa_name}|${binding.project}|${binding.role}" => binding
+  }
 
   # Service Account IAM は「誰がその SA を使えるか」を表す。
   # member は user:name@example.com のような IAM member 形式で渡す。
-  token_creator_bindings = distinct(flatten([
+  token_creator_bindings = flatten([
     for sa_name, sa in var.service_accounts : [
       for member in sa.token_creators : {
-        key     = "${sa_name}-tokenCreator-${member}"
         sa_name = sa_name
         role    = "roles/iam.serviceAccountTokenCreator"
         member  = member
       }
     ]
-  ]))
+  ])
 
-  service_account_user_bindings = distinct(flatten([
+  service_account_user_bindings = flatten([
     for sa_name, sa in var.service_accounts : [
       for member in sa.service_account_users : {
-        key     = "${sa_name}-serviceAccountUser-${member}"
         sa_name = sa_name
         role    = "roles/iam.serviceAccountUser"
         member  = member
       }
     ]
-  ]))
+  ])
 
-  service_account_iam_bindings = concat(
-    local.token_creator_bindings,
-    local.service_account_user_bindings,
-  )
+  service_account_iam_bindings = {
+    for binding in concat(
+      local.token_creator_bindings,
+      local.service_account_user_bindings,
+    ) :
+    "${binding.sa_name}|${binding.role}|${binding.member}" => binding
+  }
 }
 
 module "service_accounts" {
@@ -70,10 +73,7 @@ module "service_accounts" {
 # SA 自身に権限を付与する。例: Artifact Registry writer/reader や
 # deploy 対象 project への権限。
 resource "google_project_iam_member" "project_roles" {
-  for_each = {
-    for binding in local.project_role_bindings :
-    binding.key => binding
-  }
+  for_each = local.project_role_bindings
 
   project = each.value.project
   role    = each.value.role
@@ -83,10 +83,7 @@ resource "google_project_iam_member" "project_roles" {
 # principal に SA を使う権限を付与する。上の project_roles とは別物で、
 # こちらは SA に対する actAs / impersonation を制御する。
 resource "google_service_account_iam_member" "service_account_iam" {
-  for_each = {
-    for binding in local.service_account_iam_bindings :
-    binding.key => binding
-  }
+  for_each = local.service_account_iam_bindings
 
   service_account_id = module.service_accounts.service_accounts_map[each.value.sa_name].name
   role               = each.value.role
