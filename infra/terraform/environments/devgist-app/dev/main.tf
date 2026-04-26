@@ -23,6 +23,15 @@ data "terraform_remote_state" "ops" {
   }
 }
 
+// data 環境の Terraform state から、data 環境で作成したリソースの情報を参照するための data source
+data "terraform_remote_state" "data" {
+  backend = "gcs"
+
+  config = {
+    bucket = "haru256-devgist-data-dev-tfstate"
+  }
+}
+
 module "required_project_services" {
   source = "../../../modules/google_project_services"
 
@@ -46,10 +55,24 @@ module "service_accounts" {
   depends_on = [module.required_project_services]
 }
 
-resource "google_artifact_registry_repository_iam_member" "crawler_reader" {
+// ops 環境の Artifact Registry に対して、dev 環境の crawler 用 service account に reader 権限を付与
+resource "google_artifact_registry_repository_iam_member" "crawler" {
   project    = data.terraform_remote_state.ops.outputs.ops_project_id
   location   = data.terraform_remote_state.ops.outputs.crawler_artifact_registry_repository_location
   repository = data.terraform_remote_state.ops.outputs.crawler_artifact_registry_repository_id
   role       = "roles/artifactregistry.reader"
   member     = module.service_accounts.members["crawler"]
+}
+moved {
+  from = google_artifact_registry_repository_iam_member.crawler_reader
+  to   = google_artifact_registry_repository_iam_member.crawler
+}
+
+// data環境のGCSバケットに対して、dev環境のcrawler用service accountに読み込み・書き込み権限を付与
+resource "google_storage_bucket_iam_member" "crawler" {
+  for_each = toset(["roles/storage.objectViewer", "roles/storage.objectCreator"])
+
+  bucket = data.terraform_remote_state.data.outputs.datalake_bucket_name
+  role   = each.value
+  member = module.service_accounts.members["crawler"]
 }
