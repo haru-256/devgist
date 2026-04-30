@@ -1,0 +1,20 @@
+name: crawler
+
+services:
+  crawler:
+    build:
+      context: .
+    image: crawler:local
+    platform: linux/amd64
+    environment:
+      DATA_LAKE_PROJECT_ID: ${DATA_LAKE_PROJECT_ID:-haru256-devgist-ops}
+      DATA_LAKE_BUCKET_NAME: ${DATA_LAKE_BUCKET_NAME:?Set DATA_LAKE_BUCKET_NAME in your shell or .env file}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      CONFERENCE_NAMES: ${CONFERENCE_NAMES:-recsys}
+      YEARS: ${YEARS:-2025}
+      MAX_RETRY_COUNT: ${MAX_RETRY_COUNT:-10}
+      EMAIL: ${EMAIL:-crawler@haru256.dev}
+      GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/application_default_credentials.json
+    volumes:
+      # Mount only local Application Default Credentials instead of the whole gcloud config directory.
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/var/secrets/google/application_default_credentials.json:ro
