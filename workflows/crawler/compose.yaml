@@ -1,0 +1,15 @@
+services:
+  crawler:
+    build:
+      context: .
+    image: crawler:local
+    environment:
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-haru256-devgist-app-dev}
+      GCS_BUCKET_NAME: ${GCS_BUCKET_NAME:?Set GCS_BUCKET_NAME in your shell or .env file}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      CONFERENCE_NAMES: ${CONFERENCE_NAMES:-recsys}
+      YEARS: ${YEARS:-2025}
+      MAX_RETRY_COUNT: ${MAX_RETRY_COUNT:-10}
+      EMAIL: ${EMAIL:-crawler@haru256.dev}
+    volumes:
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
