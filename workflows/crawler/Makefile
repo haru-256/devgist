@@ -1,28 +1,22 @@
+include ../../make/help.mk
+include ../../make/python.mk
+
 .DEFAULT_GOAL := help
 
-.PHONY: lint
-lint: ## Run Linter
-	uv run ruff check .
-	uv run mypy .
+IMAGE_TAG ?= $(shell git rev-parse --short HEAD)
+REPO_URL ?= us-central1-docker.pkg.dev/haru256-devgist-ops/crawler
+IMAGE_NAME ?= crawler
+IMAGE := $(REPO_URL)/$(IMAGE_NAME):$(IMAGE_TAG)
 
-.PHONY: fmt
-fmt: ## Run formatter
-	uv run ruff check --fix .
-	uv run ruff format .
-
-.PHONY: test
-test: ## Run tests
-	uv run pytest .
-
-.PHONY: lock
-lock: ## Lock dependencies
-	uv lock
-
-.PHONY: install
-install: ## Setup the project
-	uv sync --all-groups
-
-.PHONY: help
-help: ## Show options
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+.PHONY: build-push-image
+build-push-image: ## Build, push, and print the digest image reference
+	docker build -t "$(IMAGE)" .
+	@push_output=$$(docker push "$(IMAGE)"); \
+	printf '%s\n' "$${push_output}"; \
+	digest=$$(printf '%s\n' "$${push_output}" | awk '/digest:/ {print $$3; exit}'); \
+	if [ -z "$${digest}" ]; then \
+		printf 'Failed to resolve pushed image digest for %s\n' "$(IMAGE)" >&2; \
+		exit 1; \
+	fi; \
+	image_ref="$(REPO_URL)/$(IMAGE_NAME)@$${digest}"; \
+	printf 'image_ref: %s\n' "$${image_ref}"
