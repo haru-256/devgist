@@ -11,9 +11,8 @@ IMAGE := $(REPO_URL)/$(IMAGE_NAME):$(IMAGE_TAG)
 .PHONY: build-push-image
 build-push-image: ## Build, push, and print the digest image reference
 	docker build -t "$(IMAGE)" .
-	@push_output=$$(docker push "$(IMAGE)"); \
-	printf '%s\n' "$${push_output}"; \
-	digest=$$(printf '%s\n' "$${push_output}" | awk '/digest:/ {print $$3; exit}'); \
+	docker push "$(IMAGE)"
+	@digest=$$(docker inspect --format='{{index .RepoDigests 0}}' "$(IMAGE)" | cut -d'@' -f2); \
 	if [ -z "$${digest}" ]; then \
 		printf 'Failed to resolve pushed image digest for %s\n' "$(IMAGE)" >&2; \
 		exit 1; \
