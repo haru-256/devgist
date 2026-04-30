@@ -13,7 +13,7 @@ build-push-image: ## Build, push, and print the digest image reference
 	docker build -t "$(IMAGE)" .
 	docker push "$(IMAGE)"
 	@digest=$$(docker inspect --format='{{index .RepoDigests 0}}' "$(IMAGE)" | cut -d'@' -f2); \
-	if [ -z "$${digest}" ]; then \
+	if ! printf '%s\n' "$${digest}" | grep -Eq '^sha256:[a-f0-9]{64}$$'; then \
 		printf 'Failed to resolve pushed image digest for %s\n' "$(IMAGE)" >&2; \
 		exit 1; \
 	fi; \

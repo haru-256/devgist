@@ -112,7 +112,7 @@ resource "google_cloud_run_v2_job" "crawler" {
 
     template {
       service_account = module.service_accounts.emails["crawler"]
-      max_retries     = 0
+      max_retries     = 3
       timeout         = "3600s"
 
       containers {
@@ -161,7 +161,7 @@ resource "google_cloud_run_v2_job" "crawler" {
 #
 #   http_target {
 #     http_method = "POST"
-#     uri         = "https:#${var.gcp_default_region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${data.google_project.project.project_id}/jobs/crawler:run"
+#     uri         = "https://${var.gcp_default_region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${data.google_project.project.project_id}/jobs/crawler:run"
 #     oauth_token {
 #       service_account_email = module.service_accounts.emails["crawler"]
 #     }

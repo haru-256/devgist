@@ -297,4 +297,4 @@ gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=cr
 - `crawler_image` は digest 形式（`@sha256:...`）で指定すること
 - Cloud Scheduler の oauth_token には crawler SA を使うため、SA に `run.jobs.run` 権限が必要
 - 初期フェーズでは Terraform apply 失敗時に「image は push 済みだが Job に反映されていない」状態になりうる
-- 旧 `environments/crawler` は最終的に整理・削除するが、今回のスコープでは変更しない
+- 旧 `environments/crawler` は今回のスコープで削除し、crawler の実行基盤管理を `devgist-app/dev` に集約する

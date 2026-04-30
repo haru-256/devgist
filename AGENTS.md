@@ -38,7 +38,7 @@ ADR の判断基準、相談の境界、記録ルールなどの詳細は skill 
 ## やってはいけないこと
 
 - ユーザーの合意なしに設計判断を変更すること
-- タスクの計画時に、supoerpowers:writing-plans を使わず、タスクの目的やステップを明確にせずに進めること。また、ユーザーからの明確な同意なしにタスクを開始すること。
-- タスクの実行時に、supoerpowers:subagent-driven-development や superpowers:executing-plans を使わず、タスク管理や進捗報告を怠ること。
+- タスクの計画時に、superpowers:writing-plans を使わず、タスクの目的やステップを明確にせずに進めること。また、ユーザーからの明確な同意なしにタスクを開始すること。
+- タスクの実行時に、superpowers:subagent-driven-development や superpowers:executing-plans を使わず、タスク管理や進捗報告を怠ること。
 - サブエージェントを使う場合は、タスクの難易度や複雑さに応じてmodelやreasoningを適切に選択せず、タスクの内容や進捗をユーザーに報告しないこと。
 - terraform apply やリソース変更を伴うタスクを、ユーザーの明確な同意なしに実行すること。必ずterraform plan の内容をユーザーに提示し、承認を得てから apply を実行すること。
