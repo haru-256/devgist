@@ -125,7 +125,7 @@ resource "google_cloud_run_v2_job" "crawler" {
         }
         env {
           name  = "DATA_LAKE_PROJECT_ID"
-          value = data.terraform_remote_state.ops.outputs.ops_project_id
+          value = data.terraform_remote_state.data.outputs.datalake_project_id
         }
         env {
           name  = "DATA_LAKE_BUCKET_NAME"
@@ -150,6 +150,9 @@ resource "google_cloud_run_v2_job" "crawler" {
 }
 
 # TODO: 手動実行で問題なければ有効化する
+# TODO: 以下の権限を付与する
+# 1. クローラーのサービスアカウントが自身を起動するための roles/run.invoker 権限（Cloud Run Job に対する付与）
+# 2. Cloud Scheduler サービスエージェントがクローラーのサービスアカウントを使用するための roles/iam.serviceAccountUser 権限（サービスアカウントに対する付与）
 # # Cloud Run Job を定期実行するための Cloud Scheduler ジョブの作成
 # resource "google_cloud_scheduler_job" "crawler" {
 #   name             = "crawler-scheduler"
