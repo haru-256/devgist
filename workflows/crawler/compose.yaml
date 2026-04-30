@@ -5,6 +5,7 @@ services:
     build:
       context: .
     image: crawler:local
+    platform: linux/amd64
     environment:
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:-haru256-devgist-app-dev}
       GCS_BUCKET_NAME: ${GCS_BUCKET_NAME:?Set GCS_BUCKET_NAME in your shell or .env file}
