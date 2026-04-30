@@ -31,3 +31,14 @@ variable "crawler_image" {
     error_message = "crawler_image must be an immutable digest reference ending with @sha256:<64 lowercase hex chars>."
   }
 }
+
+variable "crawler_conference_names" {
+  type        = string
+  description = "Comma-separated conference names for the crawler Cloud Run Job."
+  default     = "RecSys"
+
+  validation {
+    condition     = length(trimspace(var.crawler_conference_names)) > 0
+    error_message = "crawler_conference_names must not be empty."
+  }
+}

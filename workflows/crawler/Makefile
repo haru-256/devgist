@@ -12,7 +12,7 @@ IMAGE := $(REPO_URL)/$(IMAGE_NAME):$(IMAGE_TAG)
 .PHONY: build-push-image
 build-push-image: ## Build, push, and print the digest image reference
 	docker buildx build --platform "$(PLATFORM)" -t "$(IMAGE)" --push .
-	@digest=$$(docker inspect --format='{{index .RepoDigests 0}}' "$(IMAGE)" | cut -d'@' -f2); \
+	@digest=$$(docker buildx imagetools inspect "$(IMAGE)" --format '{{json .Manifest.Digest}}' | tr -d '"'); \
 	if ! printf '%s\n' "$${digest}" | grep -Eq '^sha256:[a-f0-9]{64}$$'; then \
 		printf 'Failed to resolve pushed image digest for %s\n' "$(IMAGE)" >&2; \
 		exit 1; \

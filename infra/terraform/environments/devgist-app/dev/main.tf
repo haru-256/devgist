@@ -125,7 +125,7 @@ resource "google_cloud_run_v2_job" "crawler" {
         }
         env {
           name  = "GCP_PROJECT_ID"
-          value = "haru256-devgist-ops" # TODO: use terraform remote state to get ops project id
+          value = data.terraform_remote_state.ops.outputs.ops_project_id
         }
         env {
           name  = "GCS_BUCKET_NAME"
@@ -137,7 +137,7 @@ resource "google_cloud_run_v2_job" "crawler" {
         }
         env {
           name  = "CONFERENCE_NAMES"
-          value = "RecSys"
+          value = var.crawler_conference_names
         }
       }
     }
