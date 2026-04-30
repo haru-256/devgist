@@ -267,8 +267,8 @@ uv run python src/crawler/main.py
 
 | 変数名 | 必須 | デフォルト | 説明 |
 |---|---|---|---|
-| `GCS_BUCKET_NAME` | **必須** | — | 保存先 GCS バケット名 |
-| `GCP_PROJECT_ID` | 任意 | `devgist` | GCP プロジェクト ID |
+| `DATA_LAKE_BUCKET_NAME` | **必須** | — | 保存先データレイクの GCS バケット名 |
+| `DATA_LAKE_PROJECT_ID` | 任意 | `devgist` | データレイクを保持する GCP プロジェクト ID |
 | `EMAIL` | 任意 | `crawler@haru256.dev` | Unpaywall API 用メールアドレス |
 | `CONFERENCE_NAMES` | 任意 | `recsys,kdd,wsdm,www,sigir,cikm` | 対象カンファレンス（カンマ区切り） |
 | `YEARS` | 任意 | `2025` | 対象年度（カンマ区切り） |
@@ -284,8 +284,8 @@ cp .env.example .env.local
 `.env.local` の例:
 
 ```bash
-GCS_BUCKET_NAME=your-bucket-name
-GCP_PROJECT_ID=your-project-id
+DATA_LAKE_BUCKET_NAME=your-data-lake-bucket-name
+DATA_LAKE_PROJECT_ID=your-data-lake-project-id
 EMAIL=you@example.com
 YEARS=2024,2025
 ```
@@ -329,10 +329,10 @@ async def fetch_papers() -> None:
         arxiv_repo = ArxivRepository.from_client(client, max_retry_count=cfg.max_retry_count)
 
         # GCS Datalake 初期化
-        storage_client = storage.Client(project=cfg.gcp_project_id)
+        storage_client = storage.Client(project=cfg.data_lake_project_id)
         datalake = GCSDatalake(
             storage_client=storage_client,
-            bucket_name=cfg.gcs_bucket_name,
+            bucket_name=cfg.data_lake_bucket_name,
         )
 
         # ユースケース実行

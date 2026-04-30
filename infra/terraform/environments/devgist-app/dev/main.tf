@@ -124,11 +124,11 @@ resource "google_cloud_run_v2_job" "crawler" {
           }
         }
         env {
-          name  = "GCP_PROJECT_ID"
+          name  = "DATA_LAKE_PROJECT_ID"
           value = data.terraform_remote_state.ops.outputs.ops_project_id
         }
         env {
-          name  = "GCS_BUCKET_NAME"
+          name  = "DATA_LAKE_BUCKET_NAME"
           value = data.terraform_remote_state.data.outputs.datalake_bucket_name
         }
         env {

@@ -17,7 +17,8 @@ class Config:
         conference_names: クロール対象のカンファレンス名リスト。
         years: クロール対象年のリスト。
         max_retry_count: HTTP リクエストの最大リトライ回数。
-        gcs_bucket_name: 論文データを保存する GCS バケット名。
+        data_lake_bucket_name: 論文データを保存するデータレイクの GCS バケット名。
+        data_lake_project_id: データレイクを保持する GCP プロジェクト ID。
     """
 
     email: str
@@ -25,23 +26,23 @@ class Config:
     conference_names: list[ConferenceName]
     years: list[int]
     max_retry_count: int
-    gcs_bucket_name: str
-    gcp_project_id: str
+    data_lake_bucket_name: str
+    data_lake_project_id: str
 
 
-def _get_gcs_bucket_name() -> str:
-    """GCS バケット名を環境変数から取得します。
+def _get_data_lake_bucket_name() -> str:
+    """データレイクの GCS バケット名を環境変数から取得します。
 
     Returns:
-        環境変数 ``GCS_BUCKET_NAME`` の値。
+        環境変数 ``DATA_LAKE_BUCKET_NAME`` の値。
 
     Raises:
-        ValueError: 環境変数 ``GCS_BUCKET_NAME`` が設定されていない場合。
+        ValueError: 環境変数 ``DATA_LAKE_BUCKET_NAME`` が設定されていない場合。
     """
-    gcs_bucket_name = os.getenv("GCS_BUCKET_NAME")
-    if gcs_bucket_name is None:
-        raise ValueError("GCS_BUCKET_NAME environment variable is not set.")
-    return gcs_bucket_name
+    data_lake_bucket_name = os.getenv("DATA_LAKE_BUCKET_NAME")
+    if data_lake_bucket_name is None:
+        raise ValueError("DATA_LAKE_BUCKET_NAME environment variable is not set.")
+    return data_lake_bucket_name
 
 
 @lru_cache(maxsize=1)
@@ -57,6 +58,6 @@ def load_config() -> Config:
         ],
         years=[int(year.strip()) for year in os.getenv("YEARS", "2025").split(",") if year.strip()],
         max_retry_count=int(os.getenv("MAX_RETRY_COUNT", 10)),
-        gcp_project_id=os.getenv("GCP_PROJECT_ID", "devgist"),
-        gcs_bucket_name=_get_gcs_bucket_name(),
+        data_lake_project_id=os.getenv("DATA_LAKE_PROJECT_ID", "devgist"),
+        data_lake_bucket_name=_get_data_lake_bucket_name(),
     )

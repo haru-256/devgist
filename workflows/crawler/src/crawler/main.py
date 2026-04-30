@@ -40,10 +40,10 @@ async def build_dependencies(client: httpx.AsyncClient, cfg: Config) -> CrawlerD
     )
     arxiv_repo = ArxivRepository.from_client(client, max_retry_count=cfg.max_retry_count)
 
-    storage_client = storage.Client(project=cfg.gcp_project_id)
+    storage_client = storage.Client(project=cfg.data_lake_project_id)
     datalake = GCSDatalake(
         storage_client=storage_client,
-        bucket_name=cfg.gcs_bucket_name,
+        bucket_name=cfg.data_lake_bucket_name,
     )
 
     usecases = [

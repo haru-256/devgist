@@ -7,8 +7,8 @@ services:
     image: crawler:local
     platform: linux/amd64
     environment:
-      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-haru256-devgist-app-dev}
-      GCS_BUCKET_NAME: ${GCS_BUCKET_NAME:?Set GCS_BUCKET_NAME in your shell or .env file}
+      DATA_LAKE_PROJECT_ID: ${DATA_LAKE_PROJECT_ID:-haru256-devgist-ops}
+      DATA_LAKE_BUCKET_NAME: ${DATA_LAKE_BUCKET_NAME:?Set DATA_LAKE_BUCKET_NAME in your shell or .env file}
       LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
       CONFERENCE_NAMES: ${CONFERENCE_NAMES:-recsys}
       YEARS: ${YEARS:-2025}
