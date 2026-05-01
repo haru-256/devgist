@@ -94,9 +94,10 @@ async def run_crawl_task(
     return enriched_papers
 
 
-async def main() -> None:
+async def main(cfg: Config | None = None) -> None:
     """クローラーを実行します。"""
-    cfg = load_config()
+    if cfg is None:
+        cfg = load_config()
     setup_logger(cfg.log_level)
 
     logger.debug(f"Config: {cfg}")
