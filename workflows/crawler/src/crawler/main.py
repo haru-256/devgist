@@ -94,8 +94,11 @@ async def run_crawl_task(
     return enriched_papers
 
 
-async def main(cfg: Config) -> None:
+async def main() -> None:
     """クローラーを実行します。"""
+    cfg = load_config()
+    setup_logger(cfg.log_level)
+
     logger.debug(f"Config: {cfg}")
 
     headers = {"User-Agent": "DevGistBot/1.0"}
@@ -118,6 +121,4 @@ async def main(cfg: Config) -> None:
 
 
 if __name__ == "__main__":
-    cfg = load_config()
-    setup_logger(cfg.log_level)
-    asyncio.run(main(cfg))
+    asyncio.run(main())
