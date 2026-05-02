@@ -4,9 +4,9 @@ override_data {
   target = data.terraform_remote_state.ops
   values = {
     outputs = {
-      ops_project_id                                 = "mock-ops-project"
-      crawler_artifact_registry_repository_id        = "mock-crawler-repo"
-      crawler_artifact_registry_repository_location  = "us-central1"
+      ops_project_id                                = "mock-ops-project"
+      crawler_artifact_registry_repository_id       = "mock-crawler-repo"
+      crawler_artifact_registry_repository_location = "us-central1"
     }
   }
 }
