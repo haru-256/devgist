@@ -97,7 +97,7 @@ jobs:
 
   terraform-module-test:
     name: terraform module test / ${{ matrix.root }}
-    needs: find_terraform_roots
+    needs: [terraform_fmt, find_terraform_roots]
     if: ${{ needs.find_terraform_roots.outputs.module_test_roots_count != '0' }}
     runs-on: ubuntu-latest
     strategy:
