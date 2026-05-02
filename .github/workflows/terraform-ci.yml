@@ -21,38 +21,89 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  find_terraform_roots:
-    name: Find Terraform roots
+  test_terraform_root_finder:
+    name: Test Terraform root finder
     runs-on: ubuntu-latest
-    outputs:
-      roots: ${{ steps.find-roots.outputs.roots }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install pytest
+        run: python -m pip install pytest
+
+      - name: Run root finder tests
+        run: PYTHONPATH=.github/scripts pytest .github/scripts/tests -v
+
+  terraform_fmt:
+    name: Terraform format check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.14.8
+          terraform_wrapper: false
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive infra/terraform
+
+  find_terraform_roots:
+    name: Find Terraform roots
+    needs: test_terraform_root_finder
+    runs-on: ubuntu-latest
+    outputs:
+      environment_roots: ${{ steps.find-roots.outputs.environment_roots }}
+      environment_roots_count: ${{ steps.find-roots.outputs.environment_roots_count }}
+      module_test_roots: ${{ steps.find-roots.outputs.module_test_roots }}
+      module_test_roots_count: ${{ steps.find-roots.outputs.module_test_roots_count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
       - name: Find Terraform roots
         id: find-roots
-        shell: bash
-        run: |
-          set -euo pipefail
-          roots_json="$(
-            find infra/terraform -maxdepth 5 -name providers.tf -print |
-            sed 's#/providers.tf$##' |
-            sort |
-            jq -R -s -c 'split("\n") | map(select(length > 0))'
-          )"
-          echo "roots=${roots_json}" >> "${GITHUB_OUTPUT}"
-          echo "Terraform roots: ${roots_json}"
+        run: python .github/scripts/find_terraform_roots.py --terraform-dir infra/terraform
 
-  terraform-root-ci:
-    name: terraform ci / ${{ matrix.root }}
-    needs: find_terraform_roots
-    if: ${{ needs.find_terraform_roots.outputs.roots != '' && toJson(fromJson(needs.find_terraform_roots.outputs.roots)) != '[]' }}
+  terraform-environment-ci:
+    name: terraform environment ci / ${{ matrix.root }}
+    needs: [terraform_fmt, find_terraform_roots]
+    if: ${{ needs.find_terraform_roots.outputs.environment_roots_count != '0' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        root: ${{ fromJson(needs.find_terraform_roots.outputs.roots) }}
+        root: ${{ fromJson(needs.find_terraform_roots.outputs.environment_roots) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Terraform check
+        uses: ./.github/actions/terraform-check
+        with:
+          working-directory: ${{ matrix.root }}
+
+  terraform-module-test:
+    name: terraform module test / ${{ matrix.root }}
+    needs: find_terraform_roots
+    if: ${{ needs.find_terraform_roots.outputs.module_test_roots_count != '0' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        root: ${{ fromJson(needs.find_terraform_roots.outputs.module_test_roots) }}
     defaults:
       run:
         shell: bash
@@ -67,36 +118,11 @@ jobs:
           terraform_version: 1.14.8
           terraform_wrapper: false
 
-      - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v6
-        with:
-          tflint_version: v0.61.0
-          tflint_config_path: "${{ github.workspace }}/infra/terraform/.tflint.hcl"
-          cache: true
-
       - name: Terraform init
         run: terraform init -backend=false -input=false
 
-      - name: Terraform validate
-        run: terraform validate -no-color
-
       - name: Terraform test
-        run: |
-          set -euo pipefail
-          test_file="$(find . -type f -name "*.tftest.hcl" -not -path "./.terraform/*" -print -quit)"
-          if [ -n "${test_file}" ]; then
-            terraform test -no-color
-          else
-            echo "No Terraform tests found. Skipping terraform test."
-          fi
-
-      - name: TFLint init
-        run: tflint --init --config "${GITHUB_WORKSPACE}/infra/terraform/.tflint.hcl"
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: TFLint
-        run: tflint --config "${GITHUB_WORKSPACE}/infra/terraform/.tflint.hcl" -f compact
+        run: terraform test -no-color
 
   terraform-security-scan:
     name: Terraform security scan
