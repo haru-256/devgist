@@ -41,7 +41,8 @@ go.work
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
 
 # Thumbnails
 ._*
@@ -296,3 +297,6 @@ terraform.rc
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,direnv,go,python,macos,mise,terraform,kubernetes,helm
 workflows/crawler/.env.local
+
+# Superpowers
+docs/superpowers

@@ -81,3 +81,27 @@ run "reject_space_separated_crawler_conference_names" {
     var.crawler_conference_names,
   ]
 }
+
+run "reject_whitespace_padded_conference_names" {
+  command = plan
+
+  variables {
+    crawler_conference_names = "recsys , kdd"
+  }
+
+  expect_failures = [
+    var.crawler_conference_names,
+  ]
+}
+
+run "reject_uppercase_conference_names" {
+  command = plan
+
+  variables {
+    crawler_conference_names = "RECSYS"
+  }
+
+  expect_failures = [
+    var.crawler_conference_names,
+  ]
+}

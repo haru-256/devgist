@@ -40,10 +40,10 @@ def find_environment_roots(terraform_dir: Path) -> list[Path]:
 
 
 def module_root_for_test(test_file: Path) -> Path:
-    test_dir = test_file.parent
-    if test_dir.name == "tests":
-        return test_dir.parent
-    return test_dir
+    for parent in test_file.parents:
+        if parent.name == "tests":
+            return parent.parent
+    return test_file.parent
 
 
 def find_module_test_roots(terraform_dir: Path) -> list[Path]:

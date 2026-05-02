@@ -35,10 +35,13 @@ variable "crawler_image" {
 variable "crawler_conference_names" {
   type        = string
   description = "Comma-separated conference names for the crawler Cloud Run Job."
-  default     = "RecSys"
+  default     = "recsys,kdd,wsdm,www,sigir,cikm"
 
   validation {
-    condition     = length(trimspace(var.crawler_conference_names)) > 0
-    error_message = "crawler_conference_names must not be empty."
+    condition = alltrue([
+      for name in split(",", var.crawler_conference_names) :
+      contains(["recsys", "kdd", "wsdm", "www", "sigir", "cikm"], name)
+    ])
+    error_message = "crawler_conference_names must be a comma-separated list of known conference names: recsys,kdd,wsdm,www,sigir,cikm."
   }
 }

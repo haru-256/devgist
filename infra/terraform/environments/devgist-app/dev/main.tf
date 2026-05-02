@@ -113,7 +113,7 @@ resource "google_cloud_run_v2_job" "crawler" {
     template {
       service_account = module.service_accounts.emails["crawler"]
       max_retries     = 3
-      timeout         = "3600s"
+      timeout         = "10800s" # タスクのタイムアウトを3時間に設定
 
       containers {
         image = var.crawler_image

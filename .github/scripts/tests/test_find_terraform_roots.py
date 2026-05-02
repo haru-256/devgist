@@ -47,5 +47,15 @@ class TestFindModuleTestRoots:
             tmp_path / "modules" / "service_accounts",
         ]
 
+    def test_finds_nested_module_tests(self, tmp_path: Path) -> None:
+        # Arrange
+        touch(tmp_path / "modules" / "service_accounts" / "tests" / "nested" / "test.tftest.hcl")
+
+        # Act
+        roots = find_module_test_roots(tmp_path)
+
+        # Assert
+        assert roots == [tmp_path / "modules" / "service_accounts"]
+
     def test_returns_empty_when_modules_missing(self, tmp_path: Path) -> None:
         assert find_module_test_roots(tmp_path) == []
