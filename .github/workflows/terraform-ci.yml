@@ -1,34 +1,110 @@
-name: Terraform Lint
+name: Terraform CI
+
 on:
   pull_request:
     paths:
       - "infra/terraform/**"
+      - ".github/workflows/terraform-ci.yml"
   push:
     branches:
       - "main"
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
-  terraform-lint:
+  find_terraform_roots:
+    name: Find Terraform roots
     runs-on: ubuntu-latest
+    outputs:
+      roots: ${{ steps.find-roots.outputs.roots }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Find Terraform roots
+        id: find-roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          roots_json="$(
+            find infra/terraform -maxdepth 5 -name providers.tf -print |
+            sed 's#/providers.tf$##' |
+            sort |
+            jq -R -s -c 'split("\n") | map(select(length > 0))'
+          )"
+          echo "roots=${roots_json}" >> "${GITHUB_OUTPUT}"
+          echo "Terraform roots: ${roots_json}"
+
+  terraform-root-ci:
+    name: terraform ci / ${{ matrix.root }}
+    needs: find_terraform_roots
+    if: ${{ needs.find_terraform_roots.outputs.roots != '' && toJson(fromJson(needs.find_terraform_roots.outputs.roots)) != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        root: ${{ fromJson(needs.find_terraform_roots.outputs.roots) }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ matrix.root }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.14.8
+          terraform_wrapper: false
+
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v6
         with:
           tflint_version: v0.61.0
+          tflint_config_path: "${{ github.workspace }}/infra/terraform/.tflint.hcl"
           cache: true
-      - name: Init TFLint
-        run: tflint --init
-        working-directory: infra/terraform
+
+      - name: Terraform init
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
+      - name: Terraform test
+        run: |
+          set -euo pipefail
+          test_file="$(find . -type f -name "*.tftest.hcl" -not -path "./.terraform/*" -print -quit)"
+          if [ -n "${test_file}" ]; then
+            terraform test -no-color
+          else
+            echo "No Terraform tests found. Skipping terraform test."
+          fi
+
+      - name: TFLint init
+        run: tflint --init --config "${GITHUB_WORKSPACE}/infra/terraform/.tflint.hcl"
         env:
-          # https://github.com/terraform-linters/tflint/blob/master/docs/user-guide/plugins.md#avoiding-rate-limiting
           GITHUB_TOKEN: ${{ github.token }}
-      - name: Lint with tflint
-        run: tflint --recursive --config "${GITHUB_WORKSPACE}/infra/terraform/.tflint.hcl" -f compact
-        working-directory: infra/terraform
+
+      - name: TFLint
+        run: tflint --config "${GITHUB_WORKSPACE}/infra/terraform/.tflint.hcl" -f compact
+
+  terraform-security-scan:
+    name: Terraform security scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Scan Terraform with Trivy
         uses: aquasecurity/trivy-action@0.35.0
         with:
