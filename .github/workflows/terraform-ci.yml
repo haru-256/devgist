@@ -56,7 +56,7 @@ jobs:
         run: terraform fmt -check -recursive infra/terraform
 
   find_terraform_roots:
-    name: Find Terraform roots
+    name: Find Terraform roots and set GITHUB_OUTPUT
     needs: test_terraform_root_finder
     runs-on: ubuntu-latest
     outputs:
@@ -104,25 +104,15 @@ jobs:
       fail-fast: false
       matrix:
         root: ${{ fromJson(needs.find_terraform_roots.outputs.module_test_roots) }}
-    defaults:
-      run:
-        shell: bash
-        working-directory: ${{ matrix.root }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
+      - name: Terraform check
+        uses: ./.github/actions/terraform-check
         with:
-          terraform_version: 1.14.8
-          terraform_wrapper: false
-
-      - name: Terraform init
-        run: terraform init -backend=false -input=false
-
-      - name: Terraform test
-        run: terraform test -no-color
+          working-directory: ${{ matrix.root }}
+          skip-validate: 'true'
 
   terraform-security-scan:
     name: Terraform security scan

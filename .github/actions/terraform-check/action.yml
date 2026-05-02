@@ -17,6 +17,10 @@ inputs:
     description: 'TFLint version'
     required: false
     default: 'v0.61.0'
+  skip-validate:
+    description: 'Skip terraform validate step'
+    required: false
+    default: 'false'
 
 runs:
   using: "composite"
@@ -40,6 +44,7 @@ runs:
       run: terraform init -backend=false -input=false
 
     - name: Terraform validate
+      if: ${{ inputs.skip-validate != 'true' }}
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: terraform validate -no-color
