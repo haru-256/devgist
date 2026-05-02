@@ -17,6 +17,7 @@
 | `INFRA-ADR-008` | `infra` | Service Account 命名規則 | Accepted | [docs/adr/infra/008-service-account-naming.md](infra/008-service-account-naming.md) |
 | `INFRA-ADR-009` | `infra` | Cross-project IAM binding の ownership | Accepted | [docs/adr/infra/009-cross-project-iam-ownership.md](infra/009-cross-project-iam-ownership.md) |
 | `INFRA-ADR-010` | `infra` | Cloud Run Job の管理責務を Terraform に集約する | Accepted | [docs/adr/infra/010-cloud-run-job-management.md](infra/010-cloud-run-job-management.md) |
+| `INFRA-ADR-011` | `infra` | Terraform monorepo における CI 対象検出と検証方針 | Accepted | [docs/adr/infra/011-terraform-ci-for-monorepo.md](infra/011-terraform-ci-for-monorepo.md) |
 | `CRAWLER-ADR-001` | `crawler` | 論文収集クローラーの実装言語としてPythonを採用 | Accepted | [docs/adr/crawler/001-language-selection.md](crawler/001-language-selection.md) |
 | `CRAWLER-ADR-002` | `crawler` | XMLパースにdefusedxmlを採用 | Accepted | [docs/adr/crawler/002-xml-parsing-security.md](crawler/002-xml-parsing-security.md) |
 

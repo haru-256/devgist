@@ -1,34 +1,132 @@
-name: Terraform Lint
+name: Terraform CI
+
 on:
   pull_request:
     paths:
       - "infra/terraform/**"
+      - ".github/workflows/terraform-ci.yml"
+      - ".github/actions/terraform-check/**"
+      - ".github/scripts/find_terraform_roots.py"
+      - ".github/scripts/tests/**"
   push:
     branches:
       - "main"
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform-ci.yml"
+      - ".github/actions/terraform-check/**"
+      - ".github/scripts/find_terraform_roots.py"
+      - ".github/scripts/tests/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
-  terraform-lint:
+  test_terraform_root_finder:
+    name: Test Terraform root finder
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-      - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
         with:
-          tflint_version: v0.61.0
-          cache: true
-      - name: Init TFLint
-        run: tflint --init
-        working-directory: infra/terraform
-        env:
-          # https://github.com/terraform-linters/tflint/blob/master/docs/user-guide/plugins.md#avoiding-rate-limiting
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: Lint with tflint
-        run: tflint --recursive --config "${GITHUB_WORKSPACE}/infra/terraform/.tflint.hcl" -f compact
-        working-directory: infra/terraform
+          python-version: "3.13"
+
+      - name: Install pytest
+        run: python -m pip install pytest
+
+      - name: Run root finder tests
+        run: PYTHONPATH=.github/scripts pytest .github/scripts/tests -v
+
+  terraform_fmt:
+    name: Terraform format check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.14.8
+          terraform_wrapper: false
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive infra/terraform
+
+  find_terraform_roots:
+    name: Find Terraform roots and set GITHUB_OUTPUT
+    needs: test_terraform_root_finder
+    runs-on: ubuntu-latest
+    outputs:
+      environment_roots: ${{ steps.find-roots.outputs.environment_roots }}
+      environment_roots_count: ${{ steps.find-roots.outputs.environment_roots_count }}
+      module_test_roots: ${{ steps.find-roots.outputs.module_test_roots }}
+      module_test_roots_count: ${{ steps.find-roots.outputs.module_test_roots_count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Find Terraform roots
+        id: find-roots
+        run: python .github/scripts/find_terraform_roots.py --terraform-dir infra/terraform
+
+  terraform-environment-ci:
+    name: terraform environment ci / ${{ matrix.root }}
+    needs: [terraform_fmt, find_terraform_roots]
+    if: ${{ needs.find_terraform_roots.outputs.environment_roots_count != '0' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        root: ${{ fromJson(needs.find_terraform_roots.outputs.environment_roots) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Terraform check
+        uses: ./.github/actions/terraform-check
+        with:
+          working-directory: ${{ matrix.root }}
+
+  terraform-module-test:
+    name: terraform module test / ${{ matrix.root }}
+    needs: [terraform_fmt, find_terraform_roots]
+    if: ${{ needs.find_terraform_roots.outputs.module_test_roots_count != '0' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        root: ${{ fromJson(needs.find_terraform_roots.outputs.module_test_roots) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Terraform check
+        uses: ./.github/actions/terraform-check
+        with:
+          working-directory: ${{ matrix.root }}
+          skip-validate: 'true'
+
+  terraform-security-scan:
+    name: Terraform security scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Scan Terraform with Trivy
         uses: aquasecurity/trivy-action@0.35.0
         with:

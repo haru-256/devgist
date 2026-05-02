@@ -1,0 +1,74 @@
+name: 'Terraform Check'
+description: 'Run Terraform init, validate, test, and TFLint for a single root'
+
+inputs:
+  working-directory:
+    description: 'Terraform root directory'
+    required: true
+  terraform-version:
+    description: 'Terraform version'
+    required: false
+    default: '1.14.8'
+  tflint-config:
+    description: 'Path to tflint config from repo root'
+    required: false
+    default: 'infra/terraform/.tflint.hcl'
+  tflint-version:
+    description: 'TFLint version'
+    required: false
+    default: 'v0.61.0'
+  skip-validate:
+    description: 'Skip terraform validate step'
+    required: false
+    default: 'false'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v4
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        terraform_wrapper: false
+
+    - name: Setup TFLint
+      uses: terraform-linters/setup-tflint@v6
+      with:
+        tflint_version: ${{ inputs.tflint-version }}
+        tflint_config_path: "${{ github.workspace }}/${{ inputs.tflint-config }}"
+        cache: true
+
+    - name: Terraform init
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: terraform init -backend=false -input=false
+
+    - name: Terraform validate
+      if: ${{ inputs.skip-validate != 'true' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: terraform validate -no-color
+
+    - name: Terraform test
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        test_file="$(find . -type f -name "*.tftest.hcl" -not -path "./.terraform/*" -print -quit)"
+        if [ -n "${test_file}" ]; then
+          terraform test -no-color
+        else
+          echo "No Terraform tests found. Skipping terraform test."
+        fi
+
+    - name: TFLint init
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: tflint --init --config "${{ github.workspace }}/${{ inputs.tflint-config }}"
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+
+    - name: TFLint
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: tflint --config "${{ github.workspace }}/${{ inputs.tflint-config }}" -f compact
