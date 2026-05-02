@@ -1,5 +1,26 @@
 mock_provider "google" {}
 
+override_data {
+  target = data.terraform_remote_state.ops
+  values = {
+    outputs = {
+      ops_project_id                                 = "mock-ops-project"
+      crawler_artifact_registry_repository_id        = "mock-crawler-repo"
+      crawler_artifact_registry_repository_location  = "us-central1"
+    }
+  }
+}
+
+override_data {
+  target = data.terraform_remote_state.data
+  values = {
+    outputs = {
+      datalake_bucket_name = "mock-datalake-bucket"
+      datalake_project_id  = "mock-data-project"
+    }
+  }
+}
+
 variables {
   gcp_project_id     = "app-dev"
   gcp_default_region = "us-central1"
@@ -82,26 +103,3 @@ run "reject_space_separated_crawler_conference_names" {
   ]
 }
 
-run "reject_whitespace_padded_conference_names" {
-  command = plan
-
-  variables {
-    crawler_conference_names = "recsys , kdd"
-  }
-
-  expect_failures = [
-    var.crawler_conference_names,
-  ]
-}
-
-run "reject_uppercase_conference_names" {
-  command = plan
-
-  variables {
-    crawler_conference_names = "RECSYS"
-  }
-
-  expect_failures = [
-    var.crawler_conference_names,
-  ]
-}

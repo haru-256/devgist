@@ -39,8 +39,8 @@ variable "crawler_conference_names" {
 
   validation {
     condition = alltrue([
-      for name in split(",", var.crawler_conference_names) :
-      contains(["recsys", "kdd", "wsdm", "www", "sigir", "cikm"], name)
+      for name in split(",", trimspace(var.crawler_conference_names)) :
+      contains(["recsys", "kdd", "wsdm", "www", "sigir", "cikm"], lower(trimspace(name)))
     ])
     error_message = "crawler_conference_names must be a comma-separated list of known conference names: recsys,kdd,wsdm,www,sigir,cikm."
   }

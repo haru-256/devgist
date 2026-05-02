@@ -5,12 +5,18 @@ on:
     paths:
       - "infra/terraform/**"
       - ".github/workflows/terraform-ci.yml"
+      - ".github/actions/terraform-check/**"
+      - ".github/scripts/find_terraform_roots.py"
+      - ".github/scripts/tests/**"
   push:
     branches:
       - "main"
     paths:
       - "infra/terraform/**"
       - ".github/workflows/terraform-ci.yml"
+      - ".github/actions/terraform-check/**"
+      - ".github/scripts/find_terraform_roots.py"
+      - ".github/scripts/tests/**"
   workflow_dispatch:
 
 permissions:
