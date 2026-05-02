@@ -112,7 +112,7 @@ jobs:
         uses: ./.github/actions/terraform-check
         with:
           working-directory: ${{ matrix.root }}
-          skip-validate: true
+          skip-validate: 'true'
 
   terraform-security-scan:
     name: Terraform security scan
