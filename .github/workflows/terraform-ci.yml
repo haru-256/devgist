@@ -68,8 +68,8 @@ jobs:
     outputs:
       environment_roots: ${{ steps.find-roots.outputs.environment_roots }}
       environment_roots_count: ${{ steps.find-roots.outputs.environment_roots_count }}
-      module_test_roots: ${{ steps.find-roots.outputs.module_test_roots }}
-      module_test_roots_count: ${{ steps.find-roots.outputs.module_test_roots_count }}
+      module_roots: ${{ steps.find-roots.outputs.module_roots }}
+      module_roots_count: ${{ steps.find-roots.outputs.module_roots_count }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -101,15 +101,15 @@ jobs:
         with:
           working-directory: ${{ matrix.root }}
 
-  terraform-module-test:
-    name: terraform module test / ${{ matrix.root }}
+  terraform-module-ci:
+    name: terraform module ci / ${{ matrix.root }}
     needs: [terraform_fmt, find_terraform_roots]
-    if: ${{ needs.find_terraform_roots.outputs.module_test_roots_count != '0' }}
+    if: ${{ needs.find_terraform_roots.outputs.module_roots_count != '0' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        root: ${{ fromJson(needs.find_terraform_roots.outputs.module_test_roots) }}
+        root: ${{ fromJson(needs.find_terraform_roots.outputs.module_roots) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -118,7 +118,7 @@ jobs:
         uses: ./.github/actions/terraform-check
         with:
           working-directory: ${{ matrix.root }}
-          skip-validate: 'true'
+          skip-validate: "true"
 
   terraform-security-scan:
     name: Terraform security scan

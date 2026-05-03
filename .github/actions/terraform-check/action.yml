@@ -1,26 +1,26 @@
-name: 'Terraform Check'
-description: 'Run Terraform init, validate, test, and TFLint for a single root'
+name: "Terraform Check"
+description: "Run Terraform init, validate, test, and TFLint for a single root"
 
 inputs:
   working-directory:
-    description: 'Terraform root directory'
+    description: "Terraform root directory"
     required: true
   terraform-version:
-    description: 'Terraform version'
+    description: "Terraform version"
     required: false
-    default: '1.14.8'
+    default: "1.14.8"
   tflint-config:
-    description: 'Path to tflint config from repo root'
+    description: "Path to tflint config from repo root"
     required: false
-    default: 'infra/terraform/.tflint.hcl'
+    default: "infra/terraform/.tflint.hcl"
   tflint-version:
-    description: 'TFLint version'
+    description: "TFLint version"
     required: false
-    default: 'v0.61.0'
+    default: "v0.61.0"
   skip-validate:
-    description: 'Skip terraform validate step'
+    description: "Skip terraform validate step"
     required: false
-    default: 'false'
+    default: "false"
 
 runs:
   using: "composite"
