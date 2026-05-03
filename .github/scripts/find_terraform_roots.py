@@ -5,14 +5,14 @@ This script detects two Terraform CI target groups under ``--terraform-dir``:
 
 * ``environment_roots``: directories under ``environments/`` that contain
   ``providers.tf``. These roots run init, validate, optional test, and tflint.
-* ``module_test_roots``: module directories under ``modules/`` that contain
-  ``*.tftest.hcl`` files. If a test file is in ``tests/``, the parent module
-  directory is used as the root. These roots run module tests without validate.
+* ``module_roots``: module directories under ``modules/`` that contain
+  ``providers.tf``. These roots run init and tflint without validate, and
+  also run ``terraform test`` when ``*.tftest.hcl`` files are present.
 
 It writes the following key/value pairs to ``$GITHUB_OUTPUT`` when running in
 GitHub Actions, and prints the same key/value pairs to stdout for local use:
-``environment_roots``, ``environment_roots_count``, ``module_test_roots``, and
-``module_test_roots_count``.
+``environment_roots``, ``environment_roots_count``, ``module_roots``, and
+``module_roots_count``.
 """
 
 from __future__ import annotations
@@ -39,21 +39,14 @@ def find_environment_roots(terraform_dir: Path) -> list[Path]:
     )
 
 
-def module_root_for_test(test_file: Path) -> Path:
-    for parent in test_file.parents:
-        if parent.name == "tests":
-            return parent.parent
-    return test_file.parent
-
-
-def find_module_test_roots(terraform_dir: Path) -> list[Path]:
+def find_module_roots(terraform_dir: Path) -> list[Path]:
     modules_dir = terraform_dir / "modules"
     if not modules_dir.exists():
         return []
 
     roots = {
-        module_root_for_test(path)
-        for path in modules_dir.rglob("*.tftest.hcl")
+        path.parent
+        for path in modules_dir.rglob("providers.tf")
         if ".terraform" not in path.parts
     }
     return sorted(roots)
@@ -87,21 +80,21 @@ def main() -> None:
     terraform_dir = args.terraform_dir
 
     environment_roots = find_environment_roots(terraform_dir)
-    module_test_roots = find_module_test_roots(terraform_dir)
+    module_roots = find_module_roots(terraform_dir)
 
     values = {
         "environment_roots": to_json(environment_roots),
         "environment_roots_count": str(len(environment_roots)),
-        "module_test_roots": to_json(module_test_roots),
-        "module_test_roots_count": str(len(module_test_roots)),
+        "module_roots": to_json(module_roots),
+        "module_roots_count": str(len(module_roots)),
     }
     write_github_output(values)
 
     print(f"Terraform environment roots: {values['environment_roots']}")
-    print(f"Terraform module test roots: {values['module_test_roots']}")
+    print(f"Terraform module roots: {values['module_roots']}")
 
-    if not environment_roots and not module_test_roots:
-        raise SystemExit("No Terraform environment or module test roots found.")
+    if not environment_roots and not module_roots:
+        raise SystemExit("No Terraform environment or module roots found.")
 
 
 if __name__ == "__main__":
