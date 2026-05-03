@@ -6,7 +6,8 @@ This script detects two Terraform CI target groups under ``--terraform-dir``:
 * ``environment_roots``: directories under ``environments/`` that contain
   ``providers.tf``. These roots run init, validate, optional test, and tflint.
 * ``module_roots``: module directories under ``modules/`` that contain
-  ``providers.tf``. These roots run init and tflint without validate.
+  ``providers.tf``. These roots run init and tflint without validate, and
+  also run ``terraform test`` when ``*.tftest.hcl`` files are present.
 
 It writes the following key/value pairs to ``$GITHUB_OUTPUT`` when running in
 GitHub Actions, and prints the same key/value pairs to stdout for local use:
