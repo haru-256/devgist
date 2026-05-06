@@ -93,7 +93,7 @@ class DBLPRepository:
         try:
             resp = await self.http.get(self.SEARCH_API, params=params)
 
-            resp.raise_for_status()
+            # raise_for_status() は不要 — HttpRetryClient が非リトライエラーで既に上げる
             data = resp.json()
             return self._parse_papers(data)
 

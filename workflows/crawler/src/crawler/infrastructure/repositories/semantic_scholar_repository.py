@@ -102,7 +102,7 @@ class SemanticScholarRepository:
                 params=params,
                 json=payload,
             )
-            resp.raise_for_status()
+            # raise_for_status() は不要 — HttpRetryClient が非リトライエラーで既に上げる
             data = resp.json()
 
             # レスポンスのパース

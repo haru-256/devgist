@@ -158,7 +158,7 @@ class ArxivRepository:
                 params=params,
                 headers={"Accept": "application/atom+xml"},
             )
-            resp.raise_for_status()
+            # raise_for_status() は不要 — HttpRetryClient が非リトライエラーで既に上げる
         except httpx.HTTPStatusError as e:
             logger.warning(
                 "arXiv HTTP error: status={status} query={query} context={ctx}",
