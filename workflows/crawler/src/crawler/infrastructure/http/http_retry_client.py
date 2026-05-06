@@ -57,7 +57,7 @@ class HttpRetryClient:
         self._retry_statuses = retry_statuses
 
         def _should_retry(resp: httpx.Response) -> bool:
-            return resp.status_code in retry_statuses
+            return resp.status_code in self._retry_statuses
 
         retry_dec = retry(
             stop=stop_after_attempt(max_retry_count),
@@ -94,7 +94,7 @@ class HttpRetryClient:
             HTTP レスポンス。
 
         Raises:
-            httpx.HTTPStatusError: ステータスコードが retry_statuses に含まれない場合。
+            httpx.HTTPStatusError: 4xx/5xx かつ retry_statuses 対象外のステータスコードの場合。
             httpx.RequestError: ネットワークレベルのエラー。
         """
         async with AsyncExitStack() as stack:
@@ -125,7 +125,7 @@ class HttpRetryClient:
                     )
                 case _:
                     raise ValueError(f"Unsupported HTTP method: {method}")
-        if response.status_code not in self._retry_statuses:
+        if response.status_code >= 400 and response.status_code not in self._retry_statuses:
             response.raise_for_status()
         return response
 
