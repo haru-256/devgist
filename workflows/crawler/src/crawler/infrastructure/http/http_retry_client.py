@@ -54,7 +54,7 @@ class HttpRetryClient:
         self._client = client
         self._limiter = limiter
         self._semaphore = semaphore
-        self._allowed: set[int] = {200} | set(retry_statuses)
+        self._retry_statuses = retry_statuses
 
         def _should_retry(resp: httpx.Response) -> bool:
             return resp.status_code in retry_statuses
@@ -81,7 +81,7 @@ class HttpRetryClient:
     ) -> httpx.Response:
         """HTTP リクエストの実装（リトライなし）。
 
-        ステータスコードが許可リストにない場合は raise_for_status() を呼び出します。
+        retry_statuses に含まれるステータスコード以外は raise_for_status() を呼び出します。
 
         Args:
             method: HTTP メソッド。指定可能な値は ``"GET"``, ``"POST"``, ``"HEAD"``。
@@ -94,7 +94,7 @@ class HttpRetryClient:
             HTTP レスポンス。
 
         Raises:
-            httpx.HTTPStatusError: ステータスコードが許可リストにない場合。
+            httpx.HTTPStatusError: ステータスコードが retry_statuses に含まれない場合。
             httpx.RequestError: ネットワークレベルのエラー。
         """
         async with AsyncExitStack() as stack:
@@ -125,7 +125,7 @@ class HttpRetryClient:
                     )
                 case _:
                     raise ValueError(f"Unsupported HTTP method: {method}")
-        if response.status_code not in self._allowed:
+        if response.status_code not in self._retry_statuses:
             response.raise_for_status()
         return response
 
