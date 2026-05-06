@@ -19,12 +19,7 @@ class DBLPRepository:
     DEFAULT_SLEEP_SECONDS = 1
     DEFAULT_CONCURRENCY = 5
     RETRY_STATUSES = frozenset({429, 500})
-    RETRY_EXCEPTIONS = (
-        httpx.ReadError,
-        httpx.RequestError,
-        httpx.ReadTimeout,
-        httpx.ConnectTimeout,
-    )
+    RETRY_EXCEPTIONS = (httpx.RequestError,)
 
     def __init__(self, http: HttpRetryClient) -> None:
         """DBLPRepositoryインスタンスを初期化します。
@@ -98,7 +93,7 @@ class DBLPRepository:
         try:
             resp = await self.http.get(self.SEARCH_API, params=params)
 
-            resp.raise_for_status()
+            # raise_for_status() は不要 — HttpRetryClient が非リトライエラーで既に上げる
             data = resp.json()
             return self._parse_papers(data)
 

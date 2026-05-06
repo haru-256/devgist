@@ -300,3 +300,6 @@ workflows/crawler/.env.local
 
 # Superpowers
 docs/superpowers
+
+# Git worktrees
+.worktrees/
