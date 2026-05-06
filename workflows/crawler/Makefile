@@ -17,7 +17,7 @@ build-push-image: ## Build, push, and print the digest image reference
 	fi
 	docker buildx build --platform "$(PLATFORM)" -t "$(IMAGE)" --load .
 	@docker push "$(IMAGE)"
-	@digest=$$(docker inspect --format='{{index .RepoDigests 0}}' "$(IMAGE)" | sed 's/.*@//'); \
+	@digest=$$(docker inspect --format='{{join .RepoDigests "\n"}}' "$(IMAGE)" | head -n 1 | sed 's/.*@//'); \
 	if [ -z "$${digest}" ]; then \
 		printf 'Failed to resolve pushed image digest for %s\n' "$(IMAGE)" >&2; \
 		exit 1; \
