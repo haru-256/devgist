@@ -11,10 +11,19 @@ IMAGE := $(REPO_URL)/$(IMAGE_NAME):$(IMAGE_TAG)
 
 .PHONY: build-push-image
 build-push-image: ## Build, push, and print the digest image reference
-	docker buildx build --platform "$(PLATFORM)" -t "$(IMAGE)" --push .
-	@digest=$$(docker buildx imagetools inspect "$(IMAGE)" --format '{{json .Manifest.Digest}}' | tr -d '"'); \
-	if ! printf '%s\n' "$${digest}" | grep -Eq '^sha256:[a-f0-9]{64}$$'; then \
+	@if printf '%s' "$(PLATFORM)" | grep -q ','; then \
+		printf 'Error: PLATFORM must be a single platform for --load (got: %s)\n' "$(PLATFORM)" >&2; \
+		exit 1; \
+	fi
+	docker buildx build --platform "$(PLATFORM)" -t "$(IMAGE)" --load .
+	@docker push "$(IMAGE)"
+	@digest=$$(docker inspect --format='{{index .RepoDigests 0}}' "$(IMAGE)" | sed 's/.*@//'); \
+	if [ -z "$${digest}" ]; then \
 		printf 'Failed to resolve pushed image digest for %s\n' "$(IMAGE)" >&2; \
+		exit 1; \
+	fi; \
+	if ! printf '%s\n' "$${digest}" | grep -Eq '^sha256:[a-f0-9]{64}$$'; then \
+		printf 'Invalid digest format: %s\n' "$${digest}" >&2; \
 		exit 1; \
 	fi; \
 	image_ref="$(REPO_URL)/$(IMAGE_NAME)@$${digest}"; \
