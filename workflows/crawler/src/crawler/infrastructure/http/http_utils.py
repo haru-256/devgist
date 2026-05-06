@@ -3,6 +3,7 @@
 リトライ処理で共通利用されるヘルパー関数を提供します。
 """
 
+from collections.abc import Callable
 from typing import NoReturn
 
 import httpx
@@ -79,7 +80,7 @@ def before_log(retry_state: RetryCallState) -> None:
     )
 
 
-def make_wait_retry_after(retry_statuses: frozenset[int]):
+def make_wait_retry_after(retry_statuses: frozenset[int]) -> Callable[[RetryCallState], float]:
     """retry_statuses に連動した wait 関数を返すファクトリ。
 
     対象ステータスかつ Retry-After ヘッダーがあればその値を使い、
