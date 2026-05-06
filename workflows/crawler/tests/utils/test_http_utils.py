@@ -360,3 +360,26 @@ async def test_retry_after_header_missing_fallback(mocker: MockerFixture) -> Non
     assert call_args
     wait_time = call_args[0][0]
     assert 1.0 <= wait_time <= 10.0
+
+
+@pytest.mark.asyncio
+async def test_retry_after_header_honored_for_non_429_retry_status(mocker: MockerFixture) -> None:
+    """retry_statuses に 503 を含めた場合、503 の Retry-After ヘッダーも使われること。"""
+    mock_sleep = mocker.patch("asyncio.sleep", new_callable=mocker.AsyncMock)
+    mock_client = mocker.AsyncMock(spec=httpx.AsyncClient)
+
+    resp_503 = mocker.MagicMock(spec=httpx.Response)
+    resp_503.status_code = 503
+    resp_503.url = "http://test.com"
+    resp_503.headers = httpx.Headers({"Retry-After": "30"})
+
+    resp_200 = mocker.MagicMock(spec=httpx.Response)
+    resp_200.status_code = 200
+
+    mock_client.post.side_effect = [resp_503, resp_200]
+
+    http = HttpRetryClient(mock_client, retry_statuses=frozenset({429, 503}))
+    response = await http.post("http://test.com", params={}, json={})
+
+    assert response.status_code == 200
+    mock_sleep.assert_awaited_once_with(30.0)

@@ -17,7 +17,7 @@ from tenacity import (
 from crawler.infrastructure.http.http_utils import (
     before_log,
     log_and_raise_final_error,
-    wait_retry_after,
+    make_wait_retry_after,
 )
 
 HttpMethod: TypeAlias = Literal["GET", "POST", "HEAD"]
@@ -61,7 +61,7 @@ class HttpRetryClient:
 
         retry_dec = retry(
             stop=stop_after_attempt(max_retry_count),
-            wait=wait_retry_after,
+            wait=make_wait_retry_after(retry_statuses),
             retry=retry_if_result(_should_retry) | retry_if_exception_type(retry_exceptions),
             before=before_log,
             retry_error_callback=log_and_raise_final_error,

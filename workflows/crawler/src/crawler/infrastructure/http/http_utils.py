@@ -79,27 +79,25 @@ def before_log(retry_state: RetryCallState) -> None:
     )
 
 
-def wait_retry_after(retry_state: RetryCallState) -> float:
-    """リトライ時の待機時間を決定します。
+def make_wait_retry_after(retry_statuses: frozenset[int]):
+    """retry_statuses に連動した wait 関数を返すファクトリ。
 
-    Retry-After ヘッダーがあればそれを使用し、なければ指数バックオフを適用します。
-
-    Args:
-        retry_state: tenacity のリトライ状態オブジェクト。
-
-    Returns:
-        次のリトライまでの待機時間（秒）。
+    対象ステータスかつ Retry-After ヘッダーがあればその値を使い、
+    なければ指数バックオフにフォールバックする。
     """
-    if retry_state.outcome is not None and retry_state.outcome.exception() is None:
-        result = retry_state.outcome.result()
-        if isinstance(result, httpx.Response) and result.status_code == 429:
-            retry_after = result.headers.get("Retry-After")
-            if retry_after:
-                try:
-                    wait_time = float(retry_after)
-                    logger.debug(f"Waiting for {wait_time}s (Retry-After)")
-                    return wait_time
-                except ValueError:
-                    logger.warning(f"Invalid Retry-After header: {retry_after}")
+    def wait_retry_after(retry_state: RetryCallState) -> float:
+        if retry_state.outcome is not None and retry_state.outcome.exception() is None:
+            result = retry_state.outcome.result()
+            if isinstance(result, httpx.Response) and result.status_code in retry_statuses:
+                retry_after = result.headers.get("Retry-After")
+                if retry_after:
+                    try:
+                        wait_time = float(retry_after)
+                        logger.debug(f"Waiting for {wait_time}s (Retry-After)")
+                        return wait_time
+                    except ValueError:
+                        logger.warning(f"Invalid Retry-After header: {retry_after}")
 
-    return wait_random_exponential(multiplier=1, min=1, max=10)(retry_state)
+        return wait_random_exponential(multiplier=1, min=1, max=10)(retry_state)
+
+    return wait_retry_after
