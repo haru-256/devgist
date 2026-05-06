@@ -19,12 +19,7 @@ class DBLPRepository:
     DEFAULT_SLEEP_SECONDS = 1
     DEFAULT_CONCURRENCY = 5
     RETRY_STATUSES = frozenset({429, 500})
-    RETRY_EXCEPTIONS = (
-        httpx.ReadError,
-        httpx.RequestError,
-        httpx.ReadTimeout,
-        httpx.ConnectTimeout,
-    )
+    RETRY_EXCEPTIONS = (httpx.RequestError,)
 
     def __init__(self, http: HttpRetryClient) -> None:
         """DBLPRepositoryインスタンスを初期化します。

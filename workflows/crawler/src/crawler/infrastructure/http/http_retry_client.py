@@ -25,10 +25,7 @@ HttpMethod: TypeAlias = Literal["GET", "POST", "HEAD"]
 
 class HttpRetryClient:
     DEFAULT_RETRY_STATUSES: frozenset[int] = frozenset({429})
-    DEFAULT_RETRY_EXCEPTIONS: tuple[type[BaseException], ...] = (
-        httpx.RequestError,
-        httpx.ReadError,
-    )
+    DEFAULT_RETRY_EXCEPTIONS: tuple[type[BaseException], ...] = (httpx.RequestError,)
 
     def __init__(
         self,
@@ -49,7 +46,7 @@ class HttpRetryClient:
             retry_statuses: リトライ対象とするステータスコードの集合。
                 デフォルトは ``frozenset({429})``。
             retry_exceptions: リトライ対象とする例外型のタプル。
-                デフォルトはネットワークエラー（``RequestError``, ``ReadError``）。
+                デフォルトはネットワークエラー（``RequestError`` およびそのサブクラス）。
             max_retry_count: リクエストの最大リトライ回数。
             limiter: 1秒あたりのリクエスト数などを制限するリミッター。
             semaphore: 同時接続数を制限するセマフォ。
