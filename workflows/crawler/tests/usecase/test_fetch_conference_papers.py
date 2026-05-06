@@ -125,6 +125,31 @@ async def test_execute_flow(
 
 
 @pytest.mark.asyncio
+async def test_execute_logs_fetch_result_with_conference_and_year(
+    mock_dblp_repo: MagicMock,
+    mock_datalake: MagicMock,
+    mocker: MockerFixture,
+) -> None:
+    """DBLP取得後のログに学会名と年度の両方が含まれること"""
+    mock_dblp_repo.fetch_papers.return_value = [
+        Paper(title="P1", authors=[], year=2024, venue="RecSys", doi="10.1145/1"),
+    ]
+
+    mock_logger = mocker.patch("crawler.application.usecases.crawl_conference_papers.logger")
+
+    usecase = CrawlConferencePapers(
+        conf_name=ConferenceName.RECSYS,
+        paper_retriever=mock_dblp_repo,
+        paper_enrichers=[],
+        paper_datalake=mock_datalake,
+    )
+
+    await usecase.execute(2024)
+
+    mock_logger.info.assert_any_call("Fetched 1 papers from DBLP for RECSYS 2024")
+
+
+@pytest.mark.asyncio
 async def test_apply_enrichments_updates_all_papers_with_same_doi(
     mock_dblp_repo: MagicMock,
     mock_semantic_scholar_repo: MagicMock,

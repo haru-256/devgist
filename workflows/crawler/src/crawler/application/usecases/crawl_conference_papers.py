@@ -98,7 +98,7 @@ class CrawlConferencePapers:
         logger.info(f"Fetching {self.conf_name.upper()} {year} papers from DBLP...")
         papers = await self.paper_retriever.fetch_papers(conf=self.conf_name, year=year, h=1000)
         logger.info(
-            f"Fetched {len(papers)} papers from DBLP in {self.conf_name.upper()} conference"
+            f"Fetched {len(papers)} papers from DBLP for {self.conf_name.upper()} {year}"
         )
 
         # 2. DOI のない論文を除外 (これ以降の Enrich 処理で DOI が必要なため)
