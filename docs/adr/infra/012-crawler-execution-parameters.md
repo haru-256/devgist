@@ -124,6 +124,7 @@ shards = [
     ...
 ]
 task_index = int(os.getenv("CLOUD_RUN_TASK_INDEX", 0))
+if task_index >= len(shards): return
 conference, year = shards[task_index]
 ```
 
