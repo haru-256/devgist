@@ -12,6 +12,12 @@ REPO_URL="${REPO_URL:?REPO_URL is required}"
 IMAGE_NAME="${IMAGE_NAME:?IMAGE_NAME is required}"
 PLATFORM="${PLATFORM:?PLATFORM is required}"
 
+# Resolve the crawler directory relative to this script so the build context is
+# independent of the caller's current working directory. This lets the script be
+# reused from the Makefile, from repo root, or from GitHub Actions without
+# accidentally building the wrong context.
+CRAWLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 # The tag is convenient for building and pushing, but it is mutable. Terraform
 # should receive the digest-based reference printed at the end of this script.
 IMAGE="${REPO_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
@@ -25,7 +31,7 @@ fi
 
 # Build the image for the requested platform and load it into the local Docker
 # daemon so it can be pushed and inspected by the following steps.
-docker buildx build --platform "${PLATFORM}" -t "${IMAGE}" --load .
+docker buildx build --platform "${PLATFORM}" -t "${IMAGE}" --load "${CRAWLER_DIR}"
 
 # Push the mutable tag to Artifact Registry. The registry records the immutable
 # content digest, which we resolve from Docker metadata below.
