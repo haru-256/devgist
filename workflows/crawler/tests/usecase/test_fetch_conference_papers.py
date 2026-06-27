@@ -117,6 +117,7 @@ async def test_execute_flow(
     mock_datalake.save_papers.assert_called_once_with(
         [initial_papers[0]],
         papers_rep_name="recsys",
+        year=year,
     )
 
     assert result == [initial_papers[0]]

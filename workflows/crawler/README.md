@@ -256,7 +256,7 @@ arXiv APIから論文情報を取得する。
 
 論文データを JSONL 形式でバッチ分割して GCS にアップロードする。
 
-- ファイル名: `{papers_rep_name}_{timestamp}_{uuid}.jsonl`
+- 保存パス: `{prefix_path}/{conference}/{year}/{conference}_{timestamp}_{uuid}.jsonl`
 - デフォルトバッチサイズ: 100件
 - 並列アップロード数: 最大5
 

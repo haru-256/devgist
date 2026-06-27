@@ -58,7 +58,9 @@ class GCSDatalake:
         self.batch_size = batch_size
         self.semaphore = asyncio.Semaphore(self.DEFAULT_CONCURRENCY)
 
-    async def save_papers(self, papers: list[Paper], papers_rep_name: str) -> list[SaveResult]:
+    async def save_papers(
+        self, papers: list[Paper], papers_rep_name: str, year: int
+    ) -> list[SaveResult]:
         """論文データをバッチ分割して GCS に並列保存します。
 
         入力された論文リストを ``batch_size`` 単位で分割し、各バッチを
@@ -70,6 +72,8 @@ class GCSDatalake:
             papers_rep_name: ファイル名のプレフィックスに使用するリポジトリ名。
                 例: "recsys", "nips", "arxiv"。ファイル名は
                 ``{papers_rep_name}_{timestamp}_{uuid_suffix}.jsonl`` となります。
+            year: 保存先パスに含める対象年度。GCS オブジェクトキーは
+                ``{prefix_path}/{papers_rep_name}/{year}/{fname}`` となります。
 
         Returns:
             各バッチの保存結果を表す SaveResult オブジェクトのリスト。
@@ -85,11 +89,8 @@ class GCSDatalake:
                 timestamp = now.strftime("%Y%m%d_%H%M%S_%f")
                 uuid_suffix = uuid.uuid4().hex[:8]  # UUIDの先頭8文字を使用
                 fname = f"{papers_rep_name}_{timestamp}_{uuid_suffix}.jsonl"
-                tasks.append(
-                    tg.create_task(
-                        self._save_content(self.bucket.blob(f"{self.prefix_path}/{fname}"), data)
-                    )
-                )
+                blob_name = f"{self.prefix_path}/{papers_rep_name}/{year}/{fname}"
+                tasks.append(tg.create_task(self._save_content(self.bucket.blob(blob_name), data)))
         results = [task.result() for task in tasks]
         failed_batches = [res for res in results if not res.success]
         if failed_batches:
