@@ -105,16 +105,18 @@ make build-push-image
 # image_ref: us-central1-docker.pkg.dev/haru256-devgist-ops/crawler/crawler@sha256:...
 
 # 2. Terraform で Cloud Run Job のイメージを更新
-cd infra/terraform/ops  # 該当ディレクトリに合わせて変更
+cd infra/terraform/environments/devgist-ops  # 該当ディレクトリに合わせて変更
 cat > crawler_image.auto.tfvars <<EOF
 crawler_image = "us-central1-docker.pkg.dev/haru256-devgist-ops/crawler/crawler@sha256:..."
 EOF
 terraform apply
 
 # 3. 実行時パラメータを上書きしてジョブを実行
+# 値にカンマを含む場合は、gcloud のリスト構文と衝突するため
+# 先頭に ^@^ を付けて @ を区切り文字にする（キーや値に @ が含まれないことを確認）
 gcloud run jobs execute crawler \
   --region us-central1 \
-  --update-env-vars CONFERENCE_NAMES=recsys,YEARS=2025
+  --update-env-vars='^@^CONFERENCE_NAMES=recsys,kdd@YEARS=2024,2025'
 ```
 
 ## ディレクトリ構成
@@ -337,13 +339,18 @@ gcloud auth application-default login
 
 ### direnv
 
-このディレクトリには `.envrc` が用意されており、[direnv](https://direnv.net/) を有効にすると自動で `uv` 仮想環境を有効化し、`.env.example` の環境変数を読み込みます。
+`.envrc` は `.gitignore` 対象のためリポジトリには含まれていません。必要に応じて以下のように `.envrc` を作成し、[direnv](https://direnv.net/) を有効にすると、`uv` 仮想環境の有効化や `.env.example` の環境変数読み込みが自動化できます。
 
 ```bash
+cat > .envrc <<'EOF'
+layout uv
+export CLOUDSDK_ACTIVE_CONFIG_NAME=haru256-devgist-data-dev
+dotenv .env.example
+EOF
 direnv allow
 ```
 
-ローカルで値を上書きしたい場合は `.env` などを作成し、`.envrc` の `dotenv .env.example` を適宜変更してください。
+ローカルで値を上書きしたい場合は `.env` などを作成し、`.envrc` の `dotenv .env.example` を `dotenv .env` に変更してください。
 
 ### Makefile ターゲット
 
