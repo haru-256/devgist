@@ -81,12 +81,15 @@ class PaperDatalake(Protocol):
     論文データをバッチ分割し、外部ストレージに永続化するインターフェースを定義します。
     """
 
-    async def save_papers(self, papers: list[Paper], papers_rep_name: str) -> list[SaveResult]:
+    async def save_papers(
+        self, papers: list[Paper], papers_rep_name: str, year: int
+    ) -> list[SaveResult]:
         """論文データをストレージに保存します。
 
         Args:
             papers: 保存対象の論文オブジェクトのリスト。
             papers_rep_name: ファイル名のプレフィックスに使用するリポジトリ名。
+            year: 保存先パスに含める対象年度。
 
         Returns:
             各バッチの保存結果を表す SaveResult オブジェクトのリスト。

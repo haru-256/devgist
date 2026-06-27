@@ -86,6 +86,7 @@ def make_wait_retry_after(retry_statuses: frozenset[int]) -> Callable[[RetryCall
     対象ステータスかつ Retry-After ヘッダーがあればその値を使い、
     なければ指数バックオフにフォールバックする。
     """
+
     def wait_retry_after(retry_state: RetryCallState) -> float:
         if retry_state.outcome is not None and retry_state.outcome.exception() is None:
             result = retry_state.outcome.result()

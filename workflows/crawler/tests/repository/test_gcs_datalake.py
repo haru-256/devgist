@@ -72,12 +72,12 @@ async def test_save_papers(
     )
 
     # save_papersを呼び出す
-    results = await datalake.save_papers(papers, papers_rep_name="test")
+    results = await datalake.save_papers(papers, papers_rep_name="test", year=2025)
 
     # バケットとblobの呼び出しを検証
     # ファイル名には timestamp と UUID が含まれるため正規表現で検証する
-    # 形式: papers/test_{YYYYMMDD}_{HHMMSS}_{microseconds}_{uuid8}.jsonl
-    blob_name_pattern = re.compile(r"papers/test_\d{8}_\d{6}_\d{6}_[a-f0-9]{8}\.jsonl")
+    # 形式: papers/test/2025/test_{YYYYMMDD}_{HHMMSS}_{microseconds}_{uuid8}.jsonl
+    blob_name_pattern = re.compile(r"papers/test/2025/test_\d{8}_\d{6}_\d{6}_[a-f0-9]{8}\.jsonl")
     actual_blob_calls = [c.args[0] for c in mock_bucket.blob.call_args_list]
     assert len(actual_blob_calls) == 2  # batch_size=1 なので 2バッチ
     for blob_path in actual_blob_calls:
