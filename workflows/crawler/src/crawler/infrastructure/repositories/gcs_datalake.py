@@ -6,6 +6,7 @@
 """
 
 import asyncio
+import posixpath
 import uuid
 from datetime import datetime, timezone
 
@@ -89,7 +90,7 @@ class GCSDatalake:
                 timestamp = now.strftime("%Y%m%d_%H%M%S_%f")
                 uuid_suffix = uuid.uuid4().hex[:8]  # UUIDの先頭8文字を使用
                 fname = f"{papers_rep_name}_{timestamp}_{uuid_suffix}.jsonl"
-                blob_name = f"{self.prefix_path}/{papers_rep_name}/{year}/{fname}"
+                blob_name = posixpath.join(self.prefix_path, papers_rep_name, str(year), fname)
                 tasks.append(tg.create_task(self._save_content(self.bucket.blob(blob_name), data)))
         results = [task.result() for task in tasks]
         failed_batches = [res for res in results if not res.success]
