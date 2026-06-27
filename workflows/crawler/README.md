@@ -11,6 +11,8 @@ crawler に関する Architecture Decision Record (ADR) は [docs/adr/](../../do
 - 運用ガイド: [docs/adr/README.md](../../docs/adr/README.md)
 - テンプレート: [docs/adr/_template.md](../../docs/adr/_template.md)
 - [INFRA-ADR-003](../../docs/adr/infra/003-crawler-execution-platform.md)
+- [INFRA-ADR-010](../../docs/adr/infra/010-cloud-run-job-management.md)
+- [INFRA-ADR-012](../../docs/adr/infra/012-crawler-execution-parameters.md)
 - [CRAWLER-ADR-001](../../docs/adr/crawler/001-language-selection.md)
 - [CRAWLER-ADR-002](../../docs/adr/crawler/002-xml-parsing-security.md)
 
@@ -67,16 +69,19 @@ graph TD
 
 ## GCP での実行構成
 
-`crawler` の実行基盤は、関連 ADR に合わせて `Cloud Run Jobs` を前提とします。初期運用では GitHub Actions でコンテナイメージをビルドして `Artifact Registry` に配置し、手動で `Cloud Run Jobs` を実行して、収集結果を `GCS` に保存します。
+`crawler` の実行基盤は `Cloud Run Jobs` です（[INFRA-ADR-003](../../docs/adr/infra/003-crawler-execution-platform.md)、[INFRA-ADR-010](../../docs/adr/infra/010-cloud-run-job-management.md)、[INFRA-ADR-012](../../docs/adr/infra/012-crawler-execution-parameters.md) 参照）。
+
+現時点では **手動でのイメージビルド・push と Cloud Run Job 実行** が運用モデルです。
 
 ```mermaid
 graph LR
-    Dev[Developer] --> GitHub[GitHub Repository]
-    GitHub --> GHA[GitHub Actions<br/>Manual workflow dispatch]
-    GHA --> Build[Build crawler image]
+    Dev[Developer / Operator] --> Make[make build-push-image]
+    Make --> Script[scripts/build-push-image.sh]
+    Script --> Build[docker buildx build]
     Build --> AR[Artifact Registry]
-    AR --> CRJ[Cloud Run Jobs<br/>crawler execution]
-    Operator[Operator / Manual trigger] --> CRJ
+    AR --> TF[Terraform<br/>image digest 適用]
+    TF --> CRJ[Cloud Run Jobs<br/>single generic job]
+    Operator[Operator] --> CRJ
     CRJ --> APIs[External source APIs<br/>DBLP / Semantic Scholar / Unpaywall / arXiv]
     APIs --> CRJ
     CRJ --> GCS[GCS Datalake<br/>JSONL]
@@ -85,18 +90,38 @@ graph LR
 
 ### 構成メモ
 
-- CI/CD は `GitHub Actions` の手動トリガー（`workflow_dispatch`）から開始する
-- コンテナイメージは `Artifact Registry` に保存し、`Cloud Run Jobs` から参照する
+- `Cloud Run Job` は Terraform で管理する（[INFRA-ADR-010](../../docs/adr/infra/010-cloud-run-job-management.md)）
+- カンファレンス論文クロールは **単一の汎用 Cloud Run Job** で運用し、実行時に `CONFERENCE_NAMES` と `YEARS` を上書きする（[INFRA-ADR-012](../../docs/adr/infra/012-crawler-execution-parameters.md)）
+- コンテナイメージは `Artifact Registry` に保存し、`make build-push-image` でビルド・push して digest 参照を取得する
+- 取得した digest 参照を Terraform の `crawler_image` 変数に渡して apply し、Job のイメージを更新する
 - crawler は HTTP サービスではなく完了まで走るバッチなので、`Cloud Run Service` ではなく `Cloud Run Jobs` を使う
 - 収集データの保存先は `GCS` をデータレイクとして使う
-- 将来定期実行へ移行する場合は、`Cloud Scheduler` を `Cloud Run Jobs` の起動元として追加する
+
+### 手動実行例
+
+```bash
+# 1. イメージをビルド・push して digest 参照を取得
+make build-push-image
+# image_ref: us-central1-docker.pkg.dev/haru256-devgist-ops/crawler/crawler@sha256:...
+
+# 2. Terraform で Cloud Run Job のイメージを更新
+cd infra/terraform/ops  # 該当ディレクトリに合わせて変更
+cat > crawler_image.auto.tfvars <<EOF
+crawler_image = "us-central1-docker.pkg.dev/haru256-devgist-ops/crawler/crawler@sha256:..."
+EOF
+terraform apply
+
+# 3. 実行時パラメータを上書きしてジョブを実行
+gcloud run jobs execute crawler \
+  --region us-central1 \
+  --update-env-vars CONFERENCE_NAMES=recsys,YEARS=2025
+```
 
 ## ディレクトリ構成
 
 ```text
 workflows/crawler/
 ├── pyproject.toml
-├── config.toml           # サイト設定（将来用）
 ├── Makefile
 ├── README.md
 ├── src/
@@ -110,7 +135,7 @@ workflows/crawler/
 │       │   ├── models/
 │       │   │   └── paper.py                    # Paper ドメインモデル
 │       │   └── repositories/
-│       │       └── repository.py               # PaperRetriever / PaperEnricher / PaperDatalake プロトコル
+│       │       └── repository.py               # PaperRetriever / PaperEnrichmentProvider / PaperDatalake プロトコル
 │       ├── infrastructure/
 │       │   ├── configs/
 │       │   │   └── __init__.py                 # Config（環境変数から読み込み）
@@ -172,7 +197,7 @@ workflows/crawler/
 | プロトコル | 役割 |
 |---|---|
 | `PaperRetriever` | 論文一覧を一次情報源から取得 |
-| `PaperEnricher` | 既存論文データに情報を追加補完 |
+| `PaperEnrichmentProvider` | 既存論文データに情報を追加補完 |
 | `PaperDatalake` | 論文データを外部ストレージに保存 |
 
 ### Application層（UseCase）
@@ -263,6 +288,8 @@ uv sync
 uv run python src/crawler/main.py
 ```
 
+`uv run` は自動で `.env` ファイルを読み込まないため、direnv を使わない場合は `.env.local` の値を事前に `export` してください。
+
 ### 環境変数
 
 | 変数名 | 必須 | デフォルト | 説明 |
@@ -274,6 +301,7 @@ uv run python src/crawler/main.py
 | `YEARS` | 任意 | `2025` | 対象年度（カンマ区切り） |
 | `MAX_RETRY_COUNT` | 任意 | `10` | HTTP リクエストの最大リトライ回数 |
 | `LOG_LEVEL` | 任意 | `DEBUG` | ログ出力レベル |
+| `GOOGLE_APPLICATION_CREDENTIALS` | 任意 | — | GCP 認証用のサービスアカウントキーまたは ADC ファイルパス（Docker Compose 使用時など） |
 
 ローカル開発では `.env.example` をコピーして `.env.local` を作成します:
 
@@ -289,6 +317,47 @@ DATA_LAKE_PROJECT_ID=your-data-lake-project-id
 EMAIL=you@example.com
 YEARS=2024,2025
 ```
+
+### Docker Compose での実行
+
+Docker Compose を使ってコンテナ内で実行できます。`.env.example` を `.env` にコピーして必要な値を設定してください。
+
+```bash
+cp .env.example .env
+# .env を編集
+
+docker compose up --build
+```
+
+`compose.yaml` は `linux/amd64` プラットフォームでビルドし、ホームディレクトリの Application Default Credentials（`~/.config/gcloud/application_default_credentials.json`）をコンテナにマウントします。事前に以下を実行しておいてください。
+
+```bash
+gcloud auth application-default login
+```
+
+### direnv
+
+このディレクトリには `.envrc` が用意されており、[direnv](https://direnv.net/) を有効にすると自動で `uv` 仮想環境を有効化し、`.env.example` の環境変数を読み込みます。
+
+```bash
+direnv allow
+```
+
+ローカルで値を上書きしたい場合は `.env` などを作成し、`.envrc` の `dotenv .env.example` を適宜変更してください。
+
+### Makefile ターゲット
+
+```bash
+make help              # 利用可能なターゲットを表示
+make install           # 依存関係をインストール
+make lock              # 依存関係をロック
+make test              # テストを実行
+make lint              # リンターを実行
+make fmt               # フォーマッターを実行
+make build-push-image  # コンテナイメージをビルド・push し digest 参照を出力
+```
+
+`build-push-image` は `scripts/build-push-image.sh` を呼び出し、単一プラットフォームのイメージをビルドして Artifact Registry に push したあと、`image_ref: <repo>/<name>@sha256:<digest>` 形式で出力します。出力した参照を Terraform の `crawler_image` 変数に渡してください。
 
 ### プログラムからの使用
 
@@ -378,12 +447,9 @@ uv run mypy .
 uv run ruff check .
 ```
 
-### Makefileターゲット
+### Makefile ターゲット
 
-```bash
-make lint
-make test
-```
+利用可能なターゲットは `make help` で確認できます。主要なターゲットについては [使用方法 > Makefile ターゲット](#makefile-ターゲット) を参照してください。
 
 ## アーキテクチャの特徴
 
