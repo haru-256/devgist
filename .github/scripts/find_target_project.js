@@ -1,58 +1,62 @@
-// .github/scripts/release-helper.js
+// .github/scripts/find_target_project.js
 
 /**
+ * Find target projects from changed files (or explicit input).
+ *
+ * Inputs are passed via environment variables so this module can be loaded by
+ * actions/github-script with `require`:
+ *   - TARGET_PROJECTS: comma separated project paths. If set, used as-is.
+ *   - REQUIRED_FILES:  comma separated file names that identify a project.
+ *   - CHANGED_FILES:   JSON array of changed file/directory paths.
+ *
  * @param {object} params
- * @param {import('@octokit/rest').Octokit} params.github
- * @param {import('@actions/github/lib/context').Context} params.context
  * @param {import('@actions/core')} params.core
  */
-module.exports = async ({ github, context, core }) => {
-  // ここにロジックを書く
-  core.info("外部スクリプトを開始します");
+module.exports = async ({ core }) => {
   const fs = require('node:fs');
-  // If target_projects input is provided, use it
-  let dispatch_inputs = "${{ inputs.target_projects }}";
-  if (dispatch_inputs !== "") {
-    dispatch_inputs = dispatch_inputs.split(',').map(path => path.trim());
-    core.setOutput('projects', JSON.stringify(dispatch_inputs));
-  } else { // If no input is provided, get directories from changed files
-    const changed_paths = JSON.parse(${{ toJSON(steps.changed-files.outputs.all_changed_and_modified_files) }});
-    // convert ['hoge/fuga', 'foo/zoo'] => ['hoge', 'hoge/fuga', 'foo', 'foo/zoo']
-    const set = new Set();
-    changed_paths.forEach(path => {
-      const segments = path.split('/');
-      let current = '';
-      segments.forEach((segment, index) => {
-        current = index === 0 ? segment : `${current}/${segment}`;
-        set.add(current);
-      });
-    });
-    const changed_directories = Array.from(set);
-    const required_files = "${{ inputs.required_files }}".split(',').map(path => path.trim());
-    // Filter out directories that contain required files.
-    const projects = changed_directories.filter(path => {
-      if (
-        fs.statSync(path).isDirectory()
-      ) {
-        // Check if all required files exist in the directory
-        const all_files_exist = required_files.every(file => fs.existsSync(`${path}/${file}`));
-        if (all_files_exist) {
-          return true;
-        }
-      }
-      return false;
-    });
+
+  // If target_projects input is provided, use it as-is.
+  const dispatchInput = (process.env.TARGET_PROJECTS ?? '').trim();
+  if (dispatchInput !== '') {
+    const projects = dispatchInput
+      .split(',')
+      .map(path => path.trim())
+      .filter(Boolean);
     core.setOutput('projects', JSON.stringify(projects));
+    return;
   }
-  const { owner, repo } = context.repo;
 
-  // 例: Issueを作成する
-  await github.rest.issues.create({
-    owner,
-    repo,
-    title: "Automated Issue via Script",
-    body: "これは外部ファイルから作成されました。",
+  // Otherwise, derive projects from the changed files.
+  // CHANGED_FILES may be an empty string when nothing changed, so guard JSON.parse.
+  const changedPaths = JSON.parse((process.env.CHANGED_FILES ?? '').trim() || '[]');
+  // convert ['hoge/fuga', 'foo/zoo'] => ['hoge', 'hoge/fuga', 'foo', 'foo/zoo']
+  const set = new Set();
+  changedPaths.forEach(path => {
+    const segments = path.split('/');
+    let current = '';
+    segments.forEach((segment, index) => {
+      current = index === 0 ? segment : `${current}/${segment}`;
+      set.add(current);
+    });
   });
+  const changedDirectories = Array.from(set);
 
-  return "完了";
+  const requiredFiles = (process.env.REQUIRED_FILES ?? '')
+    .split(',')
+    .map(path => path.trim())
+    .filter(Boolean);
+
+  if (requiredFiles.length === 0) {
+    core.setFailed('REQUIRED_FILES must not be empty');
+    return;
+  }
+
+  // Keep only directories that contain all required files.
+  const projects = changedDirectories.filter(path => {
+    if (fs.existsSync(path) && fs.statSync(path).isDirectory()) {
+      return requiredFiles.every(file => fs.existsSync(`${path}/${file}`));
+    }
+    return false;
+  });
+  core.setOutput('projects', JSON.stringify(projects));
 };

@@ -34,43 +34,14 @@ runs:
     - name: Find Target Projects
       uses: actions/github-script@v7
       id: find-target-projects
+      env:
+        TARGET_PROJECTS: ${{ inputs.target_projects }}
+        REQUIRED_FILES: ${{ inputs.required_files }}
+        CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_and_modified_files }}
       with:
         script: |
-          const fs = require('node:fs');
-          // If target_projects input is provided, use it
-          let dispatch_inputs = "${{ inputs.target_projects }}";
-          if (dispatch_inputs !== "") {
-            dispatch_inputs = dispatch_inputs.split(',').map(path => path.trim());
-            core.setOutput('projects', JSON.stringify(dispatch_inputs));
-          } else { // If no input is provided, get directories from changed files
-            const changed_paths = JSON.parse(${{ toJSON(steps.changed-files.outputs.all_changed_and_modified_files) }});
-            // convert ['hoge/fuga', 'foo/zoo'] => ['hoge', 'hoge/fuga', 'foo', 'foo/zoo']
-            const set = new Set();
-            changed_paths.forEach(path => {
-              const segments = path.split('/');
-              let current = '';
-              segments.forEach((segment, index) => {
-                current = index === 0 ? segment : `${current}/${segment}`;
-                set.add(current);
-              });
-            });
-            const changed_directories = Array.from(set);
-            const required_files = "${{ inputs.required_files }}".split(',').map(path => path.trim());
-            // Filter out directories that contain required files.
-            const projects = changed_directories.filter(path => {
-              if (
-                fs.existsSync(path) && fs.statSync(path).isDirectory()
-              ) {
-                // Check if all required files exist in the directory
-                const all_files_exist = required_files.every(file => fs.existsSync(`${path}/${file}`));
-                if (all_files_exist) {
-                  return true;
-                }
-              }
-              return false;
-            });
-            core.setOutput('projects', JSON.stringify(projects));
-          }
+          const script = require('${{ github.action_path }}/../../scripts/find_target_project.js');
+          await script({ github, context, core });
     - name: Print changed directories
       run: |
         echo "::debug::Found Projects: ${{ steps.find-target-projects.outputs.projects }}"
