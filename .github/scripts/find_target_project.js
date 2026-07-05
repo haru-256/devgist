@@ -18,7 +18,10 @@ module.exports = async ({ core }) => {
   // If target_projects input is provided, use it as-is.
   const dispatchInput = (process.env.TARGET_PROJECTS ?? '').trim();
   if (dispatchInput !== '') {
-    const projects = dispatchInput.split(',').map(path => path.trim());
+    const projects = dispatchInput
+      .split(',')
+      .map(path => path.trim())
+      .filter(Boolean);
     core.setOutput('projects', JSON.stringify(projects));
     return;
   }
@@ -40,7 +43,13 @@ module.exports = async ({ core }) => {
 
   const requiredFiles = (process.env.REQUIRED_FILES ?? '')
     .split(',')
-    .map(path => path.trim());
+    .map(path => path.trim())
+    .filter(Boolean);
+
+  if (requiredFiles.length === 0) {
+    core.setFailed('REQUIRED_FILES must not be empty');
+    return;
+  }
 
   // Keep only directories that contain all required files.
   const projects = changedDirectories.filter(path => {
