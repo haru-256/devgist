@@ -37,3 +37,23 @@ output "github_actions_service_account_member" {
   value       = module.service_accounts.members["github-actions"]
   description = "The IAM member string of the GitHub Actions service account"
 }
+
+output "ops_project_number" {
+  value       = data.google_project.project.number
+  description = "The GCP project number of the ops environment"
+}
+
+output "cursor_wif_pool_id" {
+  value       = module.cursor_wif.pool_id
+  description = "Workload identity pool ID for Cursor Cloud OIDC"
+}
+
+output "cursor_wif_provider_id" {
+  value       = module.cursor_wif.provider_id
+  description = "OIDC provider ID in the Cursor Cloud workload identity pool"
+}
+
+output "cursor_wif_audience" {
+  value       = module.cursor_wif.audience
+  description = "Default JWT audience for the Cursor Cloud OIDC provider. Mint tokens with this aud value."
+}

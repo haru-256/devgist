@@ -21,3 +21,14 @@ variable "service_account_user_emails" {
     error_message = "Each service account user email must be a valid email address."
   }
 }
+
+variable "cursor_oidc_repo_url" {
+  type        = string
+  description = "GitHub repository URL claim that Cursor OIDC tokens must match (host/owner/repo, no scheme)."
+  default     = "github.com/haru-256/devgist"
+
+  validation {
+    condition     = can(regex("^github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.cursor_oidc_repo_url))
+    error_message = "cursor_oidc_repo_url must look like github.com/owner/repo without a scheme."
+  }
+}

@@ -3,6 +3,7 @@ locals {
   required_services = [
     "artifactregistry.googleapis.com", # Artifact Registry
     "iam.googleapis.com",              # IAM
+    "sts.googleapis.com",              # Security Token Service (WIF)
   ]
 
   artifact_registries = {
@@ -38,6 +39,26 @@ module "artifact_registries" {
   location      = var.gcp_default_region
   repository_id = each.key
   description   = each.value.description
+
+  depends_on = [module.required_project_services]
+}
+
+module "cursor_wif" {
+  source = "../../modules/workload_identity_oidc"
+
+  project_id  = data.google_project.project.project_id
+  pool_id     = "cursor"
+  provider_id = "oidc"
+  issuer_uri  = "https://api.cursor.com"
+  description = "OIDC federation for Cursor Cloud Agent"
+
+  attribute_mapping = {
+    "google.subject"    = "assertion.sub"
+    "attribute.repo"    = "assertion.repo_url"
+    "attribute.runtime" = "assertion.agent_runtime"
+  }
+
+  attribute_condition = "assertion.repo_url == \"${var.cursor_oidc_repo_url}\" && assertion.agent_runtime == \"managed\""
 
   depends_on = [module.required_project_services]
 }

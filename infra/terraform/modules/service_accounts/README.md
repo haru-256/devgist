@@ -2,7 +2,7 @@
 
 Google Cloud service accounts を作成し、Service Account 自身の権限と、Service Account を利用できる principal をまとめて管理する wrapper module です。
 
-内部では公式 module [`terraform-google-modules/service-accounts/google`](https://registry.terraform.io/modules/terraform-google-modules/service-accounts/google/latest) を利用します。DevGist 側では、SA ごとに異なる project role と `roles/iam.serviceAccountUser` / `roles/iam.serviceAccountTokenCreator` を同じ入力で扱えるように薄く包んでいます。
+内部では公式 module [`terraform-google-modules/service-accounts/google`](https://registry.terraform.io/modules/terraform-google-modules/service-accounts/google/latest) を利用します。DevGist 側では、SA ごとに異なる project role と `roles/iam.serviceAccountUser` / `roles/iam.serviceAccountTokenCreator` / `roles/iam.workloadIdentityUser` を同じ入力で扱えるように薄く包んでいます。
 
 ## 役割
 
@@ -10,6 +10,7 @@ Google Cloud service accounts を作成し、Service Account 自身の権限と�
 - SA ごとに project role を付与する
 - SA ごとに `roles/iam.serviceAccountUser` を付与する
 - SA ごとに `roles/iam.serviceAccountTokenCreator` を付与する
+- SA ごとに `roles/iam.workloadIdentityUser` を付与する
 - Service Account key は作成しない
 
 ## 入力例
@@ -34,6 +35,10 @@ module "service_accounts" {
       service_account_users = [
         "user:admin@example.com",
       ]
+
+      # Optional. Use when a federated identity must impersonate this SA.
+      # Cursor Cloud uses WIF direct resource access instead (INFRA-ADR-014).
+      workload_identity_users = []
     }
   }
 }
@@ -43,11 +48,11 @@ module "service_accounts" {
 
 `project_roles` は **Service Account が何をできるか** を定義します。たとえば Artifact Registry へ push する SA には `roles/artifactregistry.writer` を付与します。
 
-`service_account_users` と `token_creators` は **誰がその Service Account を使えるか** を定義します。Cloud Run Jobs などに SA を attach / actAs できればよい場合は `service_account_users` を使います。短命 token を発行して impersonation する必要がある場合だけ `token_creators` を使います。
+`service_account_users`、`token_creators`、`workload_identity_users` は **誰がその Service Account を使えるか** を定義します。Cloud Run Jobs などに SA を attach / actAs できればよい場合は `service_account_users` を使います。短命 token を発行して impersonation する必要がある場合だけ `token_creators` を使います。Workload Identity Federation の federated principal から impersonate する場合は `workload_identity_users` に `principal://` または `principalSet://` を渡します。
 
 ## 注意点
 
-- `service_account_users` と `token_creators` は `user:...`, `group:...`, `serviceAccount:...` のような IAM member 形式で渡します。
+- `service_account_users`、`token_creators`、`workload_identity_users` は `user:...`, `group:...`, `serviceAccount:...`, `principal://...` のような IAM member 形式で渡します。
 - 人間ユーザーのメールアドレスなど repository 管理外にしたい値は、root module 側の untracked `terraform.tfvars` から渡してください。
 - この module は Service Account key を作成しません。CI/CD やローカル実行では WIF または impersonation を使う前提です。
 

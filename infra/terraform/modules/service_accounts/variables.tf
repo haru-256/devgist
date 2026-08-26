@@ -24,6 +24,10 @@ Service accounts and IAM settings.
 - service_account_users:
   Members allowed to attach / actAs this service account.
   Usually used by deployer identities for Cloud Run, GCE, Cloud Functions, etc.
+
+- workload_identity_users:
+  Members allowed to impersonate this service account through Workload Identity Federation.
+  Use principal:// or principalSet:// members from a workload identity pool.
 EOT
 
   type = map(object({
@@ -37,6 +41,8 @@ EOT
     token_creators = optional(list(string), [])
 
     service_account_users = optional(list(string), [])
+
+    workload_identity_users = optional(list(string), [])
   }))
 
   default = {}
