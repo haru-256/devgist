@@ -2,7 +2,7 @@
 
 Generic OIDC Workload Identity Federation pool and provider.
 
-This module creates one pool and one OIDC provider. It does not create service accounts or resource IAM. Callers mint a JWT whose `aud` matches the `audience` output, then impersonate a Service Account that grants `roles/iam.workloadIdentityUser` to the federated subject.
+This module creates one pool and one OIDC provider. It does not create service accounts or resource IAM. Callers mint a JWT whose `aud` matches the `audience` output, then grant IAM roles directly to the federated principal (`principal://` or `principalSet://`).
 
 ## Resources
 
@@ -53,4 +53,4 @@ module "cursor_oidc" {
 }
 ```
 
-Leave `allowed_audiences` empty so GCP accepts only the default provider audience. That value is `audience` in the module outputs.
+Leave `allowed_audiences` empty so GCP accepts only the default provider audience. That value is `audience` in the module outputs. Grant resource IAM to `principal://.../subject/<sub>`, not to a service account.

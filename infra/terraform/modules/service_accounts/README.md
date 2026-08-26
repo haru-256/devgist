@@ -35,18 +35,10 @@ module "service_accounts" {
       service_account_users = [
         "user:admin@example.com",
       ]
-    }
 
-    cursor-cloud = {
-      description = "Service account impersonated by Cursor Cloud Agent via WIF"
-
-      service_account_users = [
-        "user:admin@example.com",
-      ]
-
-      workload_identity_users = [
-        "principal://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/cursor/subject/user:1",
-      ]
+      # Optional. Use when a federated identity must impersonate this SA.
+      # Cursor Cloud uses WIF direct resource access instead (INFRA-ADR-014).
+      workload_identity_users = []
     }
   }
 }

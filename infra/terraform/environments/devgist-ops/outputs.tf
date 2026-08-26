@@ -57,13 +57,3 @@ output "cursor_wif_audience" {
   value       = module.cursor_wif.audience
   description = "Default JWT audience for the Cursor Cloud OIDC provider. Mint tokens with this aud value."
 }
-
-output "cursor_cloud_service_account_email" {
-  value       = module.service_accounts.emails["cursor-cloud"]
-  description = "The email address of the Cursor Cloud service account"
-}
-
-output "cursor_cloud_service_account_member" {
-  value       = module.service_accounts.members["cursor-cloud"]
-  description = "The IAM member string of the Cursor Cloud service account"
-}

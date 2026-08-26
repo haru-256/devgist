@@ -4,7 +4,6 @@ locals {
     "artifactregistry.googleapis.com", # Artifact Registry
     "iam.googleapis.com",              # IAM
     "sts.googleapis.com",              # Security Token Service (WIF)
-    "iamcredentials.googleapis.com",   # IAM Credentials (SA impersonation)
   ]
 
   artifact_registries = {
@@ -15,13 +14,6 @@ locals {
 
   service_account_user_members = [
     for email in var.service_account_user_emails : "user:${email}"
-  ]
-
-  # Cursor OIDC の sub を WIF federated principal に変換する。
-  # allowlist が空なら impersonate できる member は無い。
-  cursor_cloud_workload_identity_users = [
-    for sub in var.cursor_oidc_subjects :
-    "principal://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${module.cursor_wif.pool_id}/subject/${sub}"
   ]
 }
 
@@ -88,14 +80,6 @@ module "service_accounts" {
       ]
 
       service_account_users = local.service_account_user_members
-    }
-
-    cursor-cloud = {
-      description = "Service account impersonated by Cursor Cloud Agent via Workload Identity Federation"
-
-      # datalake IAM は app-dev 側で付与する。ops は data の remote state を読まない。
-      service_account_users   = local.service_account_user_members
-      workload_identity_users = local.cursor_cloud_workload_identity_users
     }
   }
 

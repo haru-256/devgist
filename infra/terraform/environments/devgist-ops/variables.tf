@@ -32,17 +32,3 @@ variable "cursor_oidc_repo_url" {
     error_message = "cursor_oidc_repo_url must look like github.com/owner/repo without a scheme."
   }
 }
-
-variable "cursor_oidc_subjects" {
-  type        = set(string)
-  description = "Cursor OIDC subject claims allowed to impersonate cursor-cloud. Empty means nobody can impersonate. Set this in the gitignored terraform.tfvars."
-  default     = []
-
-  validation {
-    condition = alltrue([
-      for sub in var.cursor_oidc_subjects :
-      can(regex("^(user|service_account):.+$", sub))
-    ])
-    error_message = "Each cursor_oidc_subjects value must start with \"user:\" or \"service_account:\"."
-  }
-}

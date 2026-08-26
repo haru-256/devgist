@@ -7,7 +7,8 @@ override_data {
       ops_project_id                                = "mock-ops-project"
       crawler_artifact_registry_repository_id       = "mock-crawler-repo"
       crawler_artifact_registry_repository_location = "us-central1"
-      cursor_cloud_service_account_member           = "serviceAccount:cursor-cloud@mock-ops-project.iam.gserviceaccount.com"
+      ops_project_number                            = "123456789"
+      cursor_wif_pool_id                            = "cursor"
     }
   }
 }
@@ -104,26 +105,41 @@ run "reject_space_separated_crawler_conference_names" {
   ]
 }
 
-run "grant_cursor_cloud_datalake_read_write" {
+run "grant_cursor_oidc_datalake_read_write" {
   command = plan
 
   variables {
     crawler_conference_names = "recsys"
+    cursor_oidc_subjects     = ["user:308716925"]
   }
 
   assert {
-    condition     = google_storage_bucket_iam_member.cursor_cloud["roles/storage.objectViewer"].member == "serviceAccount:cursor-cloud@mock-ops-project.iam.gserviceaccount.com"
-    error_message = "Expected cursor-cloud objectViewer member from ops remote state"
+    condition     = google_storage_bucket_iam_member.cursor_oidc["user:308716925|roles/storage.objectViewer"].member == "principal://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/cursor/subject/user:308716925"
+    error_message = "Expected Cursor OIDC objectViewer member to be the WIF federated principal"
   }
 
   assert {
-    condition     = google_storage_bucket_iam_member.cursor_cloud["roles/storage.objectCreator"].member == "serviceAccount:cursor-cloud@mock-ops-project.iam.gserviceaccount.com"
-    error_message = "Expected cursor-cloud objectCreator member from ops remote state"
+    condition     = google_storage_bucket_iam_member.cursor_oidc["user:308716925|roles/storage.objectCreator"].member == "principal://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/cursor/subject/user:308716925"
+    error_message = "Expected Cursor OIDC objectCreator member to be the WIF federated principal"
   }
 
   assert {
-    condition     = google_storage_bucket_iam_member.cursor_cloud["roles/storage.objectViewer"].bucket == "mock-datalake-bucket"
-    error_message = "Expected cursor-cloud IAM on the data-dev datalake bucket"
+    condition     = google_storage_bucket_iam_member.cursor_oidc["user:308716925|roles/storage.objectViewer"].bucket == "mock-datalake-bucket"
+    error_message = "Expected Cursor OIDC IAM on the data-dev datalake bucket"
+  }
+}
+
+run "skip_cursor_oidc_datalake_when_allowlist_empty" {
+  command = plan
+
+  variables {
+    crawler_conference_names = "recsys"
+    cursor_oidc_subjects     = []
+  }
+
+  assert {
+    condition     = length(google_storage_bucket_iam_member.cursor_oidc) == 0
+    error_message = "Expected no Cursor OIDC datalake IAM when the subject allowlist is empty"
   }
 }
 
