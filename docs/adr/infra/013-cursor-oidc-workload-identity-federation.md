@@ -2,7 +2,7 @@
 
 ## Conclusion (結論)
 
-- Cursor Cloud Agent が GCP を操作するときは、Cursor が発行する短命 OIDC JWT を GCP Workload Identity Federation（WIF）で交換し、dev 用 Service Account `cursor-cloud` を impersonate する。
+- Cursor Cloud Agent が GCP を操作するときは、Cursor が発行する短命 OIDC JWT を GCP Workload Identity Federation（WIF）で交換し、Ops Project の Service Account `cursor-cloud` を impersonate する。
 - Service Account JSON キーと、人間ユーザーの Application Default Credentials を Cursor 環境に置かない。
 - 初期権限は `haru256-devgist-data-dev` の datalake に対する `roles/storage.objectViewer` と `roles/storage.objectCreator` に限定する。terraform apply や Cloud Run Job 起動はこの identity に含めない。
 - terraform apply は GitHub Actions 側の別 WIF で行う。Cursor Cloud 用 WIF と混ぜない。
@@ -51,8 +51,9 @@ AWS には `CURSOR_AWS_ASSUME_IAM_ROLE_ARN` という Cursor 公式の role assu
    - Cursor Cloud 用 WIF と GitHub Actions 用 WIF は別物にする
 
 5. **既存の project / state 分割を崩さない**
-   - WIF pool は ops、dev 用の操作 identity は app-dev
-   - apply 順 `ops -> app` を維持し、remote state の循環を作らない
+   - WIF pool と `cursor-cloud` SA は ops に置く。`github-actions` と同じ actor の置き方である
+   - 個別リソースへの IAM は、そのリソースを既に扱っている root に置く。ops に全 project の IAM を集めない
+   - apply 順 `ops -> app` を維持し、remote state の循環を作らない。ops が data の remote state に依存しない
 
 6. **信頼する Cursor 実行を絞る**
    - このリポジトリの managed Cloud Agent であること
@@ -75,7 +76,14 @@ AWS には `CURSOR_AWS_ASSUME_IAM_ROLE_ARN` という Cursor 公式の role assu
 |---|---|---|---|---|
 | Option A: Cloud Run の `crawler` SA を impersonate | agent と runtime を完全に同じ権限にしたい場合 | SA が増えない。本番パスと一致する | agent 侵害が crawler runtime と同じになる | 非採用 |
 | Option B: WIF の federated principal に直接 IAM を付ける | SA を増やしたくない場合 | impersonation が無い | 監査ログ上の principal が Cursor `sub` になり、既存の SA 運用と揃わない。権限追加のたびに principal 文字列を扱う | 非採用 |
-| Option C: dev 用の専用 SA `cursor-cloud` を impersonate | agent 用 identity を runtime から分け、後から権限を足したい場合 | blast radius を分けられる。名前が crawler に固定されない。監査は SA 単位 | SA が 1 つ増える。最初は datalake 以外何もできない | 採用 |
+| Option C: 専用 SA `cursor-cloud` を impersonate | agent 用 identity を runtime から分け、後から権限を足したい場合 | blast radius を分けられる。名前が crawler に固定されない。監査は SA 単位 | SA が 1 つ増える。最初は datalake 以外何もできない | 採用 |
+
+#### SA を置く project
+
+| 選択肢 | 向いている用途 | メリット | デメリット | 今回の評価 |
+|---|---|---|---|---|
+| Option A: `haru256-devgist-app-dev` | 権限が app-dev / data-dev に閉じる場合 | email に環境が表れる。crawler SA と同じ置き方 | project をまたぐ権限を足すたびに、identity が app-dev 所属のまま他 project を触ることになる。WIF と SA が state をまたぐ | 非採用 |
+| Option B: `haru256-devgist-ops` | 複数 project のリソースへ、後から IAM を足す actor | WIF pool、SA、impersonation allowlist が同じ project に揃う。`github-actions` と同じ actor 配置。INFRA-ADR-004 の「WIF と共通 SA は ops」と揃う | ops の project ID は環境を表さない。prod 権限を足す事故を、命名だけでは防げない | 採用 |
 
 #### 信頼する Cursor 実行
 
@@ -92,6 +100,7 @@ AWS には `CURSOR_AWS_ASSUME_IAM_ROLE_ARN` という Cursor 公式の role assu
 - 今の datalake 検証と、後の dev 開発用途を同じ identity で扱えること
 - terraform apply の実行主体を GitHub Actions に残すこと
 - 既存の ops / app-dev / data-dev 分割と apply 順を崩さないこと
+- 後から複数 project へ IAM を足せる actor 配置にすること
 
 ## Considered Options
 
@@ -118,7 +127,7 @@ WIF の先を既存の `crawler@haru256-devgist-app-dev.iam.gserviceaccount.com`
 
 ### Option C: Cursor OIDC + WIF で `cursor-cloud` を impersonate する [採用]
 
-ops に Cursor 用 WIF pool を置き、app-dev の `cursor-cloud` を短命 impersonate する。最初の IAM は datalake の読書きだけにする。
+ops に Cursor 用 WIF pool と `cursor-cloud` SA を置き、短命 impersonate する。最初のリソース IAM は data-dev datalake の読書きだけにする。
 
 採用理由:
 
@@ -129,7 +138,7 @@ ops に Cursor 用 WIF pool を置き、app-dev の `cursor-cloud` を短命 imp
 
 ## Decision (決定事項)
 
-Cursor Cloud Agent から GCP への認証は、Cursor OIDC と GCP WIF による短命 impersonation とする。借りる identity は `cursor-cloud@haru256-devgist-app-dev.iam.gserviceaccount.com` である。
+Cursor Cloud Agent から GCP への認証は、Cursor OIDC と GCP WIF による短命 impersonation とする。借りる identity は `cursor-cloud@haru256-devgist-ops.iam.gserviceaccount.com` である。
 
 ### 認証の流れ
 
@@ -148,11 +157,8 @@ flowchart LR
   subgraph opsProject [haru256-devgist-ops]
     Pool[WIF pool cursor]
     Provider[OIDC provider oidc]
-    Pool --> Provider
-  end
-
-  subgraph appProject [haru256-devgist-app-dev]
     SA["SA cursor-cloud"]
+    Pool --> Provider
   end
 
   subgraph dataProject [haru256-devgist-data-dev]
@@ -211,9 +217,10 @@ GitHub Actions 用 WIF はこの図に出てこない。CI の terraform apply �
 - Cloud Agent は Unix socket から OIDC JWT を mint し、GCP STS に渡す
 - JWT の `aud` は WIF provider の既定 audience（canonical resource URL）に固定する。汎用の `https://iam.googleapis.com` は使わない
 - issuer は `https://api.cursor.com`。JWKS は Cursor の discovery を使う
-- WIF pool と OIDC provider は `haru256-devgist-ops` に置く
-- impersonate 先 SA は `haru256-devgist-app-dev` の `cursor-cloud` とする。ops の `github-actions` とは別 actor である
-- `cursor-cloud` は runtime SA ではない。INFRA-ADR-008 の actor 名として `github-actions` と同じ置き方をする。環境は project ID の `app-dev` で表す
+- WIF pool、OIDC provider、impersonate 先 SA はすべて `haru256-devgist-ops` に置く。email は `cursor-cloud@haru256-devgist-ops.iam.gserviceaccount.com` である
+- `cursor-cloud` は runtime SA ではない。INFRA-ADR-008 の actor 名として `github-actions` と同じ project に置く。ops の project ID は環境を表さないので、権限の環境境界は IAM binding で守る。初期は data-dev のみである
+- `github-actions` と `cursor-cloud` は同じ ops に置くが、別 actor である。terraform apply 用 WIF には相乗りしない
+- リソースへの IAM は ops に集めない。INFRA-ADR-009 の platform / CI identity として、そのリソースを既に扱っている root が member に `cursor-cloud` を足す。初期の datalake 読書きは、crawler と同じく app-dev state が付与する。app-dev は ops と data の remote state を既に読むので、ops に data 依存を足さない
 - provider の attribute condition で、少なくとも次を要求する
   - `assertion.repo_url == "github.com/haru-256/devgist"`
   - `assertion.agent_runtime == "managed"`
@@ -227,18 +234,18 @@ GitHub Actions 用 WIF はこの図に出てこない。CI の terraform apply �
 
 ```
 haru256-devgist-ops
-└── WIF
-    ├── pool: cursor
-    └── provider: oidc
-        ├── issuer: https://api.cursor.com
-        └── condition: repo_url と agent_runtime
+├── WIF
+│   ├── pool: cursor
+│   └── provider: oidc
+│       ├── issuer: https://api.cursor.com
+│       └── condition: repo_url と agent_runtime
+└── cursor-cloud@haru256-devgist-ops.iam.gserviceaccount.com
+    └── impersonate: 許可した Cursor sub のみ
 
 haru256-devgist-app-dev
-└── cursor-cloud@haru256-devgist-app-dev.iam.gserviceaccount.com
-    ├── impersonate: 許可した Cursor sub のみ
-    └── GCS IAM (data-dev datalake)
-        ├── roles/storage.objectViewer
-        └── roles/storage.objectCreator
+└── GCS IAM (data-dev datalake へ cursor-cloud を付与)
+    ├── roles/storage.objectViewer
+    └── roles/storage.objectCreator
 
 GitHub Actions（別 WIF、本 ADR の外）
 └── terraform apply / イメージ push など CI 操作
@@ -252,11 +259,13 @@ WIF の attribute mapping は少なくとも次を含める。
 
 allowlist に使う `sub` は `user:<cursor_user_id>` のような安定 ID とする。`owner_email` は変わり得るので信頼条件に使わない。
 
-`cursor-cloud` を app-dev に置く理由は、最初の権限も今後足す権限も dev の app / data 平面にあるからである。ops に置く `github-actions` は Artifact Registry と CI 用であり、用途が違う。
+`cursor-cloud` を ops に置く理由は、後から app-dev / data-dev / ops など複数 project のリソースへ IAM を足す actor だからである。WIF と SA と impersonation allowlist を同じ project に揃え、`github-actions` と同じ置き方にする。
+
+ops の email は環境を表さない。prod の bucket や Job へ権限を足すときは、別の明示的な判断として扱う。初期 IAM は data-dev datalake だけである。
 
 ### 権限を広げるとき
 
-dev 開発用途へ広げるときは、`cursor-cloud` を増やさず、app-dev state で IAM binding を足す。
+dev 開発用途へ広げるときは、`cursor-cloud` を増やさず、対象リソースを管理している Terraform root で IAM binding を足す。app-dev のリソースなら app-dev、data-dev の別バケットならその binding を置く root、ops の読み取りなら ops または既存の cross-project パターンに従う。
 
 足す前に、その権限が Cloud Agent 実行全体に渡ることを認めるか確認する。prod の identity や GitHub Actions 用 WIF に相乗りしない。
 
@@ -273,27 +282,30 @@ dev 開発用途へ広げるときは、`cursor-cloud` を増やさず、app-dev
 
 - Cursor 環境に無期限の GCP 鍵が残らない
 - crawler runtime と Cloud Agent の権限が分かれる
-- SA 名を変えずに、dev 向け IAM を後から足せる
+- SA 名を変えずに、複数 project のリソースへ IAM を後から足せる
+- WIF、SA、impersonation allowlist が ops に揃う
 - terraform apply の実行主体が GitHub Actions に残る
 - 空の allowlist では GCP 操作が始まらない
 
 ### Negative (デメリット)
 
 - WIF と impersonation の構築が、JSON キーを 1 本置くより重い
-- allowlist の Cursor `sub` は Terraform 変数で持つ。ユーザー追加のたびに app-dev の apply が要る
+- allowlist の Cursor `sub` は Terraform 変数で持つ。ユーザー追加のたびに ops の apply が要る
+- ops の project ID は環境を表さない。prod への権限追加を命名だけでは防げない
 - OIDC socket を叩けるプロセスは、許可済みなら `cursor-cloud` として動ける。これは Cursor の trust model であり、IAM を細かくしても VM 内では分かれていない
 - 初期状態では datalake 以外の検証はできない
 
 ### Risks / Future Review (将来の課題)
 
 - `cursor-cloud` に権限を足し続けると、名前は汎用のまま実質的に何でもできる SA になる。肥大したら SA 分割を再検討する
+- ops に置いたまま prod リソースへ IAM を足すと、dev 検証用 identity が環境をまたぐ。そのときは `cursor-cloud-dev` のような分割を再検討する
 - attribute condition の `repo_url` は primary repository だけを見る。multi-repo agent では `repo_urls` の扱いで意図より広い実行が通る可能性がある
 - Cursor の JWT claim 名や issuer URL が変わった場合、WIF provider の更新が必要になる
 - GitHub Actions 用 WIF を後から足すとき、ops の pool 設計を流用しすぎると信頼条件が混ざる
 
 ## Next Steps
 
-1. Terraform で ops の Cursor 用 WIF pool / provider と、app-dev の `cursor-cloud` SA、datalake IAM、subject allowlist を定義する
+1. Terraform で ops の Cursor 用 WIF pool / provider、`cursor-cloud` SA、subject allowlist を定義する。app-dev で datalake への `objectViewer` / `objectCreator` をこの SA に付与する
 2. ローカル PC から ops → app-dev の順で apply する
 3. Cursor Cloud 側は、WIF の audience に合わせて OIDC を mint し、ADC が `cursor-cloud` を使う状態にする。これは本 ADR の Terraform 定義の後続作業である
 4. GitHub Actions から terraform apply するための WIF は、別 ADR または別 PR で設計する
