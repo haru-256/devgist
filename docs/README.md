@@ -17,7 +17,7 @@
 
 現在、以下のドメインの ADR が存在します。
 
-- **infra/**: GCP プロジェクト構成、Terraform 構成、実行基盤、IAM など（9件）
+- **infra/**: GCP プロジェクト構成、Terraform 構成、実行基盤、IAM など（13件）
 - **crawler/**: クローラーの実装言語、XML パース戦略など（2件）
 
 各ドメインの詳細な一覧と運用ルールについては、[adr/README.md](adr/README.md) を参照してください。
