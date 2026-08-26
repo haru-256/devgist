@@ -130,7 +130,7 @@ GCP project ごとに root module を配置し、必要に応じて `dev/` な�
 - root module は `environments/<env>/<service>` に配置し、環境ごとの入力値は `terraform.tfvars` で管理します。
 - module の追加・更新は `modules/` 配下に集約し、root module 側で呼び出します。
 - `terraform.tfstate` は環境ごとの状態を保持します。リモート backend を使う場合は `backend.tf` で設定します。
-- Cursor Cloud 用 WIF（pool `cursor` / provider `oidc`）と SA `cursor-cloud` は `devgist-ops` で定義する。datalake への `objectViewer` / `objectCreator` は `devgist-app/dev` が付与する。apply 順は ops → app。`cursor_wif_audience` と `cursor_cloud_service_account_email` は後続の OIDC mint で使う。
+- Cursor Cloud 用 WIF（pool `cursor` / provider `oidc`）は `devgist-ops` で定義する。datalake への `objectViewer` / `objectCreator` は `devgist-app/dev` が federated principal に直接付与する。apply 順は ops → app。`cursor_wif_audience` は後続の OIDC mint で使う。credential config に SA impersonation は入れない。
 
 ## for_each を使う場合の outputs 出力
 

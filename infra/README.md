@@ -45,7 +45,7 @@ graph TD
 - `haru256-devgist-ops`
   - Artifact Registry
   - GitHub Actions 連携、WIF、共通 CI/CD 用 Service Account などの運用基盤
-  - Cursor Cloud 用 OIDC WIF pool / provider と `cursor-cloud` Service Account（[INFRA-ADR-013](../docs/adr/infra/013-cursor-oidc-workload-identity-federation.md)）
+  - Cursor Cloud 用 OIDC WIF pool / provider（[INFRA-ADR-014](../docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md)）
 
 - `haru256-devgist-data-{env}`
   - GCS datalake
@@ -89,17 +89,17 @@ graph LR
 1. `devgist-tf`
    - tfstate bucket を先に作成する
 2. `devgist-ops`
-   - `Artifact Registry`、Cursor 用 WIF、`cursor-cloud` SA など共通運用基盤を作成する
+   - `Artifact Registry`、Cursor 用 WIF など共通運用基盤を作成する
 3. `devgist-data/dev`
    - datalake など crawler の保存先を作成する
 4. `devgist-app/dev`
    - `terraform_remote_state` で `ops/data` の outputs を参照しながら app 側 compute を作成する
-   - `cursor-cloud` へ data-dev datalake の `objectViewer` / `objectCreator` を付与する
+   - Cursor Cloud の federated principal へ data-dev datalake の `objectViewer` / `objectCreator` を付与する
 
 ### Notes
 
 - `devgist-app/dev` は `devgist-ops` と `devgist-data/dev` の outputs を `terraform_remote_state` で参照する
 - secret は Terraform outputs では渡さず、`GCP Secret Manager` を app runtime から参照する
 - 旧 `environments/crawler` は legacy 扱いで、最終的には `ops/app/data` 側へ整理する
-- Cursor Cloud の subject allowlist（`cursor_oidc_subjects`）は ops の gitignore 済み `terraform.tfvars` に書く。空なら impersonate できない
-- Cursor 用 WIF と GitHub Actions 用 WIF は別物である。後者はこのディレクトリではまだ定義しない
+- Cursor Cloud の subject allowlist（`cursor_oidc_subjects`）は app-dev の gitignore 済み `terraform.tfvars` に書く。空なら datalake IAM member が付かない
+- Cursor 用 WIF は federated principal への direct resource access である。GitHub Actions 用 WIF は別物で、このディレクトリではまだ定義しない
