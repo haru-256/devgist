@@ -131,6 +131,80 @@ ops に Cursor 用 WIF pool を置き、app-dev の `cursor-cloud` を短命 imp
 
 Cursor Cloud Agent から GCP への認証は、Cursor OIDC と GCP WIF による短命 impersonation とする。借りる identity は `cursor-cloud@haru256-devgist-app-dev.iam.gserviceaccount.com` である。
 
+### 認証の流れ
+
+WIF は、外部 IdP が出した JWT を GCP が検証し、短命トークンに交換する仕組みである。JSON キーは無く、交換のたびに Cursor の署名と ops 上の provider 条件を見る。
+
+役割の配置は次の通りである。
+
+```mermaid
+flowchart LR
+  subgraph cursorSide [Cursor Cloud]
+    Agent[Cloud Agent VM]
+    Socket[OIDC socket]
+    Agent --> Socket
+  end
+
+  subgraph opsProject [haru256-devgist-ops]
+    Pool[WIF pool cursor]
+    Provider[OIDC provider oidc]
+    Pool --> Provider
+  end
+
+  subgraph appProject [haru256-devgist-app-dev]
+    SA["SA cursor-cloud"]
+  end
+
+  subgraph dataProject [haru256-devgist-data-dev]
+    GCS[datalake bucket]
+  end
+
+  Socket -->|"JWT 5 min"| Sts[GCP STS]
+  Sts --> Provider
+  Provider -->|"federated token"| SA
+  SA --> GCS
+```
+
+実行時は mint、交換、impersonate、アクセスの順に進む。
+
+1. Cloud Agent が VM 内の Unix socket へ、WIF provider の既定 audience を付けて JWT を要求する。
+2. Cursor が RS256 で署名した JWT を返す。`iss` は `https://api.cursor.com`、寿命は 5 分、`sub` は Cursor ユーザーの安定 ID である。
+3. GCP STS が Cursor の JWKS で署名を検証し、ops の OIDC provider に照らして `aud`、`repo_url`、`agent_runtime` を確認する。
+4. 条件を満たせば federated token を出す。`google.subject` は JWT の `sub` になる。
+5. その `sub` が allowlist にあるときだけ、`cursor-cloud` を impersonate できる。
+6. GCS への読書きは、この SA に付いた IAM で決まる。JWT 自体に GCS 権限は無い。
+
+```mermaid
+sequenceDiagram
+  participant Agent as CloudAgent
+  participant Socket as CursorOIDC
+  participant Sts as GCP_STS
+  participant Jwks as CursorJWKS
+  participant Provider as WIF_provider
+  participant Sa as cursor_cloud_SA
+  participant Gcs as datalake
+
+  Agent->>Socket: mint JWT with provider audience
+  Socket-->>Agent: RS256 JWT
+  Note over Agent,Socket: iss api.cursor.com, sub user id, 5 min
+  Agent->>Sts: exchange JWT
+  Sts->>Jwks: verify signature
+  Sts->>Provider: check aud, repo_url, agent_runtime
+  alt audience or condition mismatch
+    Provider-->>Agent: reject
+  else JWT accepted
+    Sts-->>Agent: federated token
+    alt sub not allowlisted
+      Sa-->>Agent: impersonation denied
+    else sub allowlisted
+      Agent->>Sa: impersonate cursor-cloud
+      Sa->>Gcs: objectViewer and objectCreator
+    end
+  end
+```
+
+GitHub Actions 用 WIF はこの図に出てこない。CI の terraform apply は別 issuer、別信頼条件で組む。
+
 ### 採用方針
 
 - Cursor Cloud に SA JSON キーもユーザー ADC も置かない
