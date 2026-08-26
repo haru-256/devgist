@@ -47,8 +47,9 @@ run "accept_multiple_sas_with_all_binding_types" {
         project_roles = [
           { project = "mock-project", role = "roles/storage.objectCreator" },
         ]
-        token_creators        = ["serviceAccount:deployer@mock-project.iam.gserviceaccount.com"]
-        service_account_users = ["user:admin@example.com"]
+        token_creators          = ["serviceAccount:deployer@mock-project.iam.gserviceaccount.com"]
+        service_account_users   = ["user:admin@example.com"]
+        workload_identity_users = ["principal://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/cursor/subject/user:1"]
       }
       api-server = {
         project_roles = [
@@ -62,5 +63,13 @@ run "accept_multiple_sas_with_all_binding_types" {
   assert {
     condition     = length(output.emails) == 2
     error_message = "Expected two service accounts to be created"
+  }
+
+  assert {
+    condition = contains(
+      [for binding in google_service_account_iam_member.service_account_iam : binding.role],
+      "roles/iam.workloadIdentityUser"
+    )
+    error_message = "Expected workloadIdentityUser to be granted from workload_identity_users"
   }
 }

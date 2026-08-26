@@ -45,10 +45,21 @@ locals {
     ]
   ])
 
+  workload_identity_user_bindings = flatten([
+    for sa_name, sa in var.service_accounts : [
+      for member in sa.workload_identity_users : {
+        sa_name = sa_name
+        role    = "roles/iam.workloadIdentityUser"
+        member  = member
+      }
+    ]
+  ])
+
   service_account_iam_bindings = {
     for binding in concat(
       local.token_creator_bindings,
       local.service_account_user_bindings,
+      local.workload_identity_user_bindings,
     ) :
     "${binding.sa_name}|${binding.role}|${binding.member}" => binding
   }
