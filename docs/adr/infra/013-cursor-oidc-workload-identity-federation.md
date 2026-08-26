@@ -9,7 +9,9 @@
 
 ## Status (ステータス)
 
-Accepted (承認済み) - 2026-08-26
+Superseded (置き換え済み) - 2026-08-26 by [INFRA-ADR-014](./014-cursor-oidc-wif-direct-resource-access.md)
+
+`cursor-cloud` SA の impersonation は採用しない。現行方針は WIF federated principal への direct resource access である。OIDC を使い、鍵を置かず、GitHub Actions 用 WIF と混ぜない、という点は 014 でも維持する。
 
 ## Context (背景・課題)
 
@@ -312,7 +314,7 @@ dev 開発用途へ広げるときは、`cursor-cloud` を増やさず、対象�
 
 ## Related Documents
 
-- [[INFRA-ADR-004] Terraform State Project と Ops Project を分離する](./004-separate-tf-and-ops-projects.md)
+- [[INFRA-ADR-014] Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする](./014-cursor-oidc-wif-direct-resource-access.md)（現行方針）
 - [[INFRA-ADR-007] Artifact Registry リポジトリ戦略とワークロード用 Service Account 設計](./007-artifact-registry-and-sa-strategy.md)
 - [[INFRA-ADR-008] Service Account 命名規則](./008-service-account-naming.md)
 - [[INFRA-ADR-009] Cross-project IAM binding の ownership](./009-cross-project-iam-ownership.md)
