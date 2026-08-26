@@ -75,7 +75,19 @@ infra/terraform/
 │   │   ├── main.tf
 │   │   ├── providers.tf
 │   │   └── variables.tf
-│   └── tfstate_gcs_bucket/
+│   ├── service_accounts/
+│   │   ├── main.tf
+│   │   ├── outputs.tf
+│   │   ├── providers.tf
+│   │   ├── variables.tf
+│   │   └── README.md
+│   ├── tfstate_gcs_bucket/
+│   │   ├── main.tf
+│   │   ├── outputs.tf
+│   │   ├── providers.tf
+│   │   ├── variables.tf
+│   │   └── README.md
+│   └── workload_identity_oidc/
 │       ├── main.tf
 │       ├── outputs.tf
 │       ├── providers.tf
@@ -93,7 +105,7 @@ make/
 GCP project ごとに root module を配置し、必要に応じて `dev/` などの環境サブディレクトリを切ります。
 
 - `devgist-tf/`: Terraform state 管理用 project の root module
-- `devgist-ops/`: Artifact Registry などの共通運用基盤 project の root module
+- `devgist-ops/`: Artifact Registry、Cursor 用 WIF、共通 Service Account などの運用基盤 project の root module
 - `devgist-data/dev/`: 開発環境の data project 用 root module
 - `devgist-app/dev/`: 開発環境の app project 用 root module
 
@@ -103,7 +115,9 @@ GCP project ごとに root module を配置し、必要に応じて `dev/` な�
 - `artifact_registry/`: Artifact Registry repository を作成する module
 - `datalake/`: GCP のデータレイク用 GCS バケットを作成する module
 - `google_project_services/`: GCP の API 有効化を行う module
+- `service_accounts/`: Service Account と IAM（project role / actAs / WIF impersonation）をまとめる module
 - `tfstate_gcs_bucket/`: Terraform の state 管理用 GCS バケットを作成する module
+- `workload_identity_oidc/`: 汎用 OIDC Workload Identity Federation の pool と provider を作る module
 
 ### `make/`
 リポジトリ直下にあり、リポジトリ全体で再利用する Makefile 断片を配置します。
@@ -116,6 +130,7 @@ GCP project ごとに root module を配置し、必要に応じて `dev/` な�
 - root module は `environments/<env>/<service>` に配置し、環境ごとの入力値は `terraform.tfvars` で管理します。
 - module の追加・更新は `modules/` 配下に集約し、root module 側で呼び出します。
 - `terraform.tfstate` は環境ごとの状態を保持します。リモート backend を使う場合は `backend.tf` で設定します。
+- Cursor Cloud 用 WIF（pool `cursor` / provider `oidc`）と SA `cursor-cloud` は `devgist-ops` で定義する。datalake への `objectViewer` / `objectCreator` は `devgist-app/dev` が付与する。apply 順は ops → app。`cursor_wif_audience` と `cursor_cloud_service_account_email` は後続の OIDC mint で使う。
 
 ## for_each を使う場合の outputs 出力
 
