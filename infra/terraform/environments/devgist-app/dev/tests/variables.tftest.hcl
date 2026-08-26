@@ -7,6 +7,7 @@ override_data {
       ops_project_id                                = "mock-ops-project"
       crawler_artifact_registry_repository_id       = "mock-crawler-repo"
       crawler_artifact_registry_repository_location = "us-central1"
+      cursor_cloud_service_account_member           = "serviceAccount:cursor-cloud@mock-ops-project.iam.gserviceaccount.com"
     }
   }
 }
@@ -101,5 +102,28 @@ run "reject_space_separated_crawler_conference_names" {
   expect_failures = [
     var.crawler_conference_names,
   ]
+}
+
+run "grant_cursor_cloud_datalake_read_write" {
+  command = plan
+
+  variables {
+    crawler_conference_names = "recsys"
+  }
+
+  assert {
+    condition     = google_storage_bucket_iam_member.cursor_cloud["roles/storage.objectViewer"].member == "serviceAccount:cursor-cloud@mock-ops-project.iam.gserviceaccount.com"
+    error_message = "Expected cursor-cloud objectViewer member from ops remote state"
+  }
+
+  assert {
+    condition     = google_storage_bucket_iam_member.cursor_cloud["roles/storage.objectCreator"].member == "serviceAccount:cursor-cloud@mock-ops-project.iam.gserviceaccount.com"
+    error_message = "Expected cursor-cloud objectCreator member from ops remote state"
+  }
+
+  assert {
+    condition     = google_storage_bucket_iam_member.cursor_cloud["roles/storage.objectViewer"].bucket == "mock-datalake-bucket"
+    error_message = "Expected cursor-cloud IAM on the data-dev datalake bucket"
+  }
 }
 

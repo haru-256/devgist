@@ -94,6 +94,16 @@ resource "google_storage_bucket_iam_member" "crawler" {
   member = module.service_accounts.members["crawler"]
 }
 
+# data環境のGCSバケットに対して、ops の cursor-cloud に読み込み・書き込み権限を付与
+# Cloud Agent 検証用。crawler runtime SA とは別 identity（INFRA-ADR-013）
+resource "google_storage_bucket_iam_member" "cursor_cloud" {
+  for_each = toset(["roles/storage.objectViewer", "roles/storage.objectCreator"])
+
+  bucket = data.terraform_remote_state.data.outputs.datalake_bucket_name
+  role   = each.value
+  member = data.terraform_remote_state.ops.outputs.cursor_cloud_service_account_member
+}
+
 # Crawler用のCloud Run Job の作成
 resource "google_cloud_run_v2_job" "crawler" {
   name                = "crawler"
