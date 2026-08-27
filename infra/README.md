@@ -20,6 +20,8 @@
 - `INFRA-ADR-004`: [docs/adr/infra/004-separate-tf-and-ops-projects.md](../docs/adr/infra/004-separate-tf-and-ops-projects.md)
 - `INFRA-ADR-005`: [docs/adr/infra/005-terraform-environment-slicing.md](../docs/adr/infra/005-terraform-environment-slicing.md)
 - `INFRA-ADR-006`: [docs/adr/infra/006-cross-project-output-sharing.md](../docs/adr/infra/006-cross-project-output-sharing.md)
+- `INFRA-ADR-009`: [docs/adr/infra/009-cross-project-iam-ownership.md](../docs/adr/infra/009-cross-project-iam-ownership.md)
+- `INFRA-ADR-015`: [docs/adr/infra/015-guest-iam-downstream.md](../docs/adr/infra/015-guest-iam-downstream.md)
 
 このディレクトリ配下の `infra/docs/adr/` は互換性維持のための参照パスであり、正本は [docs/adr/](../docs/adr/) 側です。
 
@@ -59,7 +61,8 @@ graph TD
 
 - crawler の image store は `ops` project 側の `Artifact Registry` に置く
 - crawler の実行先は `app` project 側の `Cloud Run Jobs` とする
-- crawler の保存先 datalake は `data` project 側に置く
+- crawler の保存先 datalake は `data` project 側に置く。data は箱であり、guest IAM は持たない
+- datalake の guest IAM は identity と箱の下流が書く。crawler SA は app、Cursor WIF は ops（[INFRA-ADR-015](../docs/adr/infra/015-guest-iam-downstream.md)）
 - project 構成の判断根拠は `INFRA-ADR-001` から `INFRA-ADR-006` を参照する
 
 ## Service To Project Mapping

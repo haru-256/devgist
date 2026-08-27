@@ -104,7 +104,7 @@ type を `Runtime Secret` にすると、agent は値を `[REDACTED]` としか�
 ## 手順
 
 1. data-dev を apply し、datalake 箱を先に作る。
-2. ops を apply し、`ops_project_number` を控える。gitignore 済み `terraform.tfvars` の `cursor_oidc_subjects` に、許可する Cursor `sub` を入れる。例: `["user:308716925"]`。`sub` はメールではない。空なら WIF は通っても GCS は拒否する。
+2. ops を apply し、`ops_project_number` を控える。gitignore 済み `terraform.tfvars` の `cursor_oidc_subjects` に、許可する Cursor `sub` を入れる。例: `["user:308716925"]`。`sub` はメールではない。空なら WIF は通っても GCS は拒否する。Cloud Run Job 起動はこの identity に含めない。付けるときは app が書く（[INFRA-ADR-015](../adr/infra/015-guest-iam-downstream.md)）。
 3. Secrets に上の 4 件を type `Environment Variable` で入れる。Environment の `start` に `setup-adc.sh` を入れる。egress を制限しているなら GCP ホストを Environment の allowlist に足す。
 4. 新しい Cloud Agent を起動する。`start` が `$HOME/.config/gcloud/cursor-wif.json` を書く。`command` は checkout した `cursor-gcp-oidc` の絶対パスである。
 

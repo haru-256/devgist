@@ -11,7 +11,7 @@
 
 Superseded (置き換え済み) - 2026-08-27 by [INFRA-ADR-015](./015-guest-iam-downstream.md)
 
-本文は書き換えない。当時の判断の記録として残す。direct resource access（SA impersonation なし、鍵を置かない、GHA 用 WIF と混ぜない）は 015 でも維持する。捨てるのは IAM binding の置き場である。app-dev に書かず ops に集めない、という判断は 015 が置き換える。
+本文は書き換えない。当時の判断の記録として残す。direct resource access（SA impersonation なし、鍵を置かない、GHA 用 WIF と混ぜない）は 015 でも維持する。捨てるのは IAM の置き場である。第三の root（app-dev）に書く判断と、ops が下流である箱への grant まで ops に置かない判断は 015 が置き換える。Cloud Run Job 起動をこの identity に含めない初期範囲は維持する。
 
 [INFRA-ADR-013](./013-cursor-oidc-workload-identity-federation.md) を supersede した経緯（impersonation から direct access）は履歴として残す。
 

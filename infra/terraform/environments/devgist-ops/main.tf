@@ -38,7 +38,7 @@ data "google_project" "project" {
   project_id = var.gcp_project_id
 }
 
-# data-dev の datalake は箱。名前だけ借りて、Cursor の grant はこちらで付ける（INFRA-ADR-015）
+# data-dev の datalake は箱。識別子だけ借りる。ops は identity かつ下流なので guest IAM はここ（INFRA-ADR-015）
 data "terraform_remote_state" "data" {
   backend = "gcs"
 
@@ -89,8 +89,8 @@ module "cursor_wif" {
   depends_on = [module.required_project_services]
 }
 
-# data-dev datalake へ Cursor Cloud の federated principal を付ける。
-# WIF direct resource access。crawler runtime SA とは別 identity（INFRA-ADR-015）
+# Cursor WIF → data-dev datalake。direct resource access（INFRA-ADR-014）。
+# 置き場は ops × data の下流（INFRA-ADR-015）。crawler runtime SA とは別 identity
 resource "google_storage_bucket_iam_member" "cursor_oidc" {
   for_each = local.cursor_oidc_datalake_bindings
 

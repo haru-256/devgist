@@ -85,7 +85,8 @@ resource "google_artifact_registry_repository_iam_member" "cloud_run_service_age
   member     = "serviceAccount:service-${data.google_project.project.number}@serverless-robot-prod.iam.gserviceaccount.com"
 }
 
-# data環境のGCSバケットに対して、dev環境のcrawler用service accountに読み込み・書き込み権限を付与
+# data環境のGCSバケットに対して、crawler SA へ読み込み・書き込みを付ける。
+# crawler は app が identity かつ下流（INFRA-ADR-009 / INFRA-ADR-015）
 resource "google_storage_bucket_iam_member" "crawler" {
   for_each = toset(["roles/storage.objectViewer", "roles/storage.objectCreator"])
 

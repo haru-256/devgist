@@ -37,7 +37,7 @@ module "service_accounts" {
       ]
 
       # Optional. Use when a federated identity must impersonate this SA.
-      # Cursor Cloud uses WIF direct resource access instead (INFRA-ADR-015).
+      # Cursor Cloud uses WIF direct resource access instead (INFRA-ADR-014).
       workload_identity_users = []
     }
   }
