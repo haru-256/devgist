@@ -20,7 +20,8 @@
 | `INFRA-ADR-011` | `infra` | Terraform monorepo における CI 対象検出と検証方針 | Accepted | [docs/adr/infra/011-terraform-ci-for-monorepo.md](infra/011-terraform-ci-for-monorepo.md) |
 | `INFRA-ADR-012` | `infra` | Cloud Run Job の実行粒度と実行時パラメータ設計 | Accepted | [docs/adr/infra/012-crawler-execution-parameters.md](infra/012-crawler-execution-parameters.md) |
 | `INFRA-ADR-013` | `infra` | Cursor Cloud から GCP への認証に Cursor OIDC と WIF を採用する | Superseded | [docs/adr/infra/013-cursor-oidc-workload-identity-federation.md](infra/013-cursor-oidc-workload-identity-federation.md) |
-| `INFRA-ADR-014` | `infra` | Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする | Accepted | [docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md](infra/014-cursor-oidc-wif-direct-resource-access.md) |
+| `INFRA-ADR-014` | `infra` | Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする | Superseded | [docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md](infra/014-cursor-oidc-wif-direct-resource-access.md) |
+| `INFRA-ADR-015` | `infra` | Cursor の datalake IAM は WIF を定義する ops に置く | Accepted | [docs/adr/infra/015-cursor-wif-iam-in-ops.md](infra/015-cursor-wif-iam-in-ops.md) |
 | `CRAWLER-ADR-001` | `crawler` | 論文収集クローラーの実装言語としてPythonを採用 | Accepted | [docs/adr/crawler/001-language-selection.md](crawler/001-language-selection.md) |
 | `CRAWLER-ADR-002` | `crawler` | XMLパースにdefusedxmlを採用 | Accepted | [docs/adr/crawler/002-xml-parsing-security.md](crawler/002-xml-parsing-security.md) |
 

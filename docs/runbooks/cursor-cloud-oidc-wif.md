@@ -43,7 +43,7 @@ sequenceDiagram
 5. GCP STS が JWKS で検証し、`repo_url` と `agent_runtime == managed` を見る。federated token を返す。
 6. GCS は `principal://.../workloadIdentityPools/cursor/subject/<sub>` に付いた IAM だけで許す。
 
-この文書は、その流れになるよう Cursor 側を配線する手順である。設計は [INFRA-ADR-014](../adr/infra/014-cursor-oidc-wif-direct-resource-access.md)。WIF pool は #83。Cursor は IdP、GCP が検証する。ダッシュボードに WIF や issuer は登録しない。`allowed_audiences` が空なら GCP は canonical name を `https:` の有無どちらでも受理する（[仕様](https://cloud.google.com/iam/docs/reference/rest/v1/projects.locations.workloadIdentityPools.providers#Oidc)）。
+この文書は、その流れになるよう Cursor 側を配線する手順である。設計は [INFRA-ADR-015](../adr/infra/015-cursor-wif-iam-in-ops.md)。認証モデル（direct resource access）は [INFRA-ADR-014](../adr/infra/014-cursor-oidc-wif-direct-resource-access.md) が決めた。WIF pool は #83。Cursor は IdP、GCP が検証する。ダッシュボードに WIF や issuer は登録しない。`allowed_audiences` が空なら GCP は canonical name を `https:` の有無どちらでも受理する（[仕様](https://cloud.google.com/iam/docs/reference/rest/v1/projects.locations.workloadIdentityPools.providers#Oidc)）。
 
 JSON を書くスクリプトは [`scripts/cursor-cloud/setup-adc.sh`](../../scripts/cursor-cloud/setup-adc.sh) である。
 
@@ -99,12 +99,12 @@ type を `Runtime Secret` にすると、agent は値を `[REDACTED]` としか�
 - Service Account JSON キー、人間ユーザーの ADC（type `Runtime Secret` でも置かない）
 - WIF pool / provider / issuer（Cursor 側に登録する欄は無い）
 - `service_account_impersonation_url`（`gcloud ... create-cred-config` に `--service-account` を付けない）
-- `cursor_oidc_subjects`（Cursor ではなく app-dev の gitignore 済み `terraform.tfvars`）
+- `cursor_oidc_subjects`（Cursor ではなく ops の gitignore 済み `terraform.tfvars`）
 
 ## 手順
 
-1. ops を apply し、`ops_project_number` を控える。
-2. app-dev の `cursor_oidc_subjects` に、許可する Cursor `sub` を入れる。例: `["user:308716925"]`。`sub` はメールではない。空なら WIF は通っても GCS は拒否する。
+1. data-dev を apply し、datalake 箱を先に作る。
+2. ops を apply し、`ops_project_number` を控える。gitignore 済み `terraform.tfvars` の `cursor_oidc_subjects` に、許可する Cursor `sub` を入れる。例: `["user:308716925"]`。`sub` はメールではない。空なら WIF は通っても GCS は拒否する。
 3. Secrets に上の 4 件を type `Environment Variable` で入れる。Environment の `start` に `setup-adc.sh` を入れる。egress を制限しているなら GCP ホストを Environment の allowlist に足す。
 4. 新しい Cloud Agent を起動する。`start` が `$HOME/.config/gcloud/cursor-wif.json` を書く。`command` は checkout した `cursor-gcp-oidc` の絶対パスである。
 

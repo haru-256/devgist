@@ -45,7 +45,7 @@ graph TD
 - `haru256-devgist-ops`
   - Artifact Registry
   - GitHub Actions 連携、WIF、共通 CI/CD 用 Service Account などの運用基盤
-  - Cursor Cloud 用 OIDC WIF pool / provider（[INFRA-ADR-014](../docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md)）
+  - Cursor Cloud 用 OIDC WIF pool / provider（認証は [INFRA-ADR-014](../docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md)、置き場は [INFRA-ADR-015](../docs/adr/infra/015-cursor-wif-iam-in-ops.md)）
 
 - `haru256-devgist-data-{env}`
   - GCS datalake
@@ -78,8 +78,9 @@ project ごとに state を分けているため、`crawler` 関連の apply は
 
 ```mermaid
 graph LR
-    TF[devgist-tf] --> OPS[devgist-ops]
-    TF --> DATA[devgist-data/dev]
+    TF[devgist-tf] --> DATA[devgist-data/dev]
+    TF --> OPS[devgist-ops]
+    DATA --> OPS
     OPS --> APP[devgist-app/dev]
     DATA --> APP
 ```
@@ -88,18 +89,20 @@ graph LR
 
 1. `devgist-tf`
    - tfstate bucket を先に作成する
-2. `devgist-ops`
-   - `Artifact Registry`、Cursor 用 WIF など共通運用基盤を作成する
-3. `devgist-data/dev`
-   - datalake など crawler の保存先を作成する
+2. `devgist-data/dev`
+   - datalake など crawler の保存先を箱として作成する
+3. `devgist-ops`
+   - `Artifact Registry`、Cursor 用 WIF を作成する
+   - Cursor Cloud の federated principal へ data-dev datalake の `objectViewer` / `objectCreator` を付与する
 4. `devgist-app/dev`
    - `terraform_remote_state` で `ops/data` の outputs を参照しながら app 側 compute を作成する
-   - Cursor Cloud の federated principal へ data-dev datalake の `objectViewer` / `objectCreator` を付与する
+   - crawler SA へ同じ datalake の読書きを付与する
 
 ### Notes
 
+- `devgist-ops` は `devgist-data/dev` の bucket 名を `terraform_remote_state` で参照する。Cursor の lake IAM があるあいだ、箱を先に apply する（[INFRA-ADR-015](../docs/adr/infra/015-cursor-wif-iam-in-ops.md)）
 - `devgist-app/dev` は `devgist-ops` と `devgist-data/dev` の outputs を `terraform_remote_state` で参照する
 - secret は Terraform outputs では渡さず、`GCP Secret Manager` を app runtime から参照する
 - 旧 `environments/crawler` は legacy 扱いで、最終的には `ops/app/data` 側へ整理する
-- Cursor Cloud の subject allowlist（`cursor_oidc_subjects`）は app-dev の gitignore 済み `terraform.tfvars` に書く。空なら datalake IAM member が付かない
+- Cursor Cloud の subject allowlist（`cursor_oidc_subjects`）は ops の gitignore 済み `terraform.tfvars` に書く。空なら datalake IAM member が付かない
 - Cursor 用 WIF は federated principal への direct resource access である。GitHub Actions 用 WIF は別物で、このディレクトリではまだ定義しない

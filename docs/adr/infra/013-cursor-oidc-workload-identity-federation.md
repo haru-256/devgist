@@ -314,7 +314,8 @@ dev 開発用途へ広げるときは、`cursor-cloud` を増やさず、対象�
 
 ## Related Documents
 
-- [[INFRA-ADR-014] Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする](./014-cursor-oidc-wif-direct-resource-access.md)（現行方針）
+- [[INFRA-ADR-015] Cursor の datalake IAM は WIF を定義する ops に置く](./015-cursor-wif-iam-in-ops.md)（現行方針）
+- [[INFRA-ADR-014] Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする](./014-cursor-oidc-wif-direct-resource-access.md)（superseded）
 - [[INFRA-ADR-004] Terraform State Project と Ops Project を分離する](./004-separate-tf-and-ops-projects.md)
 - [[INFRA-ADR-007] Artifact Registry リポジトリ戦略とワークロード用 Service Account 設計](./007-artifact-registry-and-sa-strategy.md)
 - [[INFRA-ADR-008] Service Account 命名規則](./008-service-account-naming.md)

@@ -53,4 +53,4 @@ GCP へのアクセスは Cursor OIDC と WIF を使う。Service Account JSON �
 - 保存済み Environment は VM の `install` / `start` / ネットワークである。Secret の type `Environment Variable` とは別物。`start` は `scripts/cursor-cloud/setup-adc.sh`
 - mint の JWT `aud` は `GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE` をそのまま使う。`allowed_audiences` が空なら `//iam.googleapis.com/...` と `https://iam.googleapis.com/...` のどちらも GCP が受理する
 - GCS クライアントや crawler を動かすとき、token 交換を手順として繰り返さない。ADC が mint と STS を行う
-- datalake のバケット名は `DATA_LAKE_BUCKET_NAME`。IAM の allowlist は Terraform の `cursor_oidc_subjects`
+- datalake のバケット名は `DATA_LAKE_BUCKET_NAME`。IAM の allowlist は ops の Terraform 変数 `cursor_oidc_subjects`
