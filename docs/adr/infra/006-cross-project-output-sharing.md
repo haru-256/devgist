@@ -247,6 +247,6 @@ def access_secret(project_id: str, secret_id: str, version: str = "latest") -> s
 - [INFRA-ADR-004] Terraform State Project と Ops Project を分離する
 - [INFRA-ADR-005] Terraform environments は GCP project ごとに分割する
 - [[INFRA-ADR-009] Cross-project IAM binding の ownership](./009-cross-project-iam-ownership.md)
-- [[INFRA-ADR-015] Cursor の datalake IAM は WIF を定義する ops に置く](./015-cursor-wif-iam-in-ops.md)（ops が data-dev の bucket 名を remote state で読む）
+- [[INFRA-ADR-015] data は箱とし、guest IAM は identity 定義側に書く](./015-identity-side-guest-iam.md)（identity 定義側が箱の識別子を remote state で読む）
 - [ADR運用ガイド](../../../docs/adr/README.md)
 - [Infrastructure README](../../../infra/README.md)

@@ -240,6 +240,6 @@ gcloud asset analyze-iam-policy \
 - [[INFRA-ADR-006] Cross-project Terraform output 共有戦略](./006-cross-project-output-sharing.md)
 - [[INFRA-ADR-007] Artifact Registry リポジトリ戦略とワークロード用 Service Account 設計](./007-artifact-registry-and-sa-strategy.md)
 - [[INFRA-ADR-008] Service Account 命名規則](./008-service-account-naming.md)
-- [[INFRA-ADR-015] Cursor の datalake IAM は WIF を定義する ops に置く](./015-cursor-wif-iam-in-ops.md)（共用 WIF の箱への grant は identity 側 = ops。本 ADR の crawler SA ルールは変えない）
+- [[INFRA-ADR-015] data は箱とし、guest IAM は identity 定義側に書く](./015-identity-side-guest-iam.md)（本 ADR の identity 側を、identity が app 以外にある場合へ延長する。crawler → AR は変えない）
 - [Artifact Registry repository IAM policy command](https://cloud.google.com/sdk/gcloud/reference/artifacts/repositories/get-iam-policy)
 - [Policy Analyzer for allow policies](https://cloud.google.com/policy-intelligence/docs/analyze-iam-policies)

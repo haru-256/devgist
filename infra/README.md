@@ -45,7 +45,7 @@ graph TD
 - `haru256-devgist-ops`
   - Artifact Registry
   - GitHub Actions 連携、WIF、共通 CI/CD 用 Service Account などの運用基盤
-  - Cursor Cloud 用 OIDC WIF pool / provider（認証は [INFRA-ADR-014](../docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md)、置き場は [INFRA-ADR-015](../docs/adr/infra/015-cursor-wif-iam-in-ops.md)）
+  - Cursor Cloud 用 OIDC WIF pool / provider（認証は [INFRA-ADR-014](../docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md)、guest IAM の置き場は [INFRA-ADR-015](../docs/adr/infra/015-identity-side-guest-iam.md)）
 
 - `haru256-devgist-data-{env}`
   - GCS datalake
@@ -100,7 +100,7 @@ graph LR
 
 ### Notes
 
-- `devgist-ops` は `devgist-data/dev` の bucket 名を `terraform_remote_state` で参照する。Cursor の lake IAM があるあいだ、箱を先に apply する（[INFRA-ADR-015](../docs/adr/infra/015-cursor-wif-iam-in-ops.md)）
+- `devgist-ops` は `devgist-data/dev` の bucket 名を `terraform_remote_state` で参照する。ops の identity が箱へ grant するあいだ、箱を先に apply する（[INFRA-ADR-015](../docs/adr/infra/015-identity-side-guest-iam.md)）
 - `devgist-app/dev` は `devgist-ops` と `devgist-data/dev` の outputs を `terraform_remote_state` で参照する
 - secret は Terraform outputs では渡さず、`GCP Secret Manager` を app runtime から参照する
 - 旧 `environments/crawler` は legacy 扱いで、最終的には `ops/app/data` 側へ整理する
