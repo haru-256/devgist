@@ -26,6 +26,8 @@ sequenceDiagram
   Start->>Start: cursor-wif.json を書く
   Auth->>Helper: JSON を読みヘルパーを起動
   Helper->>Socket: JWT を mint
+  Socket->>Cursor: 署名を依頼
+  Cursor-->>Socket: JWT
   Socket-->>Helper: JWT 寿命 5 分
   Helper-->>Auth: id_token
   Auth->>Sts: JWT を交換
