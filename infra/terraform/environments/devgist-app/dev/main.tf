@@ -16,21 +16,6 @@ locals {
       repository_id = data.terraform_remote_state.ops.outputs.crawler_artifact_registry_repository_id
     }
   }
-
-  cursor_oidc_datalake_roles = toset([
-    "roles/storage.objectViewer",
-    "roles/storage.objectCreator",
-  ])
-
-  cursor_oidc_datalake_bindings = {
-    for pair in setproduct(var.cursor_oidc_subjects, local.cursor_oidc_datalake_roles) :
-    "${pair[0]}|${pair[1]}" => {
-      subject = pair[0]
-      role    = pair[1]
-    }
-  }
-
-  cursor_wif_subject_prefix = "principal://iam.googleapis.com/projects/${data.terraform_remote_state.ops.outputs.ops_project_number}/locations/global/workloadIdentityPools/${data.terraform_remote_state.ops.outputs.cursor_wif_pool_id}/subject"
 }
 
 data "google_project" "project" {
@@ -107,16 +92,6 @@ resource "google_storage_bucket_iam_member" "crawler" {
   bucket = data.terraform_remote_state.data.outputs.datalake_bucket_name
   role   = each.value
   member = module.service_accounts.members["crawler"]
-}
-
-# data環境のGCSバケットに対して、Cursor Cloud の federated principal に読み込み・書き込み権限を付与
-# WIF direct resource access。crawler runtime SA とは別 identity（INFRA-ADR-014）
-resource "google_storage_bucket_iam_member" "cursor_oidc" {
-  for_each = local.cursor_oidc_datalake_bindings
-
-  bucket = data.terraform_remote_state.data.outputs.datalake_bucket_name
-  role   = each.value.role
-  member = "${local.cursor_wif_subject_prefix}/${each.value.subject}"
 }
 
 # Crawler用のCloud Run Job の作成
