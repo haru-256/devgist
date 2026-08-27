@@ -234,7 +234,7 @@ allowlist に使う `sub` は `user:<cursor_user_id>` のような安定 ID と�
 
 1. Terraform で ops の Cursor 用 WIF pool / provider を定義する。app-dev で datalake へ federated principal の `objectViewer` / `objectCreator` を付与する
 2. ローカル PC から ops → app-dev の順で apply する
-3. Cursor Cloud 側は、WIF の audience に合わせて OIDC を mint し、ADC が federated token を直接使う状態にする。credential config に `service_account_impersonation_url` は入れない
+3. Cursor Cloud 側は、WIF の audience に合わせて OIDC を mint し、ADC が federated token を直接使う状態にする。credential config に `service_account_impersonation_url` は入れない。手順は [docs/runbooks/cursor-cloud-oidc-wif.md](../../runbooks/cursor-cloud-oidc-wif.md)
 4. GitHub Actions から terraform apply するための WIF は、別 ADR または別 PR で設計する
 
 ## Related Documents
