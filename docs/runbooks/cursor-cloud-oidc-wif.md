@@ -49,20 +49,24 @@ JSON を書くスクリプトは [`scripts/cursor-cloud/setup-adc.sh`](../../scr
 
 ## Cursor に設定するもの
 
-入れる場所は [Cloud Agents](https://cursor.com/dashboard/cloud-agents) の Secrets と Environment。`CURSOR_WIF_PROJECT_NUMBER` は ops の terraform output `ops_project_number` である。秘密ではない。
+入れる場所は [Cloud Agents](https://cursor.com/dashboard/cloud-agents) の **Secrets タブ** と、Cloud Agent の **Environment**（install / `start` / ネットワークのマシン設定。プロセスの環境変数のことではない）。
 
-### Secrets
+Cloud Agents のダッシュボードには、環境変数専用の欄が無い。Secrets タブに書いた値が VM の環境変数になる。下の表はどれも秘密ではない。鍵の代わりにここに置くのではなく、専用欄が無いから Secrets タブを使う。
 
-| 名前 | 値 |
-|---|---|
-| `CURSOR_WIF_PROJECT_NUMBER` | ops の `ops_project_number` |
-| `GOOGLE_APPLICATION_CREDENTIALS` | `/home/ubuntu/.config/gcloud/cursor-wif.json`（`$HOME` が違うときは `echo $HOME` で合わせる） |
-| `GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES` | `1` |
-| `DATA_LAKE_BUCKET_NAME` | crawler を動かすなら `haru256-devgist-data-dev-datalake` |
+`CURSOR_WIF_PROJECT_NUMBER` は ops の terraform output `ops_project_number` である。
 
-`GOOGLE_APPLICATION_CREDENTIALS` は鍵ではなく、`start` が書く WIF credential config のパスである。
+### Secrets タブ（環境変数として渡る）
 
-### Environment
+| 名前 | 値 | 秘密か |
+|---|---|---|
+| `CURSOR_WIF_PROJECT_NUMBER` | ops の `ops_project_number` | いいえ |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `/home/ubuntu/.config/gcloud/cursor-wif.json`（`$HOME` が違うときは `echo $HOME` で合わせる） | いいえ。鍵ではなく `start` が書く JSON のパス |
+| `GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES` | `1` | いいえ |
+| `DATA_LAKE_BUCKET_NAME` | crawler を動かすなら `haru256-devgist-data-dev-datalake` | いいえ。バケット名 |
+
+### Environment（Cloud Agent のマシン設定）
+
+ダッシュボードの Environment は「どの VM 設定で agent を起動するか」である。プロセスの環境変数一覧ではない。環境変数は上の Secrets タブから入る。
 
 | 項目 | 値 |
 |---|---|
@@ -82,12 +86,12 @@ JSON を書くスクリプトは [`scripts/cursor-cloud/setup-adc.sh`](../../scr
 
 1. ops を apply し、`ops_project_number` を控える。
 2. app-dev の `cursor_oidc_subjects` に、許可する Cursor `sub` を入れる。例: `["user:308716925"]`。`sub` はメールではない。空なら WIF は通っても GCS は拒否する。
-3. 上の「Cursor に設定するもの」を Secrets と Environment に入れる。
+3. 上の「Cursor に設定するもの」を入れる。環境変数は Secrets タブ。`start` とネットワークは Environment（マシン設定）。
 4. 新しい Cloud Agent を起動する。`start` が `$HOME/.config/gcloud/cursor-wif.json` を書く。`command` は checkout した `cursor-gcp-oidc` の絶対パスである。
 
 ## 動作確認
 
-WIF と allowlist の apply、Cursor の設定、`start` 済みが前提。本線は ADC が token を取れることである。Secrets が入っていれば export は不要。
+WIF と allowlist の apply、Cursor の設定、`start` 済みが前提。本線は ADC が token を取れることである。Secrets タブの値が入っていれば export は不要。
 
 ```bash
 gcloud auth application-default print-access-token >/dev/null
@@ -107,7 +111,7 @@ scripts/cursor-cloud/cursor-gcp-oidc | jq -r '.success'
 | 症状 | 見るところ |
 |---|---|
 | `jq is required` | Cloud Agent の PATH に `jq` が無いか |
-| `executables need to be explicitly allowed` | Secrets の `GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES` が `1` か |
+| `executables need to be explicitly allowed` | Secrets タブの `GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES` が `1` か |
 | credential ファイルが無い | `start` に `setup-adc.sh` があるか。`CURSOR_WIF_PROJECT_NUMBER` が入っているか |
 | STS が audience 不一致 | JWT `aud` が canonical name か。`allowed_audiences` にカスタム値だけを入れてないか |
 | mint は成功、GCS が 403 | `cursor_oidc_subjects` と JWT `sub` |
