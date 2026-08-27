@@ -6,6 +6,30 @@
 
 起動時の動きは次のとおりである。
 
+```mermaid
+sequenceDiagram
+  participant Secrets as Secrets
+  participant Start as start
+  participant Auth as Google Auth
+  participant Helper as cursor-gcp-oidc
+  participant Socket as Cursor OIDC
+  participant Sts as GCP STS
+  participant Gcs as datalake
+
+  Note over Secrets,Start: VM 起動。Secrets が環境変数として入る
+  Secrets->>Start: CURSOR_WIF_PROJECT_NUMBER など
+  Start->>Start: cursor-wif.json を書く
+  Note over Start: GOOGLE_APPLICATION_CREDENTIALS がそのパス
+  Auth->>Start: 初回の GCS 呼び出しで JSON を読む
+  Auth->>Helper: ALLOW_EXECUTABLES=1 なら起動
+  Helper->>Socket: JWT を mint
+  Socket-->>Helper: JWT 寿命 5 分
+  Helper-->>Auth: id_token
+  Auth->>Sts: JWT を交換
+  Sts-->>Auth: federated token
+  Auth->>Gcs: objectViewer / objectCreator
+```
+
 1. Secrets が環境変数として入った状態で VM が上がる。
 2. `start` が `$HOME/.config/gcloud/cursor-wif.json` を書く。`GOOGLE_APPLICATION_CREDENTIALS` はそのパスを指す。
 3. GCS などに触ると Google Auth が JSON を読む。`GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES=1` なので [`scripts/cursor-cloud/cursor-gcp-oidc`](../../scripts/cursor-cloud/cursor-gcp-oidc) を起動する（`jq` と `curl` が要る）。
