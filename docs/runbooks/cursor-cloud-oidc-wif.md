@@ -8,24 +8,28 @@
 
 ```mermaid
 sequenceDiagram
-  participant Secrets as Secrets
-  participant Start as start
-  participant Auth as Google Auth
-  participant Helper as cursor-gcp-oidc
-  participant Socket as Cursor OIDC
-  participant Sts as GCP STS
-  participant Gcs as datalake
+  box Cloud Agent VM
+    participant Start as start
+    participant Auth as Google Auth
+    participant Helper as cursor-gcp-oidc
+    participant Socket as OIDC socket
+  end
+  box Cursor IdP
+    participant Cursor as api.cursor.com
+  end
+  box GCP
+    participant Sts as STS
+    participant Gcs as datalake
+  end
 
-  Note over Secrets,Start: VM 起動。Secrets が環境変数として入る
-  Secrets->>Start: CURSOR_WIF_PROJECT_NUMBER など
+  Note over Start,Socket: VM 起動。Secrets が環境変数として入る
   Start->>Start: cursor-wif.json を書く
-  Note over Start: GOOGLE_APPLICATION_CREDENTIALS がそのパス
-  Auth->>Start: 初回の GCS 呼び出しで JSON を読む
-  Auth->>Helper: ALLOW_EXECUTABLES=1 なら起動
+  Auth->>Helper: JSON を読みヘルパーを起動
   Helper->>Socket: JWT を mint
   Socket-->>Helper: JWT 寿命 5 分
   Helper-->>Auth: id_token
   Auth->>Sts: JWT を交換
+  Sts->>Cursor: JWKS で検証
   Sts-->>Auth: federated token
   Auth->>Gcs: objectViewer / objectCreator
 ```
