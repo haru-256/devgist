@@ -2,11 +2,20 @@
 
 ## 概要
 
-Cloud Agent が Cursor の短命 OIDC JWT を GCP STS に渡し、federated token で data-dev datalake を読む。設計は [INFRA-ADR-014](../adr/infra/014-cursor-oidc-wif-direct-resource-access.md)。WIF pool は #83。この文書は apply 後の Cursor 側配線である。
+達成したいのは、Cloud Agent が起動したあと、crawler や GCS クライアントが普通に data-dev datalake へ届くことである。鍵は置かない。人が token 交換を指示しない。ADC が mint と STS を行う。
 
-Cursor は IdP、GCP が検証する。ダッシュボードに WIF や issuer は登録しない。token 交換を毎回指示する必要はない。ADC が mint と STS を行う。mint の `aud` は `GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE` のまま使う。`allowed_audiences` が空なら GCP は canonical name を `https:` の有無どちらでも受理する（[仕様](https://cloud.google.com/iam/docs/reference/rest/v1/projects.locations.workloadIdentityPools.providers#Oidc)）。
+起動時の動きは次のとおりである。
 
-ヘルパーは [`scripts/cursor-cloud/setup-adc.sh`](../../scripts/cursor-cloud/setup-adc.sh)（`start` から credential JSON を書く）と [`scripts/cursor-cloud/cursor-gcp-oidc`](../../scripts/cursor-cloud/cursor-gcp-oidc)（Google Auth が呼ぶ mint。`jq` と `curl` が要る）。
+1. Secrets が環境変数として入った状態で VM が上がる。
+2. `start` が `$HOME/.config/gcloud/cursor-wif.json` を書く。`GOOGLE_APPLICATION_CREDENTIALS` はそのパスを指す。
+3. GCS などに触ると Google Auth が JSON を読む。`GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES=1` なので [`scripts/cursor-cloud/cursor-gcp-oidc`](../../scripts/cursor-cloud/cursor-gcp-oidc) を起動する（`jq` と `curl` が要る）。
+4. ヘルパーが VM 内 socket から Cursor OIDC JWT を mint する（寿命 5 分）。`aud` は `GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE` のまま。
+5. GCP STS が JWKS で検証し、`repo_url` と `agent_runtime == managed` を見る。federated token を返す。
+6. GCS は `principal://.../workloadIdentityPools/cursor/subject/<sub>` に付いた IAM だけで許す。
+
+この文書は、その流れになるよう Cursor 側を配線する手順である。設計は [INFRA-ADR-014](../adr/infra/014-cursor-oidc-wif-direct-resource-access.md)。WIF pool は #83。Cursor は IdP、GCP が検証する。ダッシュボードに WIF や issuer は登録しない。`allowed_audiences` が空なら GCP は canonical name を `https:` の有無どちらでも受理する（[仕様](https://cloud.google.com/iam/docs/reference/rest/v1/projects.locations.workloadIdentityPools.providers#Oidc)）。
+
+JSON を書くスクリプトは [`scripts/cursor-cloud/setup-adc.sh`](../../scripts/cursor-cloud/setup-adc.sh) である。
 
 ## Cursor に設定するもの
 
@@ -45,8 +54,6 @@ Cursor は IdP、GCP が検証する。ダッシュボードに WIF や issuer �
 2. app-dev の `cursor_oidc_subjects` に、許可する Cursor `sub` を入れる。例: `["user:308716925"]`。`sub` はメールではない。空なら WIF は通っても GCS は拒否する。
 3. 上の「Cursor に設定するもの」を Secrets と Environment に入れる。
 4. 新しい Cloud Agent を起動する。`start` が `$HOME/.config/gcloud/cursor-wif.json` を書く。`command` は checkout した `cursor-gcp-oidc` の絶対パスである。
-
-起動後は Google Auth が JSON を読み、ヘルパーが JWT を mint し（寿命 5 分）、STS が `repo_url` と `agent_runtime == managed` を見る。GCS は `principal://.../workloadIdentityPools/cursor/subject/<sub>` の IAM だけで許す。
 
 ## 動作確認
 
