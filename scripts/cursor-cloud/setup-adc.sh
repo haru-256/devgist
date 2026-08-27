@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Write the WIF credential config for Cursor Cloud ADC. Env vars for ADC
-# come from Cursor Secrets, not from this script.
+# Write the WIF credential config for Cursor Cloud ADC.
+# CURSOR_WIF_PROJECT_NUMBER comes from a Cursor Secret whose type is
+# Environment Variable, not Runtime Secret or Build Secret.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_number="${CURSOR_WIF_PROJECT_NUMBER:-}"

@@ -22,7 +22,7 @@ sequenceDiagram
     participant Gcs as datalake
   end
 
-  Note over Start,Socket: VM 起動。Secrets が環境変数として入る
+  Note over Start,Socket: VM 起動。type Environment Variable の Secrets がプロセス環境変数として入る
   Start->>Start: cursor-wif.json を書く
   Auth->>Helper: JSON を読みヘルパーを起動
   Helper->>Socket: JWT を mint
@@ -36,7 +36,7 @@ sequenceDiagram
   Auth->>Gcs: objectViewer / objectCreator
 ```
 
-1. Secrets が環境変数として入った状態で VM が上がる。
+1. type `Environment Variable` の Secrets がプロセス環境変数として入った状態で VM が上がる。
 2. `start` が `$HOME/.config/gcloud/cursor-wif.json` を書く。`GOOGLE_APPLICATION_CREDENTIALS` はそのパスを指す。
 3. GCS などに触ると Google Auth が JSON を読む。`GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES=1` なので [`scripts/cursor-cloud/cursor-gcp-oidc`](../../scripts/cursor-cloud/cursor-gcp-oidc) を起動する（`jq` と `curl` が要る）。
 4. ヘルパーが VM 内 socket から Cursor OIDC JWT を mint する（寿命 5 分）。`aud` は `GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE` のまま。
@@ -49,35 +49,54 @@ JSON を書くスクリプトは [`scripts/cursor-cloud/setup-adc.sh`](../../scr
 
 ## Cursor に設定するもの
 
-入れる場所は [Cloud Agents](https://cursor.com/dashboard/cloud-agents) の **Secrets タブ** と、Cloud Agent の **Environment**（install / `start` / ネットワークのマシン設定。プロセスの環境変数のことではない）。
+入れる場所は [Cloud Agents](https://cursor.com/dashboard/cloud-agents) の **Secrets** と、保存済み **Environment** である。名前が似ているが別物である。
 
-Cloud Agents のダッシュボードには、環境変数専用の欄が無い。Secrets タブに書いた値が VM の環境変数になる。下の表はどれも秘密ではない。鍵の代わりにここに置くのではなく、専用欄が無いから Secrets タブを使う。
+| ダッシュボードの名前 | 何か | この手順で触るもの |
+|---|---|---|
+| Secrets | 名前と値の組。type を選ぶ | type `Environment Variable` の 4 件 |
+| Environment | Cloud Agent のマシン設定（`install` / `start` / ネットワーク） | `start` と、egress を制限しているときの allowlist |
+
+Secrets の type は [Secrets & Network](https://cursor.com/docs/cloud-agent/security-network) の定義に従う。
+
+| type | 実行時のプロセス環境変数になるか | Cloud Agent から値が見えるか | この手順での使い方 |
+|---|---|---|---|
+| `Environment Variable` | なる | 見える。フラグや公開 URL 向け | **この手順の値はすべてこれ** |
+| `Runtime Secret` | なる | ツール結果・チャット・コミットでは `[REDACTED]` | 使わない。鍵でもない |
+| `Build Secret` | ならない（Docker build だけ） | 実行中の agent には出ない | 使わない。`start` と ADC から見えない |
+
+`Environment Variable` と `Runtime Secret` はどちらもプロセス環境変数として入る。差は agent への見せ方である。GCP の鍵はどちらにも置かない。OIDC を使う。
 
 `CURSOR_WIF_PROJECT_NUMBER` は ops の terraform output `ops_project_number` である。
 
-### Secrets タブ（環境変数として渡る）
+### Secrets（type は Environment Variable）
 
-| 名前 | 値 | 秘密か |
-|---|---|---|
-| `CURSOR_WIF_PROJECT_NUMBER` | ops の `ops_project_number` | いいえ |
-| `GOOGLE_APPLICATION_CREDENTIALS` | `/home/ubuntu/.config/gcloud/cursor-wif.json`（`$HOME` が違うときは `echo $HOME` で合わせる） | いいえ。鍵ではなく `start` が書く JSON のパス |
-| `GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES` | `1` | いいえ |
-| `DATA_LAKE_BUCKET_NAME` | crawler を動かすなら `haru256-devgist-data-dev-datalake` | いいえ。バケット名 |
+[Secrets タブ](https://cursor.com/dashboard/cloud-agents) で次を追加し、type を `Environment Variable` にする。Environment 単位でスコープできるなら、このリポジトリの Environment に付ける。
 
-### Environment（Cloud Agent のマシン設定）
+| 名前 | 値 |
+|---|---|
+| `CURSOR_WIF_PROJECT_NUMBER` | ops の `ops_project_number` |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `/home/ubuntu/.config/gcloud/cursor-wif.json`（`$HOME` が違うときは `echo $HOME` で合わせる） |
+| `GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES` | `1` |
+| `DATA_LAKE_BUCKET_NAME` | crawler を動かすなら `haru256-devgist-data-dev-datalake` |
 
-ダッシュボードの Environment は「どの VM 設定で agent を起動するか」である。プロセスの環境変数一覧ではない。環境変数は上の Secrets タブから入る。
+`GOOGLE_APPLICATION_CREDENTIALS` は鍵ではなく、`start` が書く JSON のパスである。
+
+type を `Runtime Secret` にすると、agent は値を `[REDACTED]` としか見えない。プロジェクト番号やパスの確認ができなくなる。type を `Build Secret` にすると、`start` も Google Auth も読めない。
+
+### Environment（マシン設定）
+
+保存済み Environment は「どの VM で agent を起動するか」である。Secret の type `Environment Variable` ではない。プロセス環境変数の一覧でもない。変数は上の Secrets から入る。
 
 | 項目 | 値 |
 |---|---|
 | `start` | `scripts/cursor-cloud/setup-adc.sh` |
-| Network allowlist（egress を制限しているときだけ） | `sts.googleapis.com`、`iam.googleapis.com`、`storage.googleapis.com`、`www.googleapis.com`、`oauth2.googleapis.com` |
+| Network（egress を制限しているときだけ） | Environment の network access に `sts.googleapis.com`、`iam.googleapis.com`、`storage.googleapis.com`、`www.googleapis.com`、`oauth2.googleapis.com` を足す |
 
-既存の install / snapshot は残す。リポジトリに `.cursor/environment.json` は置かない。`install` で export した変数は Build 後に残らない。mint 自体は VM 内の Unix socket で、allowlist は不要である。
+既存の `install` / snapshot は残す。リポジトリに `.cursor/environment.json` は置かない。`install` で export した変数は Build 後に残らない。mint 自体は VM 内の Unix socket で、allowlist は不要である。ネットワークの階層は [Secrets & Network](https://cursor.com/docs/cloud-agent/security-network#network-access) を見る。
 
 ### 置かないもの
 
-- Service Account JSON キー、人間ユーザーの ADC
+- Service Account JSON キー、人間ユーザーの ADC（type `Runtime Secret` でも置かない）
 - WIF pool / provider / issuer（Cursor 側に登録する欄は無い）
 - `service_account_impersonation_url`（`gcloud ... create-cred-config` に `--service-account` を付けない）
 - `cursor_oidc_subjects`（Cursor ではなく app-dev の gitignore 済み `terraform.tfvars`）
@@ -86,12 +105,12 @@ Cloud Agents のダッシュボードには、環境変数専用の欄が無い�
 
 1. ops を apply し、`ops_project_number` を控える。
 2. app-dev の `cursor_oidc_subjects` に、許可する Cursor `sub` を入れる。例: `["user:308716925"]`。`sub` はメールではない。空なら WIF は通っても GCS は拒否する。
-3. 上の「Cursor に設定するもの」を入れる。環境変数は Secrets タブ。`start` とネットワークは Environment（マシン設定）。
+3. Secrets に上の 4 件を type `Environment Variable` で入れる。Environment の `start` に `setup-adc.sh` を入れる。egress を制限しているなら GCP ホストを Environment の allowlist に足す。
 4. 新しい Cloud Agent を起動する。`start` が `$HOME/.config/gcloud/cursor-wif.json` を書く。`command` は checkout した `cursor-gcp-oidc` の絶対パスである。
 
 ## 動作確認
 
-WIF と allowlist の apply、Cursor の設定、`start` 済みが前提。本線は ADC が token を取れることである。Secrets タブの値が入っていれば export は不要。
+WIF と allowlist の apply、Cursor の設定、`start` 済みが前提。本線は ADC が token を取れることである。type `Environment Variable` の値が入っていれば export は不要。
 
 ```bash
 gcloud auth application-default print-access-token >/dev/null
@@ -111,8 +130,9 @@ scripts/cursor-cloud/cursor-gcp-oidc | jq -r '.success'
 | 症状 | 見るところ |
 |---|---|
 | `jq is required` | Cloud Agent の PATH に `jq` が無いか |
-| `executables need to be explicitly allowed` | Secrets タブの `GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES` が `1` か |
-| credential ファイルが無い | `start` に `setup-adc.sh` があるか。`CURSOR_WIF_PROJECT_NUMBER` が入っているか |
+| `executables need to be explicitly allowed` | Secrets の `GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES` が type `Environment Variable` で `1` か |
+| credential ファイルが無い | `start` に `setup-adc.sh` があるか。`CURSOR_WIF_PROJECT_NUMBER` の type が `Environment Variable` か。`Build Secret` になっていないか |
+| 値が `[REDACTED]` になる | type が `Runtime Secret` になっていないか。この手順の値は `Environment Variable` |
 | STS が audience 不一致 | JWT `aud` が canonical name か。`allowed_audiences` にカスタム値だけを入れてないか |
 | mint は成功、GCS が 403 | `cursor_oidc_subjects` と JWT `sub` |
 | `OIDC socket not found` | `/run/cursor/api.sock`。Cursor 管理 VM 以外では無い |
