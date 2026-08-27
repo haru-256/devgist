@@ -24,35 +24,21 @@ fi
 
 audience="//iam.googleapis.com/projects/${project_number}/locations/global/workloadIdentityPools/cursor/providers/oidc"
 
-python3 - "${audience}" "${mint}" "${config_path}" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-audience, executable, output = sys.argv[1], sys.argv[2], sys.argv[3]
-path = Path(output)
-path.parent.mkdir(parents=True, exist_ok=True)
-path.write_text(
-    json.dumps(
-        {
-            "type": "external_account",
-            "audience": audience,
-            "subject_token_type": "urn:ietf:params:oauth:token-type:id_token",
-            "token_url": "https://sts.googleapis.com/v1/token",
-            "universe_domain": "googleapis.com",
-            "credential_source": {
-                "executable": {
-                    "command": executable,
-                    "timeout_millis": 10000,
-                }
-            },
-        },
-        indent=2,
-    )
-    + "\n",
-    encoding="utf-8",
-)
-print(f"wrote {path}", file=sys.stderr)
-PY
+mkdir -p "$(dirname "${config_path}")"
+cat >"${config_path}" <<EOF
+{
+  "type": "external_account",
+  "audience": "${audience}",
+  "subject_token_type": "urn:ietf:params:oauth:token-type:id_token",
+  "token_url": "https://sts.googleapis.com/v1/token",
+  "universe_domain": "googleapis.com",
+  "credential_source": {
+    "executable": {
+      "command": "${mint}",
+      "timeout_millis": 10000
+    }
+  }
+}
+EOF
 
 printf 'ADC config: %s\n' "${config_path}"
