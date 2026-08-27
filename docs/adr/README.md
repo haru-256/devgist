@@ -21,7 +21,7 @@
 | `INFRA-ADR-012` | `infra` | Cloud Run Job の実行粒度と実行時パラメータ設計 | Accepted | [docs/adr/infra/012-crawler-execution-parameters.md](infra/012-crawler-execution-parameters.md) |
 | `INFRA-ADR-013` | `infra` | Cursor Cloud から GCP への認証に Cursor OIDC と WIF を採用する | Superseded | [docs/adr/infra/013-cursor-oidc-workload-identity-federation.md](infra/013-cursor-oidc-workload-identity-federation.md) |
 | `INFRA-ADR-014` | `infra` | Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする | Superseded | [docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md](infra/014-cursor-oidc-wif-direct-resource-access.md) |
-| `INFRA-ADR-015` | `infra` | data は箱とし、guest IAM は identity 定義側に書く | Accepted | [docs/adr/infra/015-identity-side-guest-iam.md](infra/015-identity-side-guest-iam.md) |
+| `INFRA-ADR-015` | `infra` | data は箱とし、guest IAM は依存の下流が書く | Accepted | [docs/adr/infra/015-guest-iam-downstream.md](infra/015-guest-iam-downstream.md) |
 | `CRAWLER-ADR-001` | `crawler` | 論文収集クローラーの実装言語としてPythonを採用 | Accepted | [docs/adr/crawler/001-language-selection.md](crawler/001-language-selection.md) |
 | `CRAWLER-ADR-002` | `crawler` | XMLパースにdefusedxmlを採用 | Accepted | [docs/adr/crawler/002-xml-parsing-security.md](crawler/002-xml-parsing-security.md) |
 

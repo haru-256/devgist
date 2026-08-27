@@ -240,6 +240,6 @@ gcloud asset analyze-iam-policy \
 - [[INFRA-ADR-006] Cross-project Terraform output 共有戦略](./006-cross-project-output-sharing.md)
 - [[INFRA-ADR-007] Artifact Registry リポジトリ戦略とワークロード用 Service Account 設計](./007-artifact-registry-and-sa-strategy.md)
 - [[INFRA-ADR-008] Service Account 命名規則](./008-service-account-naming.md)
-- [[INFRA-ADR-015] data は箱とし、guest IAM は identity 定義側に書く](./015-identity-side-guest-iam.md)（本 ADR の identity 側を、identity が app 以外にある場合へ延長する。crawler → AR は変えない）
+- [[INFRA-ADR-015] data は箱とし、guest IAM は依存の下流が書く](./015-guest-iam-downstream.md)（本 ADR の downstream を、identity が上流にある場合も含めて一意にする。crawler → AR は変えない。上流の resource 側は復活させない）
 - [Artifact Registry repository IAM policy command](https://cloud.google.com/sdk/gcloud/reference/artifacts/repositories/get-iam-policy)
 - [Policy Analyzer for allow policies](https://cloud.google.com/policy-intelligence/docs/analyze-iam-policies)

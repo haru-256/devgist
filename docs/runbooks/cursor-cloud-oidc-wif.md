@@ -43,7 +43,7 @@ sequenceDiagram
 5. GCP STS が JWKS で検証し、`repo_url` と `agent_runtime == managed` を見る。federated token を返す。
 6. GCS は `principal://.../workloadIdentityPools/cursor/subject/<sub>` に付いた IAM だけで許す。
 
-この文書は、その流れになるよう Cursor 側を配線する手順である。guest IAM の置き場は [INFRA-ADR-015](../adr/infra/015-identity-side-guest-iam.md)。認証モデル（direct resource access）は [INFRA-ADR-014](../adr/infra/014-cursor-oidc-wif-direct-resource-access.md) が決めた。WIF pool は #83。Cursor は IdP、GCP が検証する。ダッシュボードに WIF や issuer は登録しない。`allowed_audiences` が空なら GCP は canonical name を `https:` の有無どちらでも受理する（[仕様](https://cloud.google.com/iam/docs/reference/rest/v1/projects.locations.workloadIdentityPools.providers#Oidc)）。
+この文書は、その流れになるよう Cursor 側を配線する手順である。guest IAM の置き場は [INFRA-ADR-015](../adr/infra/015-guest-iam-downstream.md)。認証モデル（direct resource access）は [INFRA-ADR-014](../adr/infra/014-cursor-oidc-wif-direct-resource-access.md) が決めた。WIF pool は #83。Cursor は IdP、GCP が検証する。ダッシュボードに WIF や issuer は登録しない。`allowed_audiences` が空なら GCP は canonical name を `https:` の有無どちらでも受理する（[仕様](https://cloud.google.com/iam/docs/reference/rest/v1/projects.locations.workloadIdentityPools.providers#Oidc)）。
 
 JSON を書くスクリプトは [`scripts/cursor-cloud/setup-adc.sh`](../../scripts/cursor-cloud/setup-adc.sh) である。
 
