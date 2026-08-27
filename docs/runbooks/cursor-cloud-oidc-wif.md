@@ -67,7 +67,7 @@ WIF と allowlist の apply が済んでいる前提。
 
 ```bash
 export GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE="//iam.googleapis.com/projects/${CURSOR_WIF_PROJECT_NUMBER}/locations/global/workloadIdentityPools/cursor/providers/oidc"
-scripts/cursor-cloud/cursor-gcp-oidc | python3 -c 'import json,sys; print(json.load(sys.stdin)["success"])'
+scripts/cursor-cloud/cursor-gcp-oidc | jq -r '.success'
 
 export GOOGLE_APPLICATION_CREDENTIALS="${HOME}/.config/gcloud/cursor-wif.json"
 export GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES=1
@@ -103,6 +103,7 @@ python3 scripts/cursor-cloud/tests/test_scripts.py
 
 | 症状 | 見るところ |
 |---|---|
+| `jq is required` | Cloud Agent の PATH に `jq` が無いか |
 | `executables need to be explicitly allowed` | `GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES` が `1` か |
 | STS が audience 不一致 | JWT `aud` が canonical name か。`allowed_audiences` にカスタム値だけを入れてないか |
 | mint は成功、GCS が 403 | `cursor_oidc_subjects` と JWT `sub` |

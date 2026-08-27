@@ -3,24 +3,20 @@ set -euo pipefail
 
 # Google Auth executable helper. Mints a Cursor OIDC JWT with
 # GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE as aud and prints the JSON the auth
-# libraries expect on stdout.
+# libraries expect on stdout. JSON is handled with jq so the helper does
+# not depend on a particular python3 version.
 
 fail() {
   local code="$1"
   local message="$2"
-  python3 -c 'import json, sys
-print(json.dumps({
-    "version": 1,
-    "success": False,
-    "code": sys.argv[1],
-    "message": sys.argv[2],
-}))' "${code}" "${message}"
+  jq -n --arg code "${code}" --arg message "${message}" \
+    '{version: 1, success: false, code: $code, message: $message}'
   printf '%s\n' "${message}" >&2
   exit 1
 }
 
-if ! command -v python3 >/dev/null 2>&1; then
-  printf 'python3 is required\n' >&2
+if ! command -v jq >/dev/null 2>&1; then
+  printf 'jq is required\n' >&2
   exit 1
 fi
 if ! command -v curl >/dev/null 2>&1; then
@@ -37,7 +33,7 @@ if [[ ! -S "${socket}" ]]; then
   fail "401" "Cursor OIDC socket not found: ${socket}"
 fi
 
-payload="$(python3 -c 'import json, sys; print(json.dumps({"aud": sys.argv[1]}))' "${mint_audience}")"
+payload="$(jq -n --arg aud "${mint_audience}" '{aud: $aud}')"
 
 set +e
 response="$(
@@ -52,40 +48,17 @@ if [[ "${curl_status}" -ne 0 ]]; then
   fail "502" "Cursor OIDC mint failed (curl exit ${curl_status})"
 fi
 
-token_type="${GOOGLE_EXTERNAL_ACCOUNT_TOKEN_TYPE:-urn:ietf:params:oauth:token-type:id_token}"
+token="$(printf '%s' "${response}" | jq -er '.token')" || fail "502" "Cursor OIDC mint response missing token or expires_at"
+expires_at="$(printf '%s' "${response}" | jq -er '.expires_at')" || fail "502" "Cursor OIDC mint response missing token or expires_at"
 
-python3 - "${response}" "${token_type}" <<'PY'
-import json
-import sys
-
-raw_response, token_type = sys.argv[1], sys.argv[2]
-try:
-    body = json.loads(raw_response)
-except json.JSONDecodeError as exc:
-    print(json.dumps({
-        "version": 1,
-        "success": False,
-        "code": "502",
-        "message": f"Cursor OIDC mint returned non-JSON: {exc}",
-    }))
-    sys.exit(1)
-
-token = body.get("token")
-expires_at = body.get("expires_at")
-if not token or expires_at is None:
-    print(json.dumps({
-        "version": 1,
-        "success": False,
-        "code": "502",
-        "message": "Cursor OIDC mint response missing token or expires_at",
-    }))
-    sys.exit(1)
-
-print(json.dumps({
-    "version": 1,
-    "success": True,
-    "token_type": token_type,
-    "id_token": token,
-    "expiration_time": int(expires_at),
-}))
-PY
+jq -n \
+  --arg token "${token}" \
+  --arg token_type "${GOOGLE_EXTERNAL_ACCOUNT_TOKEN_TYPE:-urn:ietf:params:oauth:token-type:id_token}" \
+  --argjson expiration_time "${expires_at}" \
+  '{
+    version: 1,
+    success: true,
+    token_type: $token_type,
+    id_token: $token,
+    expiration_time: $expiration_time
+  }'
