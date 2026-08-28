@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Google Auth executable helper. Mints a Cursor OIDC JWT with
+# GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE as aud and prints the JSON the auth
+# libraries expect on stdout. JSON is handled with jq so the helper does
+# not depend on a particular python3 version.
+
+fail() {
+  local code="$1"
+  local message="$2"
+  jq -n --arg code "${code}" --arg message "${message}" \
+    '{version: 1, success: false, code: $code, message: $message}'
+  printf '%s\n' "${message}" >&2
+  exit 1
+}
+
+if ! command -v jq >/dev/null 2>&1; then
+  printf 'jq is required\n' >&2
+  exit 1
+fi
+if ! command -v curl >/dev/null 2>&1; then
+  fail "400" "curl is required to mint a Cursor OIDC token"
+fi
+
+mint_audience="${GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE:-}"
+if [[ -z "${mint_audience}" ]]; then
+  fail "400" "GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE is not set"
+fi
+
+socket="${CURSOR_AGENT_SOCKET:-/run/cursor/api.sock}"
+if [[ ! -S "${socket}" ]]; then
+  fail "401" "Cursor OIDC socket not found: ${socket}"
+fi
+
+payload="$(jq -n --arg aud "${mint_audience}" '{aud: $aud}')"
+
+set +e
+response="$(
+  curl -sS --fail --unix-socket "${socket}" \
+    -H 'Content-Type: application/json' \
+    -d "${payload}" \
+    http://cursor-agent/v1/tokens/oidc
+)"
+curl_status=$?
+set -e
+if [[ "${curl_status}" -ne 0 ]]; then
+  fail "502" "Cursor OIDC mint failed (curl exit ${curl_status})"
+fi
+
+token="$(printf '%s' "${response}" | jq -er '.token')" || fail "502" "Cursor OIDC mint response missing token or expires_at"
+expires_at="$(printf '%s' "${response}" | jq -er '.expires_at')" || fail "502" "Cursor OIDC mint response missing token or expires_at"
+
+jq -n \
+  --arg token "${token}" \
+  --arg token_type "${GOOGLE_EXTERNAL_ACCOUNT_TOKEN_TYPE:-urn:ietf:params:oauth:token-type:id_token}" \
+  --argjson expiration_time "${expires_at}" \
+  '{
+    version: 1,
+    success: true,
+    token_type: $token_type,
+    id_token: $token,
+    expiration_time: $expiration_time
+  }'
