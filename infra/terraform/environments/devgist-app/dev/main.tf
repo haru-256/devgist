@@ -32,7 +32,7 @@ data "terraform_remote_state" "ops" {
 }
 
 # data 環境の Terraform state から、data 環境で作成したリソースの情報を参照するための data source
-data "terraform_remote_state" "data" {
+data "terraform_remote_state" "data_dev" {
   backend = "gcs"
 
   config = {
@@ -90,7 +90,7 @@ resource "google_artifact_registry_repository_iam_member" "cloud_run_service_age
 resource "google_storage_bucket_iam_member" "crawler" {
   for_each = toset(["roles/storage.objectViewer", "roles/storage.objectCreator"])
 
-  bucket = data.terraform_remote_state.data.outputs.datalake_bucket_name
+  bucket = data.terraform_remote_state.data_dev.outputs.datalake_bucket_name
   role   = each.value
   member = module.service_accounts.members["crawler"]
 }
@@ -126,11 +126,11 @@ resource "google_cloud_run_v2_job" "crawler" {
         }
         env {
           name  = "DATA_LAKE_PROJECT_ID"
-          value = data.terraform_remote_state.data.outputs.datalake_project_id
+          value = data.terraform_remote_state.data_dev.outputs.datalake_project_id
         }
         env {
           name  = "DATA_LAKE_BUCKET_NAME"
-          value = data.terraform_remote_state.data.outputs.datalake_bucket_name
+          value = data.terraform_remote_state.data_dev.outputs.datalake_bucket_name
         }
         env {
           name  = "LOG_LEVEL"
