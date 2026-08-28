@@ -195,7 +195,7 @@ GitHub Actions から crawler image を Artifact Registry へ push するとき�
 - JWT の `aud` は WIF provider の既定 audience に固定する
 - attribute mapping は `google.subject` = `assertion.sub`、`attribute.repository_id` = `assertion.repository_id`、`attribute.repository_owner_id` = `assertion.repository_owner_id`、`attribute.environment` = `assertion.environment`。`attribute.environment` は IAM 用。GitHub Environment の無い job は claim が無く、token 交換に失敗する
 - attribute condition は `repository_id` と `repository_owner_id` にする。environment と workflow は入れない。prod / 別 workflow が同じ provider を使うため。権限の分割は IAM の `attribute.environment` で行う
-- `assertion.ref` は condition に入れない。dev の image は branch を問わず `workflows/crawler/**` の push で作る
+- `assertion.ref` は condition に入れない。dev の image は branch を問わず、image に効く `workflows/crawler/**` の push で作る。README だけでは作らない。ops を apply する前は repository variable が空なので job は skip する
 - IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github-devgist/attribute.environment/dev`
 - `google-github-actions/auth` に `service_account` を渡さない。credential config に `service_account_impersonation_url` を入れない
 - `google-github-actions/auth` に `project_id` として `haru256-devgist-ops` を渡す。WIF provider からは project number しか取れないため、gcloud の quota project に使う
@@ -220,7 +220,7 @@ haru256-devgist-ops
         └── member: principalSet://.../workloadIdentityPools/github-devgist/attribute.environment/dev
 
 GitHub Actions
-└── crawler image（どの branch でも `workflows/crawler/**` の push、workflow_dispatch。GitHub Environment `dev`）: build / push
+└── crawler image（image に効く `workflows/crawler/**` の push と workflow_dispatch。README だけでは走らない。GitHub Environment `dev`。ops apply 前は skip）: build / push
 
 手元
 └── terraform apply（app-dev の crawler_image に digest を渡す）

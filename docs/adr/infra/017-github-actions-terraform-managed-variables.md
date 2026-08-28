@@ -107,6 +107,7 @@ Terraform が正本の GitHub Actions 設定は、`devgist-ops` が GitHub provi
   - `CRAWLER_IMAGE_NAME` = crawler Artifact Registry の repository id。初期は image 名と repository id を一致させる
 - workflow は `vars.CRAWLER_REPO_URL` と `vars.CRAWLER_IMAGE_NAME` を script の `REPO_URL` / `IMAGE_NAME` に渡す。`configure-docker` の host は `REPO_URL` の先頭から取る。`GCP_PROJECT_ID` はまだ workflow に残す
 - 手元の `make build-push-image` は GitHub variable を読まない。Makefile の default は別経路として残す
+- ops を apply する前は repository variable が空なので、crawler image job は skip する。README だけの変更では workflow を起動しない
 
 ### 初期構成
 

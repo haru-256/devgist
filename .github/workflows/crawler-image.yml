@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - "workflows/crawler/**"
+      - "!workflows/crawler/**/*.md"
+      - "!workflows/crawler/docs/**"
+      - ".github/workflows/crawler-image.yml"
   workflow_dispatch:
 
 permissions:
@@ -17,6 +20,7 @@ concurrency:
 jobs:
   build-and-push:
     name: Build and push crawler image
+    if: ${{ vars.GCP_GITHUB_WIF_PROVIDER != '' && vars.CRAWLER_REPO_URL != '' && vars.CRAWLER_IMAGE_NAME != '' }}
     runs-on: ubuntu-latest
     environment: dev
     env:
