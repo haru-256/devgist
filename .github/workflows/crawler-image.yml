@@ -1,0 +1,121 @@
+name: Crawler image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "workflows/crawler/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    name: Build and push crawler image
+    runs-on: ubuntu-latest
+    env:
+      REPO_URL: us-central1-docker.pkg.dev/haru256-devgist-ops/crawler
+      IMAGE_NAME: crawler
+      PLATFORM: linux/amd64
+    steps:
+      - name: Require GCP_GITHUB_WIF_PROVIDER
+        env:
+          GCP_GITHUB_WIF_PROVIDER: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
+        run: |
+          if [[ -z "${GCP_GITHUB_WIF_PROVIDER}" ]]; then
+            echo "Set repository variable GCP_GITHUB_WIF_PROVIDER to terraform output github_wif_provider_name" >&2
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          set -euo pipefail
+          commit="$(git log -1 --format=%H -- workflows/crawler)"
+          if [[ -z "${commit}" ]]; then
+            echo "Could not resolve the last commit that touched workflows/crawler" >&2
+            exit 1
+          fi
+          tag="$(git rev-parse --short "${commit}")"
+          echo "Resolved crawler image tag ${tag} from ${commit}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+      - name: Reuse existing image if present
+        id: existing
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          image="${REPO_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
+          digest="$(gcloud artifacts docker images describe "${image}" --format='value(image_summary.digest)' 2>/dev/null | tr -d '[:space:]' || true)"
+          if [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "Reusing existing tag ${image}"
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+            echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "No existing image for ${image}; will build"
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Configure Docker for Artifact Registry
+        if: steps.existing.outputs.exists != 'true'
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        if: steps.existing.outputs.exists != 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        id: image
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          log="$(mktemp)"
+          ./workflows/crawler/scripts/build-push-image.sh | tee "${log}"
+          image_ref="$(sed -n 's/^image_ref: //p' "${log}" | tail -n 1)"
+          if [[ -z "${image_ref}" ]]; then
+            echo "build-push-image.sh did not print image_ref" >&2
+            exit 1
+          fi
+          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish image_ref
+        env:
+          EXISTS: ${{ steps.existing.outputs.exists }}
+          EXISTING_DIGEST: ${{ steps.existing.outputs.digest }}
+          BUILT_REF: ${{ steps.image.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "${EXISTS}" == "true" ]]; then
+            image_ref="${REPO_URL}/${IMAGE_NAME}@${EXISTING_DIGEST}"
+          else
+            image_ref="${BUILT_REF}"
+          fi
+          if [[ -z "${image_ref}" ]]; then
+            echo "image_ref is empty" >&2
+            exit 1
+          fi
+          echo "image_ref: ${image_ref}"
+          echo "image_ref: ${image_ref}" >> "${GITHUB_STEP_SUMMARY}"

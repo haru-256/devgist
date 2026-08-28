@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Build and push the crawler image, then print the immutable digest reference.
 #
-# This script is intentionally usable from both the Makefile and future
-# GitHub Actions workflows. Authentication is expected to be prepared by the
-# caller, for example with gcloud/docker login before invoking this script.
+# This script is used from the Makefile and from GitHub Actions. Authentication
+# is expected to be prepared by the caller, for example with gcloud/docker
+# login before invoking this script.
 
 IMAGE_TAG="${IMAGE_TAG:?IMAGE_TAG is required}"
 REPO_URL="${REPO_URL:?REPO_URL is required}"
@@ -21,6 +21,30 @@ CRAWLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # The tag is convenient for building and pushing, but it is mutable. Terraform
 # should receive the digest-based reference printed at the end of this script.
 IMAGE="${REPO_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
+
+print_image_ref() {
+  local digest="$1"
+  if [[ -z "${digest}" ]]; then
+    printf 'Failed to resolve image digest for %s\n' "${IMAGE}" >&2
+    exit 1
+  fi
+  if ! [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+    printf 'Invalid digest format: %s\n' "${digest}" >&2
+    exit 1
+  fi
+  printf 'image_ref: %s@%s\n' "${REPO_URL}/${IMAGE_NAME}" "${digest}"
+}
+
+# Skip rebuild when this tag already exists in Artifact Registry. The tag is
+# still mutable; Terraform consumes the digest printed below.
+if command -v gcloud >/dev/null 2>&1; then
+  existing_digest="$(gcloud artifacts docker images describe "${IMAGE}" --format='value(image_summary.digest)' 2>/dev/null | tr -d '[:space:]' || true)"
+  if [[ "${existing_digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+    printf 'Reusing existing tag %s\n' "${IMAGE}" >&2
+    print_image_ref "${existing_digest}"
+    exit 0
+  fi
+fi
 
 # docker buildx --load can only load a single-platform image into the local
 # Docker daemon. Reject comma-separated platform lists before build starts.
@@ -40,18 +64,4 @@ docker push "${IMAGE}"
 # Resolve the pushed digest from RepoDigests and strip the repository prefix so
 # only the sha256 digest remains, matching Terraform's expected image format.
 digest="$(docker inspect --format='{{join .RepoDigests "\n"}}' "${IMAGE}" | head -n 1 | sed 's/.*@//')"
-
-if [[ -z "${digest}" ]]; then
-  printf 'Failed to resolve pushed image digest for %s\n' "${IMAGE}" >&2
-  exit 1
-fi
-
-# Keep this validation aligned with Terraform's crawler_image validation, which
-# expects the final image reference to end with @sha256:<64 lowercase hex chars>.
-if ! [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-  printf 'Invalid digest format: %s\n' "${digest}" >&2
-  exit 1
-fi
-
-image_ref="${REPO_URL}/${IMAGE_NAME}@${digest}"
-printf 'image_ref: %s\n' "${image_ref}"
+print_image_ref "${digest}"
