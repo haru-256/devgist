@@ -36,16 +36,24 @@ locals {
   # GitHub repository id for haru-256/devgist. Rename-safe; do not use the owner/repo string.
   github_oidc_repository_id = "1106323394"
 
-  github_oidc_workflow_ref_prefix = "haru-256/devgist/.github/workflows/crawler-image.yml@"
+  # workflow_ref is owner/repo/.github/workflows/<file>@<ref>. Match the file
+  # only so the owner/repo string is not hardcoded; repository_id already pins the repo.
+  github_oidc_workflow_ref_path = "/.github/workflows/crawler-image.yml@"
 
-  # Branch is not in the condition. Dev image is built on every matching push.
-  # Prod later: add environment "prod" here, and gate that job with
-  # `if: github.ref == 'refs/heads/main'` in the workflow, not in WIF.
+  # This provider is GitHub Environment "dev" only. Prod is a separate WIF.
+  # Branch is not in the condition; dev image is built on every matching push.
   github_oidc_attribute_condition = <<-EOT
     assertion.repository_id == "${local.github_oidc_repository_id}" &&
     assertion.environment == "dev" &&
-    assertion.workflow_ref.startsWith("${local.github_oidc_workflow_ref_prefix}")
+    assertion.workflow_ref.contains("${local.github_oidc_workflow_ref_path}")
   EOT
+
+  github_oidc_attribute_mapping = {
+    "google.subject"          = "assertion.sub"
+    "attribute.repository_id" = "assertion.repository_id"
+    "attribute.environment"   = "assertion.environment"
+    "attribute.workflow_ref"  = "assertion.workflow_ref"
+  }
 }
 
 data "google_project" "project" {
@@ -112,11 +120,7 @@ module "github_wif" {
   issuer_uri  = "https://token.actions.githubusercontent.com"
   description = "OIDC federation for GitHub Actions"
 
-  attribute_mapping = {
-    "google.subject"          = "assertion.sub"
-    "attribute.repository_id" = "assertion.repository_id"
-    "attribute.workflow_ref"  = "assertion.workflow_ref"
-  }
+  attribute_mapping = local.github_oidc_attribute_mapping
 
   attribute_condition = local.github_oidc_attribute_condition
 

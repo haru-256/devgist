@@ -96,7 +96,7 @@ graph LR
 - コンテナイメージは `Artifact Registry` に保存する。どの branch でも `workflows/crawler/**` が push されると GitHub Actions が build / push する
 - GitHub Actions の image tag は `GITHUB_SHA`。同じ tag が Registry にあれば build せず、既存 digest を出す
 - 手元の `make build-push-image` の tag は現在の HEAD の短縮 SHA（`IMAGE_TAG` で上書きできる）。CI の tag とは一致しないことがある
-- WIF は `crawler-image.yml` と GitHub Environment `dev` に限定する。branch は条件に入れない。prod を足すときは job に `if: github.ref == 'refs/heads/main'` を付ける
+- WIF は `crawler-image.yml` と GitHub Environment `dev` に限定する。branch は条件に入れない。prod は別 WIF と別の attribute condition にする
 - workflow が出した digest 参照を Terraform の `crawler_image` 変数に渡して手元で apply し、Job のイメージを更新する
 - 手元の `make build-push-image` も同じ script を使う
 - crawler は HTTP サービスではなく完了まで走るバッチなので、`Cloud Run Service` ではなく `Cloud Run Jobs` を使う

@@ -130,8 +130,8 @@ GitHub Actions から crawler image を Artifact Registry へ push するとき�
 - WIF pool / provider は `haru256-devgist-ops` に置く。pool ID は `github`。provider ID は `oidc`
 - issuer は `https://token.actions.githubusercontent.com`
 - JWT の `aud` は WIF provider の既定 audience に固定する
-- attribute mapping は `google.subject` = `assertion.sub`、`attribute.repository_id` = `assertion.repository_id`、`attribute.workflow_ref` = `assertion.workflow_ref`
-- attribute condition は GitHub repository id、GitHub Environment `dev`、`crawler-image.yml` の `workflow_ref` に限定する。`assertion.ref` は入れない。repository 名は使わない（rename で変わらない id を使う）
+- attribute mapping は `google.subject` = `assertion.sub`、`attribute.repository_id` = `assertion.repository_id`、`attribute.environment` = `assertion.environment`、`attribute.workflow_ref` = `assertion.workflow_ref`。condition は `assertion.*` を直接見られるが、condition で使う claim は map する
+- attribute condition は GitHub repository id、GitHub Environment `dev`、`crawler-image.yml` の `workflow_ref` に限定する。`workflow_ref` は owner/repo をハードコードせず `contains("/.github/workflows/crawler-image.yml@")` で見る。`assertion.ref` は入れない。repository 名は使わない（rename で変わらない id を使う）
 - IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github/attribute.repository_id/<github_repository_id>`
 - `google-github-actions/auth` に `service_account` を渡さない。credential config に `service_account_impersonation_url` を入れない
 - `google-github-actions/auth` に `project_id` として `haru256-devgist-ops` を渡す。WIF provider からは project number しか取れないため、gcloud の quota project に使う
@@ -168,7 +168,7 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 
 - 使いたい Google Cloud API が federated identity に対応していない場合。その API だけ SA impersonation に寄せる
 - GitHub Actions から terraform apply するとき。guest IAM は 015 の表に従い、別 ADR で書く
-- prod を足すとき。WIF の `assertion.environment` に `prod` を足し、prod job は `environment: prod` と `if: github.ref == 'refs/heads/main'` で絞る。branch 条件は WIF ではなく job に置く
+- prod を足すとき。dev 用 provider の condition には足さない。prod は別 WIF を作り、別の attribute condition を付ける
 
 ## Consequences (結果・影響)
 
@@ -189,7 +189,7 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 ### Risks / Future Review (将来の課題)
 
 - public repo なので、default branch に入った `crawler-image.yml` を信頼する設計である。workflow file の変更は PR で見る。dev の image は branch を問わず、`workflows/crawler/**` の push で作る
-- GitHub Environment `dev` は OIDC claim 用であり、GCP の app-dev / ops に対応する。protection rule は付けない。prod 用 Environment はまだ作らない
+- GitHub Environment `dev` は OIDC claim 用であり、GCP の app-dev / ops に対応する。protection rule は付けない。prod 用 Environment と WIF はまだ作らない
 - Artifact Registry の retention は 010 のまま未決である
 - apply の CI を足すときは、tfstate と Cloud Run の IAM がこの principalSet に乗る。そのときの blast radius を別 ADR で書く
 
