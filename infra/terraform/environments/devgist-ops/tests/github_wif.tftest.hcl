@@ -52,16 +52,3 @@ run "grant_github_oidc_crawler_writer" {
     error_message = "Expected GitHub WIF provider id to be oidc"
   }
 }
-
-run "github_oidc_repository_override" {
-  command = plan
-
-  variables {
-    github_oidc_repository = "example-org/example-repo"
-  }
-
-  assert {
-    condition     = google_artifact_registry_repository_iam_member.github_oidc_crawler_writer.member == "principalSet://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/github/attribute.repository/example-org/example-repo"
-    error_message = "Expected GitHub OIDC member to follow github_oidc_repository"
-  }
-}

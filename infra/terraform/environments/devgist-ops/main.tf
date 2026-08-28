@@ -32,10 +32,6 @@ locals {
   }
 
   cursor_wif_subject_prefix = "principal://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.cursor_wif_pool_id}/subject"
-
-  github_wif_pool_id = "github"
-
-  github_wif_principal_set = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.github_wif_pool_id}/attribute.repository/${var.github_oidc_repository}"
 }
 
 data "google_project" "project" {
@@ -97,7 +93,7 @@ module "github_wif" {
   source = "../../modules/workload_identity_oidc"
 
   project_id  = data.google_project.project.project_id
-  pool_id     = local.github_wif_pool_id
+  pool_id     = "github"
   provider_id = "oidc"
   issuer_uri  = "https://token.actions.githubusercontent.com"
   description = "OIDC federation for GitHub Actions"
@@ -105,10 +101,9 @@ module "github_wif" {
   attribute_mapping = {
     "google.subject"       = "assertion.sub"
     "attribute.repository" = "assertion.repository"
-    "attribute.ref"        = "assertion.ref"
   }
 
-  attribute_condition = "assertion.repository == \"${var.github_oidc_repository}\""
+  attribute_condition = "assertion.repository == \"haru-256/devgist\""
 
   depends_on = [module.required_project_services]
 }
@@ -120,7 +115,7 @@ resource "google_artifact_registry_repository_iam_member" "github_oidc_crawler_w
   location   = module.artifact_registries["crawler"].location
   repository = module.artifact_registries["crawler"].repository_id
   role       = "roles/artifactregistry.writer"
-  member     = local.github_wif_principal_set
+  member     = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/github/attribute.repository/haru-256/devgist"
 
   depends_on = [module.github_wif]
 }

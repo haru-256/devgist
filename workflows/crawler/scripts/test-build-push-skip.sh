@@ -47,7 +47,7 @@ run_script() {
     IMAGE_NAME="crawler" \
     PLATFORM="linux/amd64" \
     PATH="${FAKE_BIN}:${PATH}" \
-    "${SCRIPT}" "$@"
+    "${SCRIPT}"
 }
 
 write_gcloud hit
@@ -61,15 +61,6 @@ if [[ -e "${FAKE_BIN}/docker.log" ]]; then
   cat "${FAKE_BIN}/docker.log" >&2
   exit 1
 fi
-print_status=0
-set +e
-print_digest="$(run_script --print-existing-digest)"
-print_status=$?
-set -e
-if [[ "${print_status}" -ne 0 || "${print_digest}" != "${DIGEST}" ]]; then
-  echo "expected --print-existing-digest to print the digest and exit 0" >&2
-  exit 1
-fi
 echo "ok: cache hit does not invoke docker"
 
 write_gcloud miss
@@ -77,8 +68,6 @@ rm -f "${FAKE_BIN}/docker.log"
 set +e
 miss_output="$(run_script 2>&1)"
 miss_status=$?
-print_digest="$(run_script --print-existing-digest 2>/dev/null)"
-print_status=$?
 set -e
 printf '%s\n' "${miss_output}"
 if [[ "${miss_status}" -eq 0 ]]; then
@@ -90,10 +79,6 @@ if [[ ! -e "${FAKE_BIN}/docker.log" ]]; then
   exit 1
 fi
 grep -q "buildx" "${FAKE_BIN}/docker.log"
-if [[ "${print_status}" -ne 2 ]]; then
-  echo "expected --print-existing-digest to exit 2 on NOT_FOUND, got ${print_status}" >&2
-  exit 1
-fi
 echo "ok: cache miss invokes docker"
 
 write_gcloud denied
@@ -101,8 +86,6 @@ rm -f "${FAKE_BIN}/docker.log"
 set +e
 denied_output="$(run_script 2>&1)"
 denied_status=$?
-print_digest="$(run_script --print-existing-digest 2>/dev/null)"
-print_status=$?
 set -e
 printf '%s\n' "${denied_output}"
 if [[ "${denied_status}" -eq 0 ]]; then
@@ -115,8 +98,4 @@ if [[ -e "${FAKE_BIN}/docker.log" ]]; then
   exit 1
 fi
 echo "${denied_output}" | grep -q "PERMISSION_DENIED"
-if [[ "${print_status}" -ne 1 ]]; then
-  echo "expected --print-existing-digest to exit 1 on permission errors, got ${print_status}" >&2
-  exit 1
-fi
 echo "ok: gcloud errors other than NOT_FOUND do not invoke docker"

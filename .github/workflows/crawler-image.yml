@@ -25,15 +25,6 @@ jobs:
       IMAGE_NAME: crawler
       PLATFORM: linux/amd64
     steps:
-      - name: Require GCP_GITHUB_WIF_PROVIDER
-        env:
-          GCP_GITHUB_WIF_PROVIDER: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
-        run: |
-          if [[ -z "${GCP_GITHUB_WIF_PROVIDER}" ]]; then
-            echo "Set repository variable GCP_GITHUB_WIF_PROVIDER to terraform output github_wif_provider_name" >&2
-            exit 1
-          fi
-
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
@@ -48,6 +39,12 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Resolve image tag
         id: tag
         run: |
@@ -61,42 +58,7 @@ jobs:
           echo "Resolved crawler image tag ${tag} from ${commit}"
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
 
-      - name: Reuse existing image if present
-        id: existing
-        env:
-          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
-        run: |
-          set +e
-          digest="$(./workflows/crawler/scripts/build-push-image.sh --print-existing-digest)"
-          status=$?
-          set -euo pipefail
-          if [[ "${status}" -eq 0 ]]; then
-            if [[ ! "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-              echo "Invalid digest from Artifact Registry: ${digest}" >&2
-              exit 1
-            fi
-            echo "Reusing existing tag ${REPO_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
-            echo "exists=true" >> "${GITHUB_OUTPUT}"
-            echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
-          elif [[ "${status}" -eq 2 ]]; then
-            echo "No existing image for ${REPO_URL}/${IMAGE_NAME}:${IMAGE_TAG}; will build"
-            echo "exists=false" >> "${GITHUB_OUTPUT}"
-          else
-            echo "Failed to look up existing crawler image tag" >&2
-            exit "${status}"
-          fi
-
-      - name: Configure Docker for Artifact Registry
-        if: steps.existing.outputs.exists != 'true'
-        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
-
-      - name: Set up Docker Buildx
-        if: steps.existing.outputs.exists != 'true'
-        uses: docker/setup-buildx-action@v3
-
       - name: Build and push
-        id: image
-        if: steps.existing.outputs.exists != 'true'
         env:
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
         run: |
@@ -108,23 +70,4 @@ jobs:
             echo "build-push-image.sh did not print image_ref" >&2
             exit 1
           fi
-          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
-
-      - name: Publish image_ref
-        env:
-          EXISTS: ${{ steps.existing.outputs.exists }}
-          EXISTING_DIGEST: ${{ steps.existing.outputs.digest }}
-          BUILT_REF: ${{ steps.image.outputs.image_ref }}
-        run: |
-          set -euo pipefail
-          if [[ "${EXISTS}" == "true" ]]; then
-            image_ref="${REPO_URL}/${IMAGE_NAME}@${EXISTING_DIGEST}"
-          else
-            image_ref="${BUILT_REF}"
-          fi
-          if [[ -z "${image_ref}" ]]; then
-            echo "image_ref is empty" >&2
-            exit 1
-          fi
-          echo "image_ref: ${image_ref}"
           echo "image_ref: ${image_ref}" >> "${GITHUB_STEP_SUMMARY}"

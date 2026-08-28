@@ -12,15 +12,6 @@ jobs:
     name: GitHub WIF federated identity
     runs-on: ubuntu-latest
     steps:
-      - name: Require GCP_GITHUB_WIF_PROVIDER
-        env:
-          GCP_GITHUB_WIF_PROVIDER: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
-        run: |
-          if [[ -z "${GCP_GITHUB_WIF_PROVIDER}" ]]; then
-            echo "Set repository variable GCP_GITHUB_WIF_PROVIDER to terraform output github_wif_provider_name" >&2
-            exit 1
-          fi
-
       - name: Checkout repository
         uses: actions/checkout@v6
 

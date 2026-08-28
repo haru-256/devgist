@@ -130,10 +130,7 @@ GitHub Actions から crawler image を Artifact Registry へ push するとき�
 - WIF pool / provider は `haru256-devgist-ops` に置く。pool ID は `github`。provider ID は `oidc`
 - issuer は `https://token.actions.githubusercontent.com`
 - JWT の `aud` は WIF provider の既定 audience に固定する
-- attribute mapping は少なくとも次を含める
-  - `google.subject` = `assertion.sub`
-  - `attribute.repository` = `assertion.repository`
-  - `attribute.ref` = `assertion.ref`
+- attribute mapping は `google.subject` = `assertion.sub` と `attribute.repository` = `assertion.repository`。`attribute.ref` は `ref` で絞るまで持たない
 - attribute condition は `assertion.repository == "haru-256/devgist"`
 - IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github/attribute.repository/haru-256/devgist`
 - repo 単位の principalSet なので、workflow ごとの `sub` allowlist は持たない

@@ -6,18 +6,11 @@ set -euo pipefail
 # This script is used from the Makefile and from GitHub Actions. Authentication
 # is expected to be prepared by the caller, for example with gcloud/docker
 # login before invoking this script.
-#
-# Usage:
-#   IMAGE_TAG=... REPO_URL=... IMAGE_NAME=... PLATFORM=... ./build-push-image.sh
-#   IMAGE_TAG=... REPO_URL=... IMAGE_NAME=... ./build-push-image.sh --print-existing-digest
-#
-# --print-existing-digest prints the digest on stdout and exits 0 when the tag
-# exists, exits 2 when Artifact Registry does not have it, and exits 1 on any
-# other gcloud error. PLATFORM is not required in that mode.
 
 IMAGE_TAG="${IMAGE_TAG:?IMAGE_TAG is required}"
 REPO_URL="${REPO_URL:?REPO_URL is required}"
 IMAGE_NAME="${IMAGE_NAME:?IMAGE_NAME is required}"
+PLATFORM="${PLATFORM:?PLATFORM is required}"
 
 # Resolve the crawler directory relative to this script so the build context is
 # independent of the caller's current working directory. This lets the script be
@@ -77,16 +70,6 @@ lookup_existing_digest() {
   rm -f "${err_file}"
   return 1
 }
-
-if [[ "${1:-}" == "--print-existing-digest" ]]; then
-  set +e
-  lookup_existing_digest
-  status=$?
-  set -e
-  exit "${status}"
-fi
-
-PLATFORM="${PLATFORM:?PLATFORM is required}"
 
 # Skip rebuild when this tag already exists in Artifact Registry. The tag is
 # still mutable; Terraform consumes the digest printed below. If gcloud is
