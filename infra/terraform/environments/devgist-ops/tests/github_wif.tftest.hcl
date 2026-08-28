@@ -51,4 +51,19 @@ run "grant_github_oidc_crawler_writer" {
     condition     = module.github_wif.provider_id == "oidc"
     error_message = "Expected GitHub WIF provider id to be oidc"
   }
+
+  assert {
+    condition     = strcontains(local.github_oidc_attribute_condition, "assertion.environment == \"dev\"")
+    error_message = "Expected GitHub WIF condition to require GitHub Environment dev"
+  }
+
+  assert {
+    condition     = strcontains(local.github_oidc_attribute_condition, "assertion.workflow_ref.startsWith")
+    error_message = "Expected GitHub WIF condition to require crawler-image.yml workflow_ref"
+  }
+
+  assert {
+    condition     = !strcontains(local.github_oidc_attribute_condition, "assertion.ref ==")
+    error_message = "Expected GitHub WIF condition not to restrict git ref; branch gating belongs on a future prod job"
+  }
 }

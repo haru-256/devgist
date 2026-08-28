@@ -37,6 +37,15 @@ locals {
   github_oidc_repository_id = "1106323394"
 
   github_oidc_workflow_ref_prefix = "haru-256/devgist/.github/workflows/crawler-image.yml@"
+
+  # Branch is not in the condition. Dev image is built on every matching push.
+  # Prod later: add environment "prod" here, and gate that job with
+  # `if: github.ref == 'refs/heads/main'` in the workflow, not in WIF.
+  github_oidc_attribute_condition = <<-EOT
+    assertion.repository_id == "${local.github_oidc_repository_id}" &&
+    assertion.environment == "dev" &&
+    assertion.workflow_ref.startsWith("${local.github_oidc_workflow_ref_prefix}")
+  EOT
 }
 
 data "google_project" "project" {
@@ -106,16 +115,10 @@ module "github_wif" {
   attribute_mapping = {
     "google.subject"          = "assertion.sub"
     "attribute.repository_id" = "assertion.repository_id"
-    "attribute.ref"           = "assertion.ref"
     "attribute.workflow_ref"  = "assertion.workflow_ref"
   }
 
-  attribute_condition = <<-EOT
-    assertion.repository_id == "${local.github_oidc_repository_id}" &&
-    assertion.environment == "development" &&
-    assertion.ref == "refs/heads/main" &&
-    assertion.workflow_ref.startsWith("${local.github_oidc_workflow_ref_prefix}")
-  EOT
+  attribute_condition = local.github_oidc_attribute_condition
 
   depends_on = [module.required_project_services]
 }

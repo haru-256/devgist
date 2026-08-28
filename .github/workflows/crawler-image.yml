@@ -2,8 +2,6 @@ name: Crawler image
 
 on:
   push:
-    branches:
-      - main
     paths:
       - "workflows/crawler/**"
   workflow_dispatch:
@@ -20,7 +18,7 @@ jobs:
   build-and-push:
     name: Build and push crawler image
     runs-on: ubuntu-latest
-    environment: development
+    environment: dev
     env:
       REPO_URL: us-central1-docker.pkg.dev/haru256-devgist-ops/crawler
       IMAGE_NAME: crawler
