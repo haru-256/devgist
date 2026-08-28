@@ -33,17 +33,9 @@ locals {
 
   cursor_wif_subject_prefix = "principal://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.cursor_wif_pool_id}/subject"
 
-  # GitHub repository id for haru-256/devgist. Rename-safe; do not use the owner/repo string.
-  github_oidc_repository_id = "1106323394"
-
-  # workflow_ref is owner/repo/.github/workflows/<file>@<ref>. Match the file
-  # only so the owner/repo string is not hardcoded; repository_id already pins the repo.
-  github_oidc_workflow_ref_path = "/.github/workflows/crawler-image.yml@"
-
-  # This pool is for haru-256/devgist. Other GitHub repos get a different pool.
-  # Prod and dev share the pool; IAM splits on attribute.environment.
-  # principalSet allows one attribute, so the member is environment not repository_id.
-  # Branch is not in the condition; dev image is built on every matching push.
+  # GitHub Actions OIDC（INFRA-ADR-016）
+  github_oidc_repository_id       = "1106323394"
+  github_oidc_workflow_ref_path   = "/.github/workflows/crawler-image.yml@"
   github_oidc_attribute_condition = <<-EOT
     assertion.repository_id == "${local.github_oidc_repository_id}" &&
     assertion.environment == "dev" &&
@@ -113,6 +105,7 @@ module "cursor_wif" {
   depends_on = [module.required_project_services]
 }
 
+# INFRA-ADR-016
 module "github_wif" {
   source = "../../modules/workload_identity_oidc"
 
@@ -129,8 +122,7 @@ module "github_wif" {
   depends_on = [module.required_project_services]
 }
 
-# GitHub Actions WIF → crawler Artifact Registry。direct resource access（INFRA-ADR-016）。
-# 置き場は ops 同一 root（INFRA-ADR-015）。github-actions SA は impersonate しない。
+# GitHub Actions → crawler AR writer（INFRA-ADR-016）。置き場は ops 同一 root（INFRA-ADR-015）
 resource "google_artifact_registry_repository_iam_member" "github_oidc_crawler_writer" {
   project    = data.google_project.project.project_id
   location   = module.artifact_registries["crawler"].location
@@ -151,8 +143,7 @@ resource "google_storage_bucket_iam_member" "cursor_oidc" {
   member = "${local.cursor_wif_subject_prefix}/${each.value.subject}"
 }
 
-# 既存の GitHub Actions 用 SA。INFRA-ADR-016 の image push はこの SA を impersonate しない。
-# project 全体の Artifact Registry writer と人間の actAs は残す。削除は別判断。
+# 既存の GitHub Actions 用 SA。INFRA-ADR-016 の image push では使わない。
 module "service_accounts" {
   source = "../../modules/service_accounts"
 
