@@ -63,6 +63,11 @@ run "grant_github_oidc_crawler_writer" {
   }
 
   assert {
+    condition     = strcontains(local.github_oidc_attribute_condition, "assertion.repository_owner_id == \"31652298\"")
+    error_message = "Expected GitHub WIF condition to require this repository owner id"
+  }
+
+  assert {
     condition     = !strcontains(local.github_oidc_attribute_condition, "assertion.environment")
     error_message = "Expected GitHub WIF condition not to pin environment; IAM uses attribute.environment"
   }

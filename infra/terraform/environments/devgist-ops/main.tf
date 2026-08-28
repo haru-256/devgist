@@ -36,11 +36,16 @@ locals {
   # GitHub Actions OIDC（INFRA-ADR-016）
   github_wif_pool_id              = "github-devgist"
   github_oidc_repository_id       = "1106323394"
-  github_oidc_attribute_condition = "assertion.repository_id == \"${local.github_oidc_repository_id}\""
+  github_oidc_repository_owner_id = "31652298"
+  github_oidc_attribute_condition = <<-EOT
+    assertion.repository_id == "${local.github_oidc_repository_id}" &&
+    assertion.repository_owner_id == "${local.github_oidc_repository_owner_id}"
+  EOT
   github_oidc_attribute_mapping = {
-    "google.subject"          = "assertion.sub"
-    "attribute.repository_id" = "assertion.repository_id"
-    "attribute.environment"   = "assertion.environment"
+    "google.subject"                = "assertion.sub"
+    "attribute.repository_id"       = "assertion.repository_id"
+    "attribute.repository_owner_id" = "assertion.repository_owner_id"
+    "attribute.environment"         = "assertion.environment"
   }
 }
 

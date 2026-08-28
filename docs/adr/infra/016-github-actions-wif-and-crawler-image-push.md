@@ -5,7 +5,7 @@
 - GitHub Actions が GCP を操作するときは、GitHub OIDC JWT を WIF で federated token に換え、その federated principal へリソース IAM を直接付ける。Service Account を impersonate しない。CI 用の新しい SA も作らない。
 - GitHub Actions 用 WIF は Cursor 用 pool `cursor` と分ける。ops に pool `github-devgist` / provider `oidc` を置く。issuer は `https://token.actions.githubusercontent.com`。
 - pool `github-devgist` は GitHub リポジトリ `haru-256/devgist` 専用である。別リポジトリは別 pool にする。ops は prod と dev の両方を担うので、prod と dev はこの pool を共有する。
-- IAM の principalSet は pool 単位で、`attribute.NAME/VALUE` を 1 段しか取れない。crawler Artifact Registry の writer は `attribute.environment/dev` に付ける。provider の condition は `repository_id` だけにする。environment と workflow は condition に入れない。
+- IAM の principalSet は pool 単位で、`attribute.NAME/VALUE` を 1 段しか取れない。crawler Artifact Registry の writer は `attribute.environment/dev` に付ける。provider の condition は `repository_id` と `repository_owner_id` にする。environment と workflow は condition に入れない。
 - この identity の初期権限は crawler Artifact Registry への `roles/artifactregistry.writer` に限る。terraform apply の CI は本 ADR では作らない。[INFRA-ADR-010](./010-cloud-run-job-management.md) の apply は手元のまま。
 
 ## Status (ステータス)
@@ -90,7 +90,8 @@ ops には `github-actions` SA があり、project 全体の `roles/artifactregi
 | 選択肢 | 向いている用途 | メリット | デメリット | 今回の評価 |
 |---|---|---|---|---|
 | Option A: `repository_id` + `environment` + `workflow_ref` | この provider を crawler image 専用にしたい場合 | token 交換の時点で workflow と env が閉じる | 別 workflow / 別 env を足すたびに condition を広げる。prod が同じ WIF を使えない | 非採用 |
-| Option B: `repository_id` だけ | この pool をリポジトリの GitHub Actions 入口にしたい場合 | 別 workflow / 別 env が同じ provider を使える。権限は IAM で足す | `environment: dev` の全 job が、その env に付いた IAM を持つ | 採用 |
+| Option B: `repository_id` だけ | この pool をリポジトリの GitHub Actions 入口にしたい場合 | 別 workflow / 別 env が同じ provider を使える。権限は IAM で足す | owner が変わっても通る | 非採用 |
+| Option C: `repository_id` + `repository_owner_id` | この pool をリポジトリの GitHub Actions 入口にしつつ、owner も id で固定したい場合 | 別 workflow / 別 env が同じ provider を使える。rename でも id は変わらない | transfer すると condition を直す必要がある。今回は transfer しない | 採用 |
 
 #### 今回実装する範囲
 
@@ -180,7 +181,7 @@ crawler Artifact Registry の writer を
 - `.../attribute.repository_id/<id>/attribute.environment/dev`。GCP が 2 段目を値の一部と解釈する
 - `attribute.repo_env/<id>:<env>`。pool を repo ごとに分けるなら repository_id を principal に載せる必要が無い
 
-repository_id は IAM ではなく provider の attribute condition に置く。rename で変わらない id を使い、repository 名は使わない。
+repository_id と repository_owner_id は IAM ではなく provider の attribute condition に置く。rename で変わらない id を使い、repository 名と owner login は使わない。transfer は想定しないが、owner_id も条件に残す。
 
 ## Decision (決定事項)
 
@@ -188,12 +189,12 @@ GitHub Actions から crawler image を Artifact Registry へ push するとき�
 
 ### 採用方針
 
-- WIF pool / provider は `haru256-devgist-ops` に置く。pool ID は `github-devgist`。provider ID は `oidc`。リポジトリ名は `pool_id` に載せる。`provider_id` と display_name には載せない。owner は `pool_id` に入れない（`/` が使えず、GitHub rename で ID を変えられない）。リポジトリの固定は condition の `repository_id`
+- WIF pool / provider は `haru256-devgist-ops` に置く。pool ID は `github-devgist`。provider ID は `oidc`。リポジトリ名は `pool_id` に載せる。`provider_id` と display_name には載せない。owner login は `pool_id` に入れない。リポジトリと owner の固定は condition の `repository_id` と `repository_owner_id`
 - この pool は GitHub リポジトリ `haru-256/devgist` 専用。別リポジトリは別 pool。prod と dev はこの pool を共有する
 - issuer は `https://token.actions.githubusercontent.com`
 - JWT の `aud` は WIF provider の既定 audience に固定する
-- attribute mapping は `google.subject` = `assertion.sub`、`attribute.repository_id` = `assertion.repository_id`、`attribute.environment` = `assertion.environment`。`attribute.environment` は IAM 用。GitHub Environment の無い job は claim が無く、token 交換に失敗する
-- attribute condition は `repository_id` だけにする。environment と workflow は入れない。prod / 別 workflow が同じ provider を使うため。権限の分割は IAM の `attribute.environment` で行う
+- attribute mapping は `google.subject` = `assertion.sub`、`attribute.repository_id` = `assertion.repository_id`、`attribute.repository_owner_id` = `assertion.repository_owner_id`、`attribute.environment` = `assertion.environment`。`attribute.environment` は IAM 用。GitHub Environment の無い job は claim が無く、token 交換に失敗する
+- attribute condition は `repository_id` と `repository_owner_id` にする。environment と workflow は入れない。prod / 別 workflow が同じ provider を使うため。権限の分割は IAM の `attribute.environment` で行う
 - `assertion.ref` は condition に入れない。dev の image は branch を問わず `workflows/crawler/**` の push で作る
 - IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github-devgist/attribute.environment/dev`
 - `google-github-actions/auth` に `service_account` を渡さない。credential config に `service_account_impersonation_url` を入れない
@@ -213,7 +214,7 @@ haru256-devgist-ops
 │   ├── pool: github-devgist   # haru-256/devgist 専用。prod / dev 共有
 │   └── provider: oidc
 │       ├── issuer: https://token.actions.githubusercontent.com
-│       └── condition: repository_id
+│       └── condition: repository_id + repository_owner_id
 └── Artifact Registry repository crawler
     └── roles/artifactregistry.writer
         └── member: principalSet://.../workloadIdentityPools/github-devgist/attribute.environment/dev
