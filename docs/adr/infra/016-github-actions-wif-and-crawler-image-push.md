@@ -5,7 +5,7 @@
 - GitHub Actions が GCP を操作するときは、GitHub OIDC JWT を WIF で federated token に換え、その federated principal へリソース IAM を直接付ける。Service Account を impersonate しない。CI 用の新しい SA も作らない。
 - GitHub Actions 用 WIF は Cursor 用 pool `cursor` と分ける。ops に pool `github-devgist` / provider `oidc` を置く。issuer は `https://token.actions.githubusercontent.com`。
 - pool `github-devgist` は GitHub リポジトリ `haru-256/devgist` 専用である。別リポジトリは別 pool にする。ops は prod と dev の両方を担うので、prod と dev はこの pool を共有する。
-- IAM の principalSet は pool 単位で、`attribute.NAME/VALUE` を 1 段しか取れない。crawler Artifact Registry の writer は `attribute.environment/dev` に付ける。repository_id は provider の condition に残す。
+- IAM の principalSet は pool 単位で、`attribute.NAME/VALUE` を 1 段しか取れない。crawler Artifact Registry の writer は `attribute.environment/dev` に付ける。provider の condition は `repository_id` だけにする。environment と workflow は condition に入れない。
 - この identity の初期権限は crawler Artifact Registry への `roles/artifactregistry.writer` に限る。terraform apply の CI は本 ADR では作らない。[INFRA-ADR-010](./010-cloud-run-job-management.md) の apply は手元のまま。
 
 ## Status (ステータス)
@@ -83,7 +83,14 @@ ops には `github-actions` SA があり、project 全体の `roles/artifactregi
 | Option A: `attribute.repository_id/<id>` | 同じ pool に 1 リポジトリしか乗せず、環境も 1 つのとき | 単純 | 同じ pool に prod identity が乗ると、dev AR の writer が prod にも付く | 非採用 |
 | Option B: `attribute.repository_id/<id>/attribute.environment/dev` と 2 段つなぐ | 2 条件を IAM だけで AND したい場合 | 意図は明快 | GCP の principalSet は attribute を 1 段しか取れない。値として解釈されて誰にも付かない | 非採用 |
 | Option C: `attribute.repo_env/<id>:<env>` の合成 attribute | 同じ pool に複数 repo と複数環境が乗るとき | IAM 1 本で repo と環境を切れる | pool を repo ごとに分けるなら repository_id は principal に不要。合成が余る | 非採用 |
-| Option D: `attribute.environment/dev` | pool が 1 リポジトリ専用で、環境だけ IAM で分けたいとき | principalSet の文法に合う。prod は別 binding を足せる | 同じ pool に別リポジトリを足すと `environment/dev` が混ざる | 採用 |
+| Option D: `attribute.environment/dev` | pool が 1 リポジトリ専用で、環境だけ IAM で分けたいとき | principalSet の文法に合う。prod は別 binding を足せる | 同じ GitHub Environment `dev` を使う全 workflow が同じ IAM を共有する | 採用 |
+
+#### provider の attribute condition
+
+| 選択肢 | 向いている用途 | メリット | デメリット | 今回の評価 |
+|---|---|---|---|---|
+| Option A: `repository_id` + `environment` + `workflow_ref` | この provider を crawler image 専用にしたい場合 | token 交換の時点で workflow と env が閉じる | 別 workflow / 別 env を足すたびに condition を広げる。prod が同じ WIF を使えない | 非採用 |
+| Option B: `repository_id` だけ | この pool をリポジトリの GitHub Actions 入口にしたい場合 | 別 workflow / 別 env が同じ provider を使える。権限は IAM で足す | `environment: dev` の全 job が、その env に付いた IAM を持つ | 採用 |
 
 #### 今回実装する範囲
 
@@ -185,10 +192,9 @@ GitHub Actions から crawler image を Artifact Registry へ push するとき�
 - この pool は GitHub リポジトリ `haru-256/devgist` 専用。別リポジトリは別 pool。prod と dev はこの pool を共有する
 - issuer は `https://token.actions.githubusercontent.com`
 - JWT の `aud` は WIF provider の既定 audience に固定する
-- attribute mapping は `google.subject` = `assertion.sub`、`attribute.repository_id` = `assertion.repository_id`、`attribute.environment` = `assertion.environment`、`attribute.workflow_ref` = `assertion.workflow_ref`
-- attribute condition は `repository_id`、GitHub Environment `dev`、`crawler-image.yml` の `workflow_ref` に限定する
-- `workflow_ref` は `contains("/.github/workflows/crawler-image.yml@")` で見る。owner/repo をハードコードしない。`endsWith("...@refs/heads/main")` は使わない。dev の image は branch を問わず `workflows/crawler/**` の push で作る
-- `assertion.ref` は condition に入れない
+- attribute mapping は `google.subject` = `assertion.sub`、`attribute.repository_id` = `assertion.repository_id`、`attribute.environment` = `assertion.environment`。`attribute.environment` は IAM 用。GitHub Environment の無い job は claim が無く、token 交換に失敗する
+- attribute condition は `repository_id` だけにする。environment と workflow は入れない。prod / 別 workflow が同じ provider を使うため。権限の分割は IAM の `attribute.environment` で行う
+- `assertion.ref` は condition に入れない。dev の image は branch を問わず `workflows/crawler/**` の push で作る
 - IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github-devgist/attribute.environment/dev`
 - `google-github-actions/auth` に `service_account` を渡さない。credential config に `service_account_impersonation_url` を入れない
 - `google-github-actions/auth` に `project_id` として `haru256-devgist-ops` を渡す。WIF provider からは project number しか取れないため、gcloud の quota project に使う
@@ -207,7 +213,7 @@ haru256-devgist-ops
 │   ├── pool: github-devgist   # haru-256/devgist 専用。prod / dev 共有
 │   └── provider: oidc
 │       ├── issuer: https://token.actions.githubusercontent.com
-│       └── condition: repository_id + environment dev + crawler-image.yml
+│       └── condition: repository_id
 └── Artifact Registry repository crawler
     └── roles/artifactregistry.writer
         └── member: principalSet://.../workloadIdentityPools/github-devgist/attribute.environment/dev
@@ -227,6 +233,7 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 - GitHub Actions から terraform apply するとき。guest IAM は 015 の表に従い、別 ADR で書く
 - 同じ pool に別 GitHub リポジトリを乗せるとき。そのときは IAM principal に repository_id を戻すか、合成 attribute を検討する
 - prod を足すとき。同じ pool `github-devgist` を使う。IAM は `attribute.environment/prod` を別 binding にする
+- 同じ GitHub Environment を使う workflow 同士で IAM を分けたくなったとき。Environment 名を分けるか、そのときだけ workflow を condition に戻す
 
 ## Consequences (結果・影響)
 
@@ -244,11 +251,11 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 - digest を手元 apply し忘れると、Job は古い image のままである。010 が受け入れた中間状態が、この ADR の通常運用になる
 - WIF 自体の apply は手元に残る。CI が自分の identity を作れない
 - 既存の `github-actions` SA が残る。本 pipeline は使わない
-- 同じ pool に別リポジトリを足すと、`attribute.environment/dev` が混ざる。その変更は再検討条件に送る
+- 同じ GitHub Environment `dev` を使う全 workflow が、crawler AR writer を共有する。権限を分けたいときは Environment 名を分ける
 
 ### Risks / Future Review (将来の課題)
 
-- public repo なので、default branch に入った `crawler-image.yml` を信頼する設計である。workflow file の変更は PR で見る
+- public repo なので、この provider を呼ぶ workflow は default branch に入ったものが federate できる。`environment: dev` を付けた job は crawler AR writer を共有する。権限を分けたいときは GitHub Environment 名を分ける
 - GitHub Environment `dev` は OIDC claim 用であり、GCP の app-dev / ops に対応する。protection rule は付けない。prod 用 Environment はまだ作らない
 - Artifact Registry の retention は 010 のまま未決である
 - apply の CI を足すときは、tfstate と Cloud Run の IAM がこの principalSet に乗る。そのときの blast radius を別 ADR で書く

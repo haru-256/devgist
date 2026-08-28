@@ -54,26 +54,26 @@ run "grant_github_oidc_crawler_writer" {
 
   assert {
     condition     = local.github_oidc_attribute_mapping["attribute.environment"] == "assertion.environment"
-    error_message = "Expected GitHub WIF to map the environment claim used in the attribute condition"
+    error_message = "Expected GitHub WIF to map the environment claim used in IAM"
   }
 
   assert {
-    condition     = strcontains(local.github_oidc_attribute_condition, "assertion.environment == \"dev\"")
-    error_message = "Expected GitHub WIF condition to require GitHub Environment dev"
+    condition     = strcontains(local.github_oidc_attribute_condition, "assertion.repository_id == \"1106323394\"")
+    error_message = "Expected GitHub WIF condition to require this repository id"
   }
 
   assert {
-    condition     = strcontains(local.github_oidc_attribute_condition, "assertion.workflow_ref.contains(\"/.github/workflows/crawler-image.yml@\")")
-    error_message = "Expected GitHub WIF condition to match crawler-image.yml without hardcoding owner/repo"
+    condition     = !strcontains(local.github_oidc_attribute_condition, "assertion.environment")
+    error_message = "Expected GitHub WIF condition not to pin environment; IAM uses attribute.environment"
   }
 
   assert {
-    condition     = !strcontains(local.github_oidc_attribute_condition, "haru-256/devgist")
-    error_message = "Expected GitHub WIF workflow_ref check not to hardcode owner/repo; repository_id pins the repo"
+    condition     = !strcontains(local.github_oidc_attribute_condition, "assertion.workflow_ref")
+    error_message = "Expected GitHub WIF condition not to pin a workflow; this pool is for the whole repository"
   }
 
   assert {
-    condition     = !strcontains(local.github_oidc_attribute_condition, "assertion.ref ==")
-    error_message = "Expected GitHub WIF condition not to restrict git ref"
+    condition     = !contains(keys(local.github_oidc_attribute_mapping), "attribute.workflow_ref")
+    error_message = "Expected GitHub WIF not to map workflow_ref when it is unused in condition and IAM"
   }
 }
