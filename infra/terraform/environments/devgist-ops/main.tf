@@ -15,10 +15,36 @@ locals {
   service_account_user_members = [
     for email in var.service_account_user_emails : "user:${email}"
   ]
+
+  cursor_wif_pool_id = "cursor"
+
+  cursor_oidc_datalake_roles = toset([
+    "roles/storage.objectViewer",
+    "roles/storage.objectCreator",
+  ])
+
+  cursor_oidc_datalake_bindings = {
+    for pair in setproduct(var.cursor_oidc_subjects, local.cursor_oidc_datalake_roles) :
+    "${pair[0]}|${pair[1]}" => {
+      subject = pair[0]
+      role    = pair[1]
+    }
+  }
+
+  cursor_wif_subject_prefix = "principal://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.cursor_wif_pool_id}/subject"
 }
 
 data "google_project" "project" {
   project_id = var.gcp_project_id
+}
+
+# data-dev の datalake は箱。識別子だけ借りる。ops は identity かつ下流なので guest IAM はここ（INFRA-ADR-015）
+data "terraform_remote_state" "data" {
+  backend = "gcs"
+
+  config = {
+    bucket = "haru256-devgist-data-dev-tfstate"
+  }
 }
 
 module "required_project_services" {
@@ -47,7 +73,7 @@ module "cursor_wif" {
   source = "../../modules/workload_identity_oidc"
 
   project_id  = data.google_project.project.project_id
-  pool_id     = "cursor"
+  pool_id     = local.cursor_wif_pool_id
   provider_id = "oidc"
   issuer_uri  = "https://api.cursor.com"
   description = "OIDC federation for Cursor Cloud Agent"
@@ -61,6 +87,16 @@ module "cursor_wif" {
   attribute_condition = "assertion.repo_url == \"${var.cursor_oidc_repo_url}\" && assertion.agent_runtime == \"managed\""
 
   depends_on = [module.required_project_services]
+}
+
+# Cursor WIF → data-dev datalake。direct resource access（INFRA-ADR-014）。
+# 置き場は ops × data の下流（INFRA-ADR-015）。crawler runtime SA とは別 identity
+resource "google_storage_bucket_iam_member" "cursor_oidc" {
+  for_each = local.cursor_oidc_datalake_bindings
+
+  bucket = data.terraform_remote_state.data.outputs.datalake_bucket_name
+  role   = each.value.role
+  member = "${local.cursor_wif_subject_prefix}/${each.value.subject}"
 }
 
 module "service_accounts" {

@@ -9,9 +9,11 @@
 
 ## Status (ステータス)
 
-Accepted (承認済み) - 2026-08-26
+Superseded (置き換え済み) - 2026-08-27 by [INFRA-ADR-015](./015-guest-iam-downstream.md)
 
-[INFRA-ADR-013](./013-cursor-oidc-workload-identity-federation.md) を supersede する。013 が決めた「OIDC + WIF、鍵を置かない、crawler runtime と分ける、GHA と混ぜない」は維持し、権限の付け方だけを差し替える。
+本文は書き換えない。当時の判断の記録として残す。direct resource access（SA impersonation なし、鍵を置かない、GHA 用 WIF と混ぜない）は 015 でも維持する。捨てるのは IAM の置き場である。第三の root（app-dev）に書く判断と、ops が下流である箱への grant まで ops に置かない判断は 015 が置き換える。Cloud Run Job 起動をこの identity に含めない初期範囲は維持する。
+
+[INFRA-ADR-013](./013-cursor-oidc-workload-identity-federation.md) を supersede した経緯（impersonation から direct access）は履歴として残す。
 
 ## Context (背景・課題)
 
@@ -239,6 +241,7 @@ allowlist に使う `sub` は `user:<cursor_user_id>` のような安定 ID と�
 
 ## Related Documents
 
+- [[INFRA-ADR-015] data は箱とし、guest IAM は依存の下流が書く](./015-guest-iam-downstream.md)（現行方針。IAM の置き場）
 - [[INFRA-ADR-013] Cursor Cloud から GCP への認証に Cursor OIDC と WIF を採用する](./013-cursor-oidc-workload-identity-federation.md)（superseded）
 - [[INFRA-ADR-004] Terraform State Project と Ops Project を分離する](./004-separate-tf-and-ops-projects.md)
 - [[INFRA-ADR-009] Cross-project IAM binding の ownership](./009-cross-project-iam-ownership.md)
