@@ -49,7 +49,7 @@ GCP へのアクセスは Cursor OIDC と WIF を使う。Service Account JSON �
 
 手順の正本は [`docs/runbooks/cursor-cloud-oidc-wif.md`](docs/runbooks/cursor-cloud-oidc-wif.md)。ヘルパーは [`scripts/cursor-cloud/`](scripts/cursor-cloud/)。
 
-- WIF 用の値は Secrets に type `Environment Variable` で置く。`Runtime Secret` にも `Build Secret` にもしない。`CURSOR_WIF_PROJECT_NUMBER`、`GOOGLE_APPLICATION_CREDENTIALS`、`CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE`（`GOOGLE_APPLICATION_CREDENTIALS` と同じパス）、`GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES=1`
+- WIF 用の値は Secrets に type `Environment Variable` で置く。`Runtime Secret` にも `Build Secret` にもしない。`CURSOR_WIF_PROJECT_NUMBER`、`GOOGLE_APPLICATION_CREDENTIALS`、`GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES=1`
 - 保存済み Environment は VM の `install` / `start` / ネットワークである。Secret の type `Environment Variable` とは別物。`start` は `scripts/cursor-cloud/setup-adc.sh`
 - mint の JWT `aud` は `GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE` をそのまま使う。`allowed_audiences` が空なら `//iam.googleapis.com/...` と `https://iam.googleapis.com/...` のどちらも GCP が受理する
 - GCS クライアントや crawler を動かすとき、token 交換を手順として繰り返さない。ADC が mint と STS を行う
