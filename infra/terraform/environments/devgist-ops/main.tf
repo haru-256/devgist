@@ -39,7 +39,7 @@ data "google_project" "project" {
 }
 
 # data-dev の datalake は箱。識別子だけ借りる。ops は identity かつ下流なので guest IAM はここ（INFRA-ADR-015）
-data "terraform_remote_state" "data" {
+data "terraform_remote_state" "data_dev" {
   backend = "gcs"
 
   config = {
@@ -94,11 +94,14 @@ module "cursor_wif" {
 resource "google_storage_bucket_iam_member" "cursor_oidc" {
   for_each = local.cursor_oidc_datalake_bindings
 
-  bucket = data.terraform_remote_state.data.outputs.datalake_bucket_name
+  bucket = data.terraform_remote_state.data_dev.outputs.datalake_bucket_name
   role   = each.value.role
   member = "${local.cursor_wif_subject_prefix}/${each.value.subject}"
 }
 
+# GitHub Actions の CI/CD 用サービスアカウントを作成し、ops 環境の Artifact Registry
+# （crawler イメージ置き場）へイメージを push できるよう roles/artifactregistry.writer を付与。
+# service_account_users で指定されたユーザーがこの SA を借用（actAs）できる。
 module "service_accounts" {
   source = "../../modules/service_accounts"
 
