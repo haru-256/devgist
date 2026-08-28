@@ -45,12 +45,4 @@ ADR の判断基準、相談の境界、記録ルールなどの詳細は skill 
 
 ## Cursor Cloud specific instructions
 
-GCP へのアクセスは Cursor OIDC と WIF を使う。Service Account JSON キーもユーザー ADC も置かない。credential config に `service_account_impersonation_url` を入れない。
-
-手順の正本は [`docs/runbooks/cursor-cloud-oidc-wif.md`](docs/runbooks/cursor-cloud-oidc-wif.md)。ヘルパーは [`scripts/cursor-cloud/`](scripts/cursor-cloud/)。
-
-- WIF 用の値は Secrets に type `Environment Variable` で置く。`Runtime Secret` にも `Build Secret` にもしない。`CURSOR_WIF_PROJECT_NUMBER`、`GOOGLE_APPLICATION_CREDENTIALS`、`GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES=1`
-- 保存済み Environment は VM の `install` / `start` / ネットワークである。Secret の type `Environment Variable` とは別物。`start` は `scripts/cursor-cloud/setup-adc.sh`
-- mint の JWT `aud` は `GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE` をそのまま使う。`allowed_audiences` が空なら `//iam.googleapis.com/...` と `https://iam.googleapis.com/...` のどちらも GCP が受理する
-- GCS クライアントや crawler を動かすとき、token 交換を手順として繰り返さない。ADC が mint と STS を行う
-- datalake のバケット名は `DATA_LAKE_BUCKET_NAME`。IAM の allowlist は ops の Terraform 変数 `cursor_oidc_subjects`
+GCP へのアクセスは Cursor OIDC と WIF を使う。Service Account JSON キーもユーザー ADC も置かない。credential config に `service_account_impersonation_url` を入れない。GCS や crawler では token 交換を手順として繰り返さない。ADC が mint と STS を行う。datalake のバケット名は `DATA_LAKE_BUCKET_NAME`。手順の正本は [`docs/runbooks/cursor-cloud-oidc-wif.md`](docs/runbooks/cursor-cloud-oidc-wif.md)。
