@@ -28,7 +28,7 @@ run "grant_github_oidc_crawler_writer" {
   command = plan
 
   assert {
-    condition     = google_artifact_registry_repository_iam_member.github_oidc_crawler_writer.member == "principalSet://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/github/attribute.environment/dev"
+    condition     = google_artifact_registry_repository_iam_member.github_oidc_crawler_writer.member == "principalSet://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/github-devgist/attribute.environment/dev"
     error_message = "Expected GitHub OIDC writer member to be the environment principalSet"
   }
 
@@ -43,8 +43,8 @@ run "grant_github_oidc_crawler_writer" {
   }
 
   assert {
-    condition     = module.github_wif.pool_id == "github"
-    error_message = "Expected GitHub WIF pool id to be github"
+    condition     = module.github_wif.pool_id == "github-devgist"
+    error_message = "Expected GitHub WIF pool id to be github-devgist"
   }
 
   assert {

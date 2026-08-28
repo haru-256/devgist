@@ -3,8 +3,8 @@
 ## Conclusion (結論)
 
 - GitHub Actions が GCP を操作するときは、GitHub OIDC JWT を WIF で federated token に換え、その federated principal へリソース IAM を直接付ける。Service Account を impersonate しない。CI 用の新しい SA も作らない。
-- GitHub Actions 用 WIF は Cursor 用 pool `cursor` と分ける。ops に pool `github` / provider `oidc` を置く。issuer は `https://token.actions.githubusercontent.com`。
-- pool `github` は GitHub リポジトリ `haru-256/devgist` 専用である。別リポジトリは別 pool にする。ops は prod と dev の両方を担うので、prod と dev はこの pool を共有する。
+- GitHub Actions 用 WIF は Cursor 用 pool `cursor` と分ける。ops に pool `github-devgist` / provider `oidc` を置く。issuer は `https://token.actions.githubusercontent.com`。
+- pool `github-devgist` は GitHub リポジトリ `haru-256/devgist` 専用である。別リポジトリは別 pool にする。ops は prod と dev の両方を担うので、prod と dev はこの pool を共有する。
 - IAM の principalSet は pool 単位で、`attribute.NAME/VALUE` を 1 段しか取れない。crawler Artifact Registry の writer は `attribute.environment/dev` に付ける。repository_id は provider の condition に残す。
 - この identity の初期権限は crawler Artifact Registry への `roles/artifactregistry.writer` に限る。terraform apply の CI は本 ADR では作らない。[INFRA-ADR-010](./010-cloud-run-job-management.md) の apply は手元のまま。
 
@@ -59,7 +59,7 @@ ops には `github-actions` SA があり、project 全体の `roles/artifactregi
 | 選択肢 | 向いている用途 | メリット | デメリット | 今回の評価 |
 |---|---|---|---|---|
 | Option A: Cursor の pool `cursor` を共有する | issuer が同じ IdP のとき | pool が増えない | GitHub と Cursor で issuer も claim も違う。013 / 014 が混ぜないと書いた | 非採用 |
-| Option B: ops に pool `github` を新設する | GitHub と Cursor を別 IdP として扱う場合 | 信頼条件が分かれる。blast radius を IAM で切れる | pool が 1 本増える | 採用 |
+| Option B: ops に pool `github-devgist` を新設する | GitHub と Cursor を別 IdP として扱う場合 | 信頼条件が分かれる。blast radius を IAM で切れる | pool が 1 本増える | 採用 |
 
 #### 認証モデル
 
@@ -114,7 +114,7 @@ GitHub OIDC の provider を pool `cursor` に足す、または Cursor の prov
 - Cursor の claim は `repo_url` と `agent_runtime`。GitHub の claim は `repository_id` と `environment`
 - 013 / 014 は GitHub Actions 用 WIF を混ぜないと書いた
 
-### Option B: ops に GitHub リポジトリ専用の pool `github` を置く [採用]
+### Option B: ops に GitHub リポジトリ専用の pool `github-devgist` を置く [採用]
 
 GitHub 専用の pool と provider を ops に置く。Cursor の pool には触れない。prod と dev は同じ pool を使う。別 GitHub リポジトリは別 pool にする。
 
@@ -157,7 +157,7 @@ build / push のあと、digest を `crawler_image` に渡して app-dev を app
 
 crawler Artifact Registry の writer を
 
-`principalSet://.../workloadIdentityPools/github/attribute.environment/dev`
+`principalSet://.../workloadIdentityPools/github-devgist/attribute.environment/dev`
 
 に付ける。
 
@@ -177,11 +177,11 @@ repository_id は IAM ではなく provider の attribute condition に置く。
 
 ## Decision (決定事項)
 
-GitHub Actions から crawler image を Artifact Registry へ push するときは、GitHub OIDC と ops の WIF pool `github` による federated principal への direct resource access を使う。初期 IAM は crawler リポジトリの writer だけである。terraform apply の CI は作らない。
+GitHub Actions から crawler image を Artifact Registry へ push するときは、GitHub OIDC と ops の WIF pool `github-devgist` による federated principal への direct resource access を使う。初期 IAM は crawler リポジトリの writer だけである。terraform apply の CI は作らない。
 
 ### 採用方針
 
-- WIF pool / provider は `haru256-devgist-ops` に置く。pool ID は `github`。provider ID は `oidc`
+- WIF pool / provider は `haru256-devgist-ops` に置く。pool ID は `github-devgist`。provider ID は `oidc`。リポジトリ名は `pool_id` に載せる。`provider_id` と display_name には載せない。owner は `pool_id` に入れない（`/` が使えず、GitHub rename で ID を変えられない）。リポジトリの固定は condition の `repository_id`
 - この pool は GitHub リポジトリ `haru-256/devgist` 専用。別リポジトリは別 pool。prod と dev はこの pool を共有する
 - issuer は `https://token.actions.githubusercontent.com`
 - JWT の `aud` は WIF provider の既定 audience に固定する
@@ -189,7 +189,7 @@ GitHub Actions から crawler image を Artifact Registry へ push するとき�
 - attribute condition は `repository_id`、GitHub Environment `dev`、`crawler-image.yml` の `workflow_ref` に限定する
 - `workflow_ref` は `contains("/.github/workflows/crawler-image.yml@")` で見る。owner/repo をハードコードしない。`endsWith("...@refs/heads/main")` は使わない。dev の image は branch を問わず `workflows/crawler/**` の push で作る
 - `assertion.ref` は condition に入れない
-- IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github/attribute.environment/dev`
+- IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github-devgist/attribute.environment/dev`
 - `google-github-actions/auth` に `service_account` を渡さない。credential config に `service_account_impersonation_url` を入れない
 - `google-github-actions/auth` に `project_id` として `haru256-devgist-ops` を渡す。WIF provider からは project number しか取れないため、gcloud の quota project に使う
 - crawler Artifact Registry リポジトリへ `roles/artifactregistry.writer` を付ける。置き場は ops 同一 root（015）
@@ -204,13 +204,13 @@ GitHub Actions から crawler image を Artifact Registry へ push するとき�
 ```
 haru256-devgist-ops
 ├── WIF
-│   ├── pool: github   # haru-256/devgist 専用。prod / dev 共有
+│   ├── pool: github-devgist   # haru-256/devgist 専用。prod / dev 共有
 │   └── provider: oidc
 │       ├── issuer: https://token.actions.githubusercontent.com
 │       └── condition: repository_id + environment dev + crawler-image.yml
 └── Artifact Registry repository crawler
     └── roles/artifactregistry.writer
-        └── member: principalSet://.../workloadIdentityPools/github/attribute.environment/dev
+        └── member: principalSet://.../workloadIdentityPools/github-devgist/attribute.environment/dev
 
 GitHub Actions
 └── crawler image（どの branch でも `workflows/crawler/**` の push、workflow_dispatch。GitHub Environment `dev`）: build / push
@@ -226,7 +226,7 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 - 使いたい Google Cloud API が federated identity に対応していない場合。その API だけ SA impersonation に寄せる
 - GitHub Actions から terraform apply するとき。guest IAM は 015 の表に従い、別 ADR で書く
 - 同じ pool に別 GitHub リポジトリを乗せるとき。そのときは IAM principal に repository_id を戻すか、合成 attribute を検討する
-- prod を足すとき。同じ pool `github` を使う。IAM は `attribute.environment/prod` を別 binding にする
+- prod を足すとき。同じ pool `github-devgist` を使う。IAM は `attribute.environment/prod` を別 binding にする
 
 ## Consequences (結果・影響)
 

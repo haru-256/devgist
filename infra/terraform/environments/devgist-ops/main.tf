@@ -34,6 +34,7 @@ locals {
   cursor_wif_subject_prefix = "principal://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.cursor_wif_pool_id}/subject"
 
   # GitHub Actions OIDC（INFRA-ADR-016）
+  github_wif_pool_id              = "github-devgist"
   github_oidc_repository_id       = "1106323394"
   github_oidc_workflow_ref_path   = "/.github/workflows/crawler-image.yml@"
   github_oidc_attribute_condition = <<-EOT
@@ -110,7 +111,7 @@ module "github_wif" {
   source = "../../modules/workload_identity_oidc"
 
   project_id  = data.google_project.project.project_id
-  pool_id     = "github"
+  pool_id     = local.github_wif_pool_id
   provider_id = "oidc"
   issuer_uri  = "https://token.actions.githubusercontent.com"
   description = "OIDC federation for GitHub Actions"
@@ -128,7 +129,7 @@ resource "google_artifact_registry_repository_iam_member" "github_oidc_crawler_w
   location   = module.artifact_registries["crawler"].location
   repository = module.artifact_registries["crawler"].repository_id
   role       = "roles/artifactregistry.writer"
-  member     = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/github/attribute.environment/dev"
+  member     = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.github_wif_pool_id}/attribute.environment/dev"
 
   depends_on = [module.github_wif]
 }
