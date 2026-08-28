@@ -37,7 +37,7 @@ sequenceDiagram
 ```
 
 1. type `Environment Variable` の Secrets がプロセス環境変数として入った状態で VM が上がる。
-2. `start` が `$HOME/.config/gcloud/cursor-wif.json` を書く。`GOOGLE_APPLICATION_CREDENTIALS` はそのパスを指す。
+2. `start` が `$HOME/.config/gcloud/cursor-wif.json` を書く。`GOOGLE_APPLICATION_CREDENTIALS` と `CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE` はそのパスを指す。ADC は前者、`gcloud storage` などは後者を見る。
 3. GCS などに触ると Google Auth が JSON を読む。`GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES=1` なので [`scripts/cursor-cloud/cursor-gcp-oidc`](../../scripts/cursor-cloud/cursor-gcp-oidc) を起動する（`jq` と `curl` が要る）。
 4. ヘルパーが VM 内 socket から Cursor OIDC JWT を mint する（寿命 5 分）。`aud` は `GOOGLE_EXTERNAL_ACCOUNT_AUDIENCE` のまま。
 5. GCP STS が JWKS で検証し、`repo_url` と `agent_runtime == managed` を見る。federated token を返す。
@@ -53,7 +53,7 @@ JSON を書くスクリプトは [`scripts/cursor-cloud/setup-adc.sh`](../../scr
 
 | ダッシュボードの名前 | 何か | この手順で触るもの |
 |---|---|---|
-| Secrets | 名前と値の組。type を選ぶ | type `Environment Variable` の 4 件 |
+| Secrets | 名前と値の組。type を選ぶ | type `Environment Variable` の 5 件 |
 | Environment | Cloud Agent のマシン設定（`install` / `start` / ネットワーク） | `start` と、egress を制限しているときの allowlist |
 
 Secrets の type は [Secrets & Network](https://cursor.com/docs/cloud-agent/security-network) の定義に従う。
@@ -76,10 +76,11 @@ Secrets の type は [Secrets & Network](https://cursor.com/docs/cloud-agent/sec
 |---|---|
 | `CURSOR_WIF_PROJECT_NUMBER` | ops の `ops_project_number` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | `/home/ubuntu/.config/gcloud/cursor-wif.json`（`$HOME` が違うときは `echo $HOME` で合わせる） |
+| `CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE` | `/home/ubuntu/.config/gcloud/cursor-wif.json`（`GOOGLE_APPLICATION_CREDENTIALS` と同じ。`gcloud storage` など gcloud CLI が ADC を見ないため） |
 | `GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES` | `1` |
 | `DATA_LAKE_BUCKET_NAME` | crawler を動かすなら `haru256-devgist-data-dev-datalake` |
 
-`GOOGLE_APPLICATION_CREDENTIALS` は鍵ではなく、`start` が書く JSON のパスである。
+`GOOGLE_APPLICATION_CREDENTIALS` と `CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE` は鍵ではなく、`start` が書く JSON のパスである。Python の GCS クライアントは前者、`gcloud storage ls` は後者を使う。JSON 本体を Secret に置かない。
 
 type を `Runtime Secret` にすると、agent は値を `[REDACTED]` としか見えない。プロジェクト番号やパスの確認ができなくなる。type を `Build Secret` にすると、`start` も Google Auth も読めない。
 
@@ -105,7 +106,7 @@ type を `Runtime Secret` にすると、agent は値を `[REDACTED]` としか�
 
 1. data-dev を apply し、datalake 箱を先に作る。
 2. ops を apply し、`ops_project_number` を控える。gitignore 済み `terraform.tfvars` の `cursor_oidc_subjects` に、許可する Cursor `sub` を入れる。例: `["user:308716925"]`。`sub` はメールではない。空なら WIF は通っても GCS は拒否する。Cloud Run Job 起動はこの identity に含めない。付けるときは app が書く（[INFRA-ADR-015](../adr/infra/015-guest-iam-downstream.md)）。
-3. Secrets に上の 4 件を type `Environment Variable` で入れる。Environment の `start` に `setup-adc.sh` を入れる。egress を制限しているなら GCP ホストを Environment の allowlist に足す。
+3. Secrets に上の 5 件を type `Environment Variable` で入れる。Environment の `start` に `setup-adc.sh` を入れる。egress を制限しているなら GCP ホストを Environment の allowlist に足す。
 4. 新しい Cloud Agent を起動する。`start` が `$HOME/.config/gcloud/cursor-wif.json` を書く。`command` は checkout した `cursor-gcp-oidc` の絶対パスである。
 
 ## 動作確認
@@ -114,7 +115,10 @@ WIF と allowlist の apply、Cursor の設定、`start` 済みが前提。本�
 
 ```bash
 gcloud auth application-default print-access-token >/dev/null
+gcloud storage ls "gs://${DATA_LAKE_BUCKET_NAME:-haru256-devgist-data-dev-datalake}"
 ```
+
+`gcloud storage` は ADC を見ない。`CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE` が無いと `You do not currently have an active account selected` になる。
 
 mint ヘルパーだけを試すときは audience を渡す。値は付け替えない。
 
@@ -132,6 +136,7 @@ scripts/cursor-cloud/cursor-gcp-oidc | jq -r '.success'
 | `jq is required` | Cloud Agent の PATH に `jq` が無いか |
 | `executables need to be explicitly allowed` | Secrets の `GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES` が type `Environment Variable` で `1` か |
 | credential ファイルが無い | `start` に `setup-adc.sh` があるか。`CURSOR_WIF_PROJECT_NUMBER` の type が `Environment Variable` か。`Build Secret` になっていないか |
+| `You do not currently have an active account selected` | Secrets の `CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE` が `GOOGLE_APPLICATION_CREDENTIALS` と同じパスか。type が `Environment Variable` か |
 | 値が `[REDACTED]` になる | type が `Runtime Secret` になっていないか。この手順の値は `Environment Variable` |
 | STS が audience 不一致 | JWT `aud` が canonical name か。`allowed_audiences` にカスタム値だけを入れてないか |
 | mint は成功、GCS が 403 | `cursor_oidc_subjects` と JWT `sub` |
