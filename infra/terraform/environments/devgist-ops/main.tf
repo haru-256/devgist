@@ -112,7 +112,7 @@ module "github_wif" {
 
   attribute_condition = <<-EOT
     assertion.repository_id == "${local.github_oidc_repository_id}" &&
-    assertion.environment == "production" &&
+    assertion.environment == "development" &&
     assertion.ref == "refs/heads/main" &&
     assertion.workflow_ref.startsWith("${local.github_oidc_workflow_ref_prefix}")
   EOT
