@@ -130,17 +130,16 @@ GitHub Actions から crawler image を Artifact Registry へ push するとき�
 - WIF pool / provider は `haru256-devgist-ops` に置く。pool ID は `github`。provider ID は `oidc`
 - issuer は `https://token.actions.githubusercontent.com`
 - JWT の `aud` は WIF provider の既定 audience に固定する
-- attribute mapping は `google.subject` = `assertion.sub` と `attribute.repository` = `assertion.repository`。`attribute.ref` は `ref` で絞るまで持たない
-- attribute condition は `assertion.repository == "haru-256/devgist"`
-- IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github/attribute.repository/haru-256/devgist`
-- repo 単位の principalSet なので、workflow ごとの `sub` allowlist は持たない
+- attribute mapping は `google.subject` = `assertion.sub`、`attribute.repository_id` = `assertion.repository_id`、`attribute.ref` = `assertion.ref`、`attribute.workflow_ref` = `assertion.workflow_ref`
+- attribute condition は GitHub repository id、GitHub Environment `production`、`ref == refs/heads/main`、`crawler-image.yml` の `workflow_ref` に限定する。repository 名は使わない（rename で変わらない id を使う）
+- IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github/attribute.repository_id/<github_repository_id>`
 - `google-github-actions/auth` に `service_account` を渡さない。credential config に `service_account_impersonation_url` を入れない
 - `google-github-actions/auth` に `project_id` として `haru256-devgist-ops` を渡す。WIF provider からは project number しか取れないため、gcloud の quota project に使う
 - crawler Artifact Registry リポジトリへ `roles/artifactregistry.writer` を付ける。置き場は ops 同一 root（015）
 - tfstate、datalake、app-dev、Cloud Run には付けない
 - 既存の `github-actions` SA には `workload_identity_users` を足さない
 - CI は image を build / push し、digest 参照を `image_ref:` として出す。Job の更新は手元で `crawler_image` に渡して apply する
-- image tag は `workflows/crawler` を最後に変更した commit の短縮 SHA。同じ tag が Artifact Registry にあれば build しない
+- image tag は `GITHUB_SHA`。同じ tag が Artifact Registry にあれば build しない
 - `gcloud run jobs deploy` と `gcloud run jobs update` は使わない
 
 ### 初期構成
@@ -151,14 +150,13 @@ haru256-devgist-ops
 │   ├── pool: github
 │   └── provider: oidc
 │       ├── issuer: https://token.actions.githubusercontent.com
-│       └── condition: repository == haru-256/devgist
+│       └── condition: repository_id + environment production + ref main + crawler-image.yml
 └── Artifact Registry repository crawler
     └── roles/artifactregistry.writer
-        └── member: principalSet://.../workloadIdentityPools/github/attribute.repository/haru-256/devgist
+        └── member: principalSet://.../workloadIdentityPools/github/attribute.repository_id/<github_repository_id>
 
 GitHub Actions
-├── smoke（workflow_dispatch）: token 交換と AR list
-└── crawler image（main の workflows/crawler/**、workflow_dispatch）: build / push
+└── crawler image（main の workflows/crawler/**、workflow_dispatch。GitHub Environment production）: build / push
 
 手元
 └── terraform apply（app-dev の crawler_image に digest を渡す）
@@ -171,7 +169,6 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 - 使いたい Google Cloud API が federated identity に対応していない場合。その API だけ SA impersonation に寄せる
 - GitHub Actions から terraform apply するとき。guest IAM は 015 の表に従い、別 ADR で書く
 - prod を足すとき
-- repository 単位の principalSet が広すぎ、`ref == refs/heads/main` や workflow 名で絞りたくなったとき
 
 ## Consequences (結果・影響)
 
@@ -186,13 +183,13 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 ### Negative (デメリット)
 
 - digest を手元 apply し忘れると、Job は古い image のままである。010 が受け入れた中間状態が、この ADR の通常運用になる
-- repository 単位の principalSet は、この repo のどの workflow からも crawler AR へ push できる
 - WIF 自体の apply は手元に残る。CI が自分の identity を作れない
 - 既存の `github-actions` SA が残る。本 pipeline は使わない
 
 ### Risks / Future Review (将来の課題)
 
-- public repo なので、main に入った workflow を信頼する設計である。workflow file の変更は PR で見る
+- public repo なので、main に入った `crawler-image.yml` を信頼する設計である。workflow file の変更は PR で見る
+- GitHub Environment `production` は OIDC claim 用であり、GCP prod 環境ではない
 - Artifact Registry の retention は 010 のまま未決である
 - apply の CI を足すときは、tfstate と Cloud Run の IAM がこの principalSet に乗る。そのときの blast radius を別 ADR で書く
 
@@ -201,9 +198,8 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 1. Terraform で ops の GitHub 用 WIF pool / provider と、crawler AR への writer を定義する
 2. 手元で ops を apply する
 3. GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に `github_wif_provider_name` を入れる
-4. smoke workflow で token 交換と AR list を確認する
-5. crawler image の build / push workflow を足す
-6. GitHub Actions から terraform apply するための IAM と workflow は、別 ADR で設計する
+4. crawler image の build / push workflow で token 交換と push を確認する
+5. GitHub Actions から terraform apply するための IAM と workflow は、別 ADR で設計する
 
 ## Related Documents
 

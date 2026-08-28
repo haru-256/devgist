@@ -32,6 +32,11 @@ locals {
   }
 
   cursor_wif_subject_prefix = "principal://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.cursor_wif_pool_id}/subject"
+
+  # GitHub repository id for haru-256/devgist. Rename-safe; do not use the owner/repo string.
+  github_oidc_repository_id = "1106323394"
+
+  github_oidc_workflow_ref_prefix = "haru-256/devgist/.github/workflows/crawler-image.yml@"
 }
 
 data "google_project" "project" {
@@ -99,11 +104,18 @@ module "github_wif" {
   description = "OIDC federation for GitHub Actions"
 
   attribute_mapping = {
-    "google.subject"       = "assertion.sub"
-    "attribute.repository" = "assertion.repository"
+    "google.subject"          = "assertion.sub"
+    "attribute.repository_id" = "assertion.repository_id"
+    "attribute.ref"           = "assertion.ref"
+    "attribute.workflow_ref"  = "assertion.workflow_ref"
   }
 
-  attribute_condition = "assertion.repository == \"haru-256/devgist\""
+  attribute_condition = <<-EOT
+    assertion.repository_id == "${local.github_oidc_repository_id}" &&
+    assertion.environment == "production" &&
+    assertion.ref == "refs/heads/main" &&
+    assertion.workflow_ref.startsWith("${local.github_oidc_workflow_ref_prefix}")
+  EOT
 
   depends_on = [module.required_project_services]
 }
@@ -115,7 +127,7 @@ resource "google_artifact_registry_repository_iam_member" "github_oidc_crawler_w
   location   = module.artifact_registries["crawler"].location
   repository = module.artifact_registries["crawler"].repository_id
   role       = "roles/artifactregistry.writer"
-  member     = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/github/attribute.repository/haru-256/devgist"
+  member     = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/github/attribute.repository_id/${local.github_oidc_repository_id}"
 
   depends_on = [module.github_wif]
 }

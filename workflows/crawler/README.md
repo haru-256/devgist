@@ -94,9 +94,9 @@ graph LR
 - `Cloud Run Job` は Terraform で管理する（[INFRA-ADR-010](../../docs/adr/infra/010-cloud-run-job-management.md)）
 - カンファレンス論文クロールは **単一の汎用 Cloud Run Job** で運用し、実行時に `CONFERENCE_NAMES` と `YEARS` を上書きする（[INFRA-ADR-012](../../docs/adr/infra/012-crawler-execution-parameters.md)）
 - コンテナイメージは `Artifact Registry` に保存する。`workflows/crawler/**` が `main` に入ると GitHub Actions が build / push する
-- GitHub Actions の image tag は `workflows/crawler` を最後に変更した commit の短縮 SHA。同じ tag が Registry にあれば build せず、既存 digest を出す
+- GitHub Actions の image tag は `GITHUB_SHA`。同じ tag が Registry にあれば build せず、既存 digest を出す
 - 手元の `make build-push-image` の tag は現在の HEAD の短縮 SHA（`IMAGE_TAG` で上書きできる）。CI の tag とは一致しないことがある
-- `workflow_dispatch` は branch を問わずこの repo の federated principal として crawler Artifact Registry へ push できる
+- WIF は `main` の `crawler-image.yml` と GitHub Environment `production` に限定する。`workflow_dispatch` も `main` からだけ通る
 - workflow が出した digest 参照を Terraform の `crawler_image` 変数に渡して手元で apply し、Job のイメージを更新する
 - 手元の `make build-push-image` も同じ script を使う
 - crawler は HTTP サービスではなく完了まで走るバッチなので、`Cloud Run Service` ではなく `Cloud Run Jobs` を使う

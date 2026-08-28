@@ -28,8 +28,8 @@ run "grant_github_oidc_crawler_writer" {
   command = plan
 
   assert {
-    condition     = google_artifact_registry_repository_iam_member.github_oidc_crawler_writer.member == "principalSet://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/github/attribute.repository/haru-256/devgist"
-    error_message = "Expected GitHub OIDC writer member to be the repository principalSet"
+    condition     = google_artifact_registry_repository_iam_member.github_oidc_crawler_writer.member == "principalSet://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/github/attribute.repository_id/1106323394"
+    error_message = "Expected GitHub OIDC writer member to be the repository_id principalSet"
   }
 
   assert {
