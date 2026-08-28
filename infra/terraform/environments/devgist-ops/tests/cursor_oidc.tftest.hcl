@@ -10,7 +10,7 @@ override_data {
 }
 
 override_data {
-  target = data.terraform_remote_state.data
+  target = data.terraform_remote_state.data_dev
   values = {
     outputs = {
       datalake_bucket_name = "mock-datalake-bucket"
