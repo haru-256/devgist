@@ -20,8 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
     env:
-      REPO_URL: us-central1-docker.pkg.dev/haru256-devgist-ops/crawler
-      IMAGE_NAME: crawler
+      REPO_URL: ${{ vars.CRAWLER_REPO_URL }}
+      IMAGE_NAME: ${{ vars.CRAWLER_IMAGE_NAME }}
       PLATFORM: linux/amd64
       IMAGE_TAG: ${{ github.sha }}
     steps:
@@ -38,7 +38,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v3
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+        run: gcloud auth configure-docker "${REPO_URL%%/*}" --quiet
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

@@ -14,6 +14,7 @@ crawler に関する Architecture Decision Record (ADR) は [docs/adr/](../../do
 - [INFRA-ADR-010](../../docs/adr/infra/010-cloud-run-job-management.md)
 - [INFRA-ADR-012](../../docs/adr/infra/012-crawler-execution-parameters.md)
 - [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)
+- [INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)
 - [CRAWLER-ADR-001](../../docs/adr/crawler/001-language-selection.md)
 - [CRAWLER-ADR-002](../../docs/adr/crawler/002-xml-parsing-security.md)
 
@@ -96,7 +97,7 @@ graph LR
 - コンテナイメージは `Artifact Registry` に保存する。どの branch でも `workflows/crawler/**` が push されると GitHub Actions が build / push する
 - GitHub Actions の image tag は `GITHUB_SHA`。同じ tag が Registry にあれば build せず、既存 digest を出す
 - 手元の `make build-push-image` の tag は現在の HEAD の短縮 SHA（`IMAGE_TAG` で上書きできる）。CI の tag とは一致しないことがある
-- GitHub Actions からの image push の認証と IAM は [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md) に従う
+- GitHub Actions からの image push の認証と IAM は [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md) に従う。`REPO_URL` / `IMAGE_NAME` / WIF provider は ops Terraform が GitHub の repository variable に書く（[INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)）
 - workflow が出した digest 参照を Terraform の `crawler_image` 変数に渡して手元で apply し、Job のイメージを更新する
 - 手元の `make build-push-image` も同じ script を使う
 - crawler は HTTP サービスではなく完了まで走るバッチなので、`Cloud Run Service` ではなく `Cloud Run Jobs` を使う

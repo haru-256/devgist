@@ -106,7 +106,7 @@ make/
 GCP project ごとに root module を配置し、必要に応じて `dev/` などの環境サブディレクトリを切ります。
 
 - `devgist-tf/`: Terraform state 管理用 project の root module
-- `devgist-ops/`: Artifact Registry、Cursor 用 WIF、GitHub Actions 用 WIF、共通 Service Account などの運用基盤 project の root module
+- `devgist-ops/`: Artifact Registry、Cursor 用 WIF、GitHub Actions 用 WIF、GitHub Environment / repository variable、共通 Service Account などの運用基盤 project の root module
 - `devgist-data/dev/`: 開発環境の data project 用 root module
 - `devgist-app/dev/`: 開発環境の app project 用 root module
 
@@ -132,7 +132,7 @@ GCP project ごとに root module を配置し、必要に応じて `dev/` な�
 - module の追加・更新は `modules/` 配下に集約し、root module 側で呼び出します。
 - `terraform.tfstate` は環境ごとの状態を保持します。リモート backend を使う場合は `backend.tf` で設定します。
 - Cursor Cloud 用 WIF（pool `cursor` / provider `oidc`）は `devgist-ops` で定義する。datalake への `objectViewer` / `objectCreator` は依存の下流（ops）が federated principal に直接付与する（[INFRA-ADR-015](../../docs/adr/infra/015-guest-iam-downstream.md)）。apply 順は data → ops → app。`cursor_wif_audience` は後続の OIDC mint で使う。credential config に SA impersonation は入れない。
-- GitHub Actions 用 WIF（pool `github-devgist` / provider `oidc`）も `devgist-ops` で定義する。issuer は GitHub。crawler Artifact Registry への writer は ops 同一 root が federated principalSet に直接付与する（[INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)）。`github_wif_provider_name` は GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に入れる。credential config に SA impersonation は入れない。terraform apply の CI はまだ無い。
+- GitHub Actions 用 WIF（pool `github-devgist` / provider `oidc`）も `devgist-ops` で定義する。issuer は GitHub。crawler Artifact Registry への writer は ops 同一 root が federated principalSet に直接付与する（[INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)）。GitHub Environment `dev` と repository variable（`GCP_GITHUB_WIF_PROVIDER`、`CRAWLER_REPO_URL`、`CRAWLER_IMAGE_NAME`）も ops が書く（[INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)）。apply 時は `GITHUB_TOKEN` が要る。credential config に SA impersonation は入れない。terraform apply の CI はまだ無い。
 
 ## for_each を使う場合の outputs 出力
 

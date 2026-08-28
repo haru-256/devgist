@@ -226,7 +226,7 @@ GitHub Actions
 └── terraform apply（app-dev の crawler_image に digest を渡す）
 ```
 
-GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform output `github_wif_provider_name` を入れる。workflow はこの値を `workload_identity_provider` に渡す。
+GitHub の repository variable は ops Terraform が書く（[INFRA-ADR-017](./017-github-actions-terraform-managed-variables.md)）。workflow は `GCP_GITHUB_WIF_PROVIDER` を `workload_identity_provider` に渡す。
 
 ### 再検討条件
 
@@ -257,17 +257,16 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 ### Risks / Future Review (将来の課題)
 
 - public repo なので、この provider を呼ぶ workflow は default branch に入ったものが federate できる。`environment: dev` を付けた job は crawler AR writer を共有する。権限を分けたいときは GitHub Environment 名を分ける
-- GitHub Environment `dev` は OIDC claim 用であり、GCP の app-dev / ops に対応する。protection rule は付けない。prod 用 Environment はまだ作らない
+- GitHub Environment `dev` は OIDC claim 用であり、GCP の app-dev / ops に対応する。protection rule は付けない。prod 用 Environment はまだ作らない。本体は ops Terraform が書く（[INFRA-ADR-017](./017-github-actions-terraform-managed-variables.md)）
 - Artifact Registry の retention は 010 のまま未決である
 - apply の CI を足すときは、tfstate と Cloud Run の IAM がこの principalSet に乗る。そのときの blast radius を別 ADR で書く
 
 ## Next Steps
 
 1. Terraform で ops の GitHub 用 WIF pool / provider と、crawler AR への writer を定義する
-2. 手元で ops を apply する
-3. GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に `github_wif_provider_name` を入れる
-4. crawler image の build / push workflow で token 交換と push を確認する
-5. GitHub Actions から terraform apply するための IAM と workflow は、別 ADR で設計する
+2. 手元で ops を apply する。GitHub Environment と repository variable も同じ apply で書く（[INFRA-ADR-017](./017-github-actions-terraform-managed-variables.md)）
+3. crawler image の build / push workflow で token 交換と push を確認する
+4. GitHub Actions から terraform apply するための IAM と workflow は、別 ADR で設計する
 
 ## Related Documents
 
@@ -277,5 +276,6 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 - [[INFRA-ADR-011] Terraform monorepo における CI 対象検出と検証方針](./011-terraform-ci-for-monorepo.md)
 - [[INFRA-ADR-014] Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする](./014-cursor-oidc-wif-direct-resource-access.md)
 - [[INFRA-ADR-015] data は箱とし、guest IAM は依存の下流が書く](./015-guest-iam-downstream.md)
+- [[INFRA-ADR-017] GitHub Actions の Terraform 由来設定は ops が repository variable として書く](./017-github-actions-terraform-managed-variables.md)
 - [Infrastructure README](../../../infra/README.md)
 - [issue #60](https://github.com/haru-256/devgist/issues/60)

@@ -37,6 +37,9 @@ locals {
   github_wif_pool_id              = "github-devgist"
   github_oidc_repository_id       = "1106323394"
   github_oidc_repository_owner_id = "31652298"
+  github_repository_owner         = split("/", var.cursor_oidc_repo_url)[1]
+  github_repository_name          = split("/", var.cursor_oidc_repo_url)[2]
+  github_environment_name         = "dev"
   github_oidc_attribute_condition = <<-EOT
     assertion.repository_id == "${local.github_oidc_repository_id}" &&
     assertion.repository_owner_id == "${local.github_oidc_repository_owner_id}"
@@ -127,7 +130,7 @@ resource "google_artifact_registry_repository_iam_member" "github_oidc_crawler_w
   location   = module.artifact_registries["crawler"].location
   repository = module.artifact_registries["crawler"].repository_id
   role       = "roles/artifactregistry.writer"
-  member     = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.github_wif_pool_id}/attribute.environment/dev"
+  member     = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.github_wif_pool_id}/attribute.environment/${local.github_environment_name}"
 
   depends_on = [module.github_wif]
 }

@@ -60,5 +60,5 @@ output "cursor_wif_audience" {
 
 output "github_wif_provider_name" {
   value       = module.github_wif.provider_name
-  description = "Full resource name of the GitHub Actions OIDC provider. Pass this to google-github-actions/auth as workload_identity_provider."
+  description = "Full resource name of the GitHub Actions OIDC provider. ops Terraform also writes this to the GitHub repository variable GCP_GITHUB_WIF_PROVIDER."
 }
