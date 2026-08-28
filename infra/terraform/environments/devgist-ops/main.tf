@@ -40,7 +40,9 @@ locals {
   # only so the owner/repo string is not hardcoded; repository_id already pins the repo.
   github_oidc_workflow_ref_path = "/.github/workflows/crawler-image.yml@"
 
-  # This provider is GitHub Environment "dev" only. Prod is a separate WIF.
+  # This pool is for haru-256/devgist. Other GitHub repos get a different pool.
+  # Prod and dev share the pool; IAM splits on attribute.environment.
+  # principalSet allows one attribute, so the member is environment not repository_id.
   # Branch is not in the condition; dev image is built on every matching push.
   github_oidc_attribute_condition = <<-EOT
     assertion.repository_id == "${local.github_oidc_repository_id}" &&
@@ -134,7 +136,7 @@ resource "google_artifact_registry_repository_iam_member" "github_oidc_crawler_w
   location   = module.artifact_registries["crawler"].location
   repository = module.artifact_registries["crawler"].repository_id
   role       = "roles/artifactregistry.writer"
-  member     = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/github/attribute.repository_id/${local.github_oidc_repository_id}"
+  member     = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/github/attribute.environment/dev"
 
   depends_on = [module.github_wif]
 }

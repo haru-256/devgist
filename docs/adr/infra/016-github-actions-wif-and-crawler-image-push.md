@@ -3,7 +3,7 @@
 ## Conclusion (結論)
 
 - GitHub Actions が GCP を操作するときは、GitHub OIDC JWT を WIF で federated token に換え、その federated principal へリソース IAM を直接付ける。Service Account を impersonate しない。CI 用の新しい SA も作らない。
-- GitHub Actions 用 WIF は Cursor 用 pool `cursor` と分ける。ops に pool `github` / provider `oidc` を置く。issuer は `https://token.actions.githubusercontent.com`。
+- GitHub Actions 用 WIF は Cursor 用 pool `cursor` と分ける。ops に pool `github` / provider `oidc` を置く。issuer は `https://token.actions.githubusercontent.com`。この pool は GitHub リポジトリ `haru-256/devgist` 用である。別リポジトリは別 pool にする。prod と dev はこの pool を共有する。
 - この identity の初期権限は ops の crawler Artifact Registry リポジトリに対する `roles/artifactregistry.writer` に限定する。terraform apply、tfstate、datalake、Cloud Run Job 起動はこの identity に含めない。
 - [INFRA-ADR-010](./010-cloud-run-job-management.md) の「CI が digest を渡して apply する」は維持する。apply の CI は本 ADR では作らない。Job の更新は手元 apply のまま。
 
@@ -127,12 +127,12 @@ GitHub Actions から crawler image を Artifact Registry へ push するとき�
 
 ### 採用方針
 
-- WIF pool / provider は `haru256-devgist-ops` に置く。pool ID は `github`。provider ID は `oidc`
+- WIF pool / provider は `haru256-devgist-ops` に置く。pool ID は `github`。provider ID は `oidc`。この pool は GitHub リポジトリ `haru-256/devgist` 用。別リポジトリは別 pool。prod と dev はこの pool を共有する
 - issuer は `https://token.actions.githubusercontent.com`
 - JWT の `aud` は WIF provider の既定 audience に固定する
 - attribute mapping は `google.subject` = `assertion.sub`、`attribute.repository_id` = `assertion.repository_id`、`attribute.environment` = `assertion.environment`、`attribute.workflow_ref` = `assertion.workflow_ref`。condition は `assertion.*` を直接見られるが、condition で使う claim は map する
 - attribute condition は GitHub repository id、GitHub Environment `dev`、`crawler-image.yml` の `workflow_ref` に限定する。`workflow_ref` は owner/repo をハードコードせず `contains("/.github/workflows/crawler-image.yml@")` で見る。`assertion.ref` は入れない。repository 名は使わない（rename で変わらない id を使う）
-- IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github/attribute.repository_id/<github_repository_id>`
+- IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github/attribute.environment/dev`。principalSet は attribute を 1 段しか取れない。repository_id は provider の condition に残し、IAM の境界には使わない。リポジトリの分離は pool 単位である
 - `google-github-actions/auth` に `service_account` を渡さない。credential config に `service_account_impersonation_url` を入れない
 - `google-github-actions/auth` に `project_id` として `haru256-devgist-ops` を渡す。WIF provider からは project number しか取れないため、gcloud の quota project に使う
 - crawler Artifact Registry リポジトリへ `roles/artifactregistry.writer` を付ける。置き場は ops 同一 root（015）
@@ -153,7 +153,7 @@ haru256-devgist-ops
 │       └── condition: repository_id + environment dev + crawler-image.yml
 └── Artifact Registry repository crawler
     └── roles/artifactregistry.writer
-        └── member: principalSet://.../workloadIdentityPools/github/attribute.repository_id/<github_repository_id>
+        └── member: principalSet://.../workloadIdentityPools/github/attribute.environment/dev
 
 GitHub Actions
 └── crawler image（どの branch でも `workflows/crawler/**` の push、workflow_dispatch。GitHub Environment `dev`）: build / push
@@ -168,7 +168,7 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 
 - 使いたい Google Cloud API が federated identity に対応していない場合。その API だけ SA impersonation に寄せる
 - GitHub Actions から terraform apply するとき。guest IAM は 015 の表に従い、別 ADR で書く
-- prod を足すとき。dev 用 provider の condition には足さない。prod は別 WIF を作り、別の attribute condition を付ける
+- prod を足すとき。ops の pool `github` を共有する。IAM は `attribute.environment/prod` を別 binding にする。dev 用の `attribute.environment/dev` には乗せない
 
 ## Consequences (結果・影響)
 
@@ -189,7 +189,7 @@ GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` に、ops の terraform
 ### Risks / Future Review (将来の課題)
 
 - public repo なので、default branch に入った `crawler-image.yml` を信頼する設計である。workflow file の変更は PR で見る。dev の image は branch を問わず、`workflows/crawler/**` の push で作る
-- GitHub Environment `dev` は OIDC claim 用であり、GCP の app-dev / ops に対応する。protection rule は付けない。prod 用 Environment と WIF はまだ作らない
+- GitHub Environment `dev` は OIDC claim 用であり、GCP の app-dev / ops に対応する。protection rule は付けない。prod 用 Environment はまだ作らない。prod は同じ pool `github` に乗り、IAM は `attribute.environment` で分ける
 - Artifact Registry の retention は 010 のまま未決である
 - apply の CI を足すときは、tfstate と Cloud Run の IAM がこの principalSet に乗る。そのときの blast radius を別 ADR で書く
 
