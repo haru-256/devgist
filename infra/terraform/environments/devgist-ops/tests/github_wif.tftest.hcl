@@ -41,6 +41,16 @@ run "grant_github_oidc_crawler_writer" {
     condition     = google_artifact_registry_repository_iam_member.github_oidc_crawler_writer.repository == "crawler"
     error_message = "Expected GitHub OIDC writer on the crawler Artifact Registry repository"
   }
+
+  assert {
+    condition     = module.github_wif.pool_id == "github"
+    error_message = "Expected GitHub WIF pool id to be github"
+  }
+
+  assert {
+    condition     = module.github_wif.provider_id == "oidc"
+    error_message = "Expected GitHub WIF provider id to be oidc"
+  }
 }
 
 run "github_oidc_repository_override" {

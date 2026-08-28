@@ -6,11 +6,18 @@ set -euo pipefail
 # This script is used from the Makefile and from GitHub Actions. Authentication
 # is expected to be prepared by the caller, for example with gcloud/docker
 # login before invoking this script.
+#
+# Usage:
+#   IMAGE_TAG=... REPO_URL=... IMAGE_NAME=... PLATFORM=... ./build-push-image.sh
+#   IMAGE_TAG=... REPO_URL=... IMAGE_NAME=... ./build-push-image.sh --print-existing-digest
+#
+# --print-existing-digest prints the digest on stdout and exits 0 when the tag
+# exists, exits 2 when Artifact Registry does not have it, and exits 1 on any
+# other gcloud error. PLATFORM is not required in that mode.
 
 IMAGE_TAG="${IMAGE_TAG:?IMAGE_TAG is required}"
 REPO_URL="${REPO_URL:?REPO_URL is required}"
 IMAGE_NAME="${IMAGE_NAME:?IMAGE_NAME is required}"
-PLATFORM="${PLATFORM:?PLATFORM is required}"
 
 # Resolve the crawler directory relative to this script so the build context is
 # independent of the caller's current working directory. This lets the script be
@@ -35,14 +42,69 @@ print_image_ref() {
   printf 'image_ref: %s@%s\n' "${REPO_URL}/${IMAGE_NAME}" "${digest}"
 }
 
+is_image_not_found() {
+  grep -qiE 'NOT_FOUND|not found|failed to find image' <<<"$1"
+}
+
+# stdout: digest when found. exit 0 found, 2 missing, 1 error.
+lookup_existing_digest() {
+  local err_file out status digest
+  if ! command -v gcloud >/dev/null 2>&1; then
+    printf 'gcloud is required to look up %s\n' "${IMAGE}" >&2
+    return 1
+  fi
+  err_file="$(mktemp)"
+  set +e
+  out="$(gcloud artifacts docker images describe "${IMAGE}" --format='value(image_summary.digest)' 2>"${err_file}")"
+  status=$?
+  set -e
+  if [[ "${status}" -eq 0 ]]; then
+    digest="$(tr -d '[:space:]' <<<"${out}")"
+    rm -f "${err_file}"
+    if ! [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+      printf 'Invalid digest from Artifact Registry for %s: %s\n' "${IMAGE}" "${digest}" >&2
+      return 1
+    fi
+    printf '%s\n' "${digest}"
+    return 0
+  fi
+  if is_image_not_found "$(cat "${err_file}")"; then
+    rm -f "${err_file}"
+    return 2
+  fi
+  printf 'gcloud artifacts docker images describe failed for %s\n' "${IMAGE}" >&2
+  cat "${err_file}" >&2
+  rm -f "${err_file}"
+  return 1
+}
+
+if [[ "${1:-}" == "--print-existing-digest" ]]; then
+  set +e
+  lookup_existing_digest
+  status=$?
+  set -e
+  exit "${status}"
+fi
+
+PLATFORM="${PLATFORM:?PLATFORM is required}"
+
 # Skip rebuild when this tag already exists in Artifact Registry. The tag is
-# still mutable; Terraform consumes the digest printed below.
+# still mutable; Terraform consumes the digest printed below. If gcloud is
+# missing, fall through to docker so a local daemon-only build can still run.
 if command -v gcloud >/dev/null 2>&1; then
-  existing_digest="$(gcloud artifacts docker images describe "${IMAGE}" --format='value(image_summary.digest)' 2>/dev/null | tr -d '[:space:]' || true)"
-  if [[ "${existing_digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+  existing_digest=""
+  lookup_status=0
+  set +e
+  existing_digest="$(lookup_existing_digest)"
+  lookup_status=$?
+  set -e
+  if [[ "${lookup_status}" -eq 0 ]]; then
     printf 'Reusing existing tag %s\n' "${IMAGE}" >&2
     print_image_ref "${existing_digest}"
     exit 0
+  fi
+  if [[ "${lookup_status}" -ne 2 ]]; then
+    exit "${lookup_status}"
   fi
 fi
 

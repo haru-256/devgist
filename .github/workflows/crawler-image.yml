@@ -42,6 +42,7 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
+          project_id: haru256-devgist-ops
           workload_identity_provider: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
 
       - name: Setup gcloud
@@ -65,16 +66,24 @@ jobs:
         env:
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
         run: |
+          set +e
+          digest="$(./workflows/crawler/scripts/build-push-image.sh --print-existing-digest)"
+          status=$?
           set -euo pipefail
-          image="${REPO_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
-          digest="$(gcloud artifacts docker images describe "${image}" --format='value(image_summary.digest)' 2>/dev/null | tr -d '[:space:]' || true)"
-          if [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-            echo "Reusing existing tag ${image}"
+          if [[ "${status}" -eq 0 ]]; then
+            if [[ ! "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              echo "Invalid digest from Artifact Registry: ${digest}" >&2
+              exit 1
+            fi
+            echo "Reusing existing tag ${REPO_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
             echo "exists=true" >> "${GITHUB_OUTPUT}"
             echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
-          else
-            echo "No existing image for ${image}; will build"
+          elif [[ "${status}" -eq 2 ]]; then
+            echo "No existing image for ${REPO_URL}/${IMAGE_NAME}:${IMAGE_TAG}; will build"
             echo "exists=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "Failed to look up existing crawler image tag" >&2
+            exit "${status}"
           fi
 
       - name: Configure Docker for Artifact Registry

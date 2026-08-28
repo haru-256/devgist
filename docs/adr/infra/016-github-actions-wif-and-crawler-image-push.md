@@ -138,6 +138,7 @@ GitHub Actions から crawler image を Artifact Registry へ push するとき�
 - IAM member は `principalSet://iam.googleapis.com/projects/<ops_number>/locations/global/workloadIdentityPools/github/attribute.repository/haru-256/devgist`
 - repo 単位の principalSet なので、workflow ごとの `sub` allowlist は持たない
 - `google-github-actions/auth` に `service_account` を渡さない。credential config に `service_account_impersonation_url` を入れない
+- `google-github-actions/auth` に `project_id` として `haru256-devgist-ops` を渡す。WIF provider からは project number しか取れないため、gcloud の quota project に使う
 - crawler Artifact Registry リポジトリへ `roles/artifactregistry.writer` を付ける。置き場は ops 同一 root（015）
 - tfstate、datalake、app-dev、Cloud Run には付けない
 - 既存の `github-actions` SA には `workload_identity_users` を足さない

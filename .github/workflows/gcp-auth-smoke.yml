@@ -21,9 +21,13 @@ jobs:
             exit 1
           fi
 
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
+          project_id: haru256-devgist-ops
           workload_identity_provider: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
 
       - name: Setup gcloud
