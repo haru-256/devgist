@@ -32,6 +32,10 @@ locals {
   }
 
   cursor_wif_subject_prefix = "principal://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.cursor_wif_pool_id}/subject"
+
+  github_wif_pool_id = "github"
+
+  github_wif_principal_set = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.github_wif_pool_id}/attribute.repository/${var.github_oidc_repository}"
 }
 
 data "google_project" "project" {
@@ -89,6 +93,38 @@ module "cursor_wif" {
   depends_on = [module.required_project_services]
 }
 
+module "github_wif" {
+  source = "../../modules/workload_identity_oidc"
+
+  project_id  = data.google_project.project.project_id
+  pool_id     = local.github_wif_pool_id
+  provider_id = "oidc"
+  issuer_uri  = "https://token.actions.githubusercontent.com"
+  description = "OIDC federation for GitHub Actions"
+
+  attribute_mapping = {
+    "google.subject"       = "assertion.sub"
+    "attribute.repository" = "assertion.repository"
+    "attribute.ref"        = "assertion.ref"
+  }
+
+  attribute_condition = "assertion.repository == \"${var.github_oidc_repository}\""
+
+  depends_on = [module.required_project_services]
+}
+
+# GitHub Actions WIF → crawler Artifact Registry。direct resource access（INFRA-ADR-016）。
+# 置き場は ops 同一 root（INFRA-ADR-015）。github-actions SA は impersonate しない。
+resource "google_artifact_registry_repository_iam_member" "github_oidc_crawler_writer" {
+  project    = data.google_project.project.project_id
+  location   = module.artifact_registries["crawler"].location
+  repository = module.artifact_registries["crawler"].repository_id
+  role       = "roles/artifactregistry.writer"
+  member     = local.github_wif_principal_set
+
+  depends_on = [module.github_wif]
+}
+
 # Cursor WIF → data-dev datalake。direct resource access（INFRA-ADR-014）。
 # 置き場は ops × data の下流（INFRA-ADR-015）。crawler runtime SA とは別 identity
 resource "google_storage_bucket_iam_member" "cursor_oidc" {
@@ -99,9 +135,8 @@ resource "google_storage_bucket_iam_member" "cursor_oidc" {
   member = "${local.cursor_wif_subject_prefix}/${each.value.subject}"
 }
 
-# GitHub Actions の CI/CD 用サービスアカウントを作成し、ops 環境の Artifact Registry
-# （crawler イメージ置き場）へイメージを push できるよう roles/artifactregistry.writer を付与。
-# service_account_users で指定されたユーザーがこの SA を借用（actAs）できる。
+# 既存の GitHub Actions 用 SA。INFRA-ADR-016 の image push はこの SA を impersonate しない。
+# project 全体の Artifact Registry writer と人間の actAs は残す。削除は別判断。
 module "service_accounts" {
   source = "../../modules/service_accounts"
 

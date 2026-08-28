@@ -1,0 +1,51 @@
+name: GCP auth smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  github-wif:
+    name: GitHub WIF federated identity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require GCP_GITHUB_WIF_PROVIDER
+        env:
+          GCP_GITHUB_WIF_PROVIDER: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
+        run: |
+          if [[ -z "${GCP_GITHUB_WIF_PROVIDER}" ]]; then
+            echo "Set repository variable GCP_GITHUB_WIF_PROVIDER to terraform output github_wif_provider_name" >&2
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Show federated identity
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(os.environ["GOOGLE_APPLICATION_CREDENTIALS"], encoding="utf-8") as fh:
+              data = json.load(fh)
+          if "service_account_impersonation_url" in data:
+              sys.exit("credential config must not impersonate a service account")
+          audience = data.get("audience", "")
+          print(f"audience: {audience}")
+          if "workloadIdentityPools/github" not in audience:
+              sys.exit("expected GitHub WIF pool in audience")
+          PY
+          gcloud auth list
+
+      - name: List crawler Artifact Registry images
+        run: gcloud artifacts docker images list us-central1-docker.pkg.dev/haru256-devgist-ops/crawler --limit=1

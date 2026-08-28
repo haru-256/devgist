@@ -57,3 +57,28 @@ output "cursor_wif_audience" {
   value       = module.cursor_wif.audience
   description = "Default JWT audience for the Cursor Cloud OIDC provider. Mint tokens with this aud value."
 }
+
+output "github_wif_pool_id" {
+  value       = module.github_wif.pool_id
+  description = "Workload identity pool ID for GitHub Actions OIDC"
+}
+
+output "github_wif_provider_id" {
+  value       = module.github_wif.provider_id
+  description = "OIDC provider ID in the GitHub Actions workload identity pool"
+}
+
+output "github_wif_provider_name" {
+  value       = module.github_wif.provider_name
+  description = "Full resource name of the GitHub Actions OIDC provider. Pass this to google-github-actions/auth as workload_identity_provider."
+}
+
+output "github_wif_audience" {
+  value       = module.github_wif.audience
+  description = "Default JWT audience for the GitHub Actions OIDC provider. Mint tokens with this aud value."
+}
+
+output "github_wif_principal_set" {
+  value       = local.github_wif_principal_set
+  description = "IAM member string for the GitHub Actions federated principalSet keyed by repository. Use this when adding guest IAM for this identity."
+}

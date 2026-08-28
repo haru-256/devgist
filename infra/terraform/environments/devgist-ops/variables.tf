@@ -46,3 +46,14 @@ variable "cursor_oidc_subjects" {
     error_message = "Each cursor_oidc_subjects value must start with \"user:\" or \"service_account:\"."
   }
 }
+
+variable "github_oidc_repository" {
+  type        = string
+  description = "GitHub repository claim that GitHub Actions OIDC tokens must match (owner/repo, no host)."
+  default     = "haru-256/devgist"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_oidc_repository))
+    error_message = "github_oidc_repository must look like owner/repo without a host or scheme."
+  }
+}
