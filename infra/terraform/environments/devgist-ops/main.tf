@@ -33,7 +33,9 @@ locals {
 
   cursor_wif_subject_prefix = "principal://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.cursor_wif_pool_id}/subject"
 
-  # GitHub Actions OIDC（INFRA-ADR-016）
+  # この root は haru-256/devgist 専用。GitHub の identity は入力にしない（INFRA-ADR-016 / 017）
+  github_repository_owner         = "haru-256"
+  github_repository_name          = "devgist"
   github_wif_pool_id              = "github-devgist"
   github_oidc_repository_id       = "1106323394"
   github_oidc_repository_owner_id = "31652298"
@@ -99,7 +101,7 @@ module "cursor_wif" {
     "attribute.runtime" = "assertion.agent_runtime"
   }
 
-  attribute_condition = "assertion.repo_url == \"github.com/${var.github_repository_owner}/${var.github_repository_name}\" && assertion.agent_runtime == \"managed\""
+  attribute_condition = "assertion.repo_url == \"github.com/${local.github_repository_owner}/${local.github_repository_name}\" && assertion.agent_runtime == \"managed\""
 
   depends_on = [module.required_project_services]
 }

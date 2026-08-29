@@ -34,6 +34,11 @@ run "write_github_actions_config_from_ops" {
   }
 
   assert {
+    condition     = local.github_repository_owner == "haru-256" && local.github_repository_name == "devgist"
+    error_message = "Expected GitHub repository identity to be locals for this root, not input variables"
+  }
+
+  assert {
     condition     = github_repository_environment.dev.repository == "devgist"
     error_message = "Expected GitHub Environment dev to belong to this repository"
   }

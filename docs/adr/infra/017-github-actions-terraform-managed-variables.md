@@ -99,7 +99,7 @@ Terraform が正本の GitHub Actions 設定は、`devgist-ops` が GitHub provi
 
 ### 採用方針
 
-- GitHub provider は `devgist-ops` に置く。owner と repository 名は `github_repository_owner` と `github_repository_name` にする。Cursor OIDC の `repo_url` もこの 2 つから組み立てる。token は apply 時の環境変数 `GITHUB_TOKEN` とし、tfvars と state には書かない
+- GitHub provider は `devgist-ops` に置く。owner、repository 名、repository id、owner id はこの root の identity なので local に置く。Cursor OIDC の `repo_url` は owner と name から組み立てる。token は apply 時の環境変数 `GITHUB_TOKEN` とし、tfvars と state には書かない
 - GitHub Environment 名は `dev` で固定する。IAM の `attribute.environment` も `dev`。reviewers と `deployment_branch_policy` は付けない。どの branch でも image を push するためである
 - repository variable は次の 3 つにする
   - `GCP_GITHUB_WIF_PROVIDER` = GitHub WIF provider の resource name
