@@ -41,7 +41,23 @@ runs:
     - name: Terraform init
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: terraform init -backend=false -input=false
+      run: |
+        set -euo pipefail
+        # Provider downloads from releases.hashicorp.com can fail transiently
+        # (connection reset). Retry a few times before failing the job.
+        attempts=3
+        for attempt in $(seq 1 "${attempts}"); do
+          if terraform init -backend=false -input=false; then
+            exit 0
+          fi
+          if [ "${attempt}" -eq "${attempts}" ]; then
+            echo "terraform init failed after ${attempts} attempts" >&2
+            exit 1
+          fi
+          sleep_seconds=$((attempt * 5))
+          echo "terraform init failed (attempt ${attempt}/${attempts}); retrying in ${sleep_seconds}s..." >&2
+          sleep "${sleep_seconds}"
+        done
 
     - name: Terraform validate
       if: ${{ inputs.skip-validate != 'true' }}
