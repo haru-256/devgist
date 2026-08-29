@@ -121,7 +121,7 @@ devgist-ops Terraform
     ├── CRAWLER_REPO_URL
     └── CRAWLER_IMAGE_NAME
 
-GitHub Actions crawler-image.yml
+GitHub Actions crawler-deploy.yaml
 ├── environment: dev
 ├── vars.CRAWLER_REPO_URL → REPO_URL
 ├── vars.CRAWLER_IMAGE_NAME → IMAGE_NAME
@@ -161,14 +161,14 @@ GitHub Actions crawler-image.yml
 1. `devgist-ops` に GitHub provider、Environment `dev`、repository variable を定義する
 2. 手元 apply の前に、既存の Environment `dev` を `terraform import github_repository_environment.dev devgist:dev` する
 3. `GITHUB_TOKEN` を入れて ops を apply する
-4. crawler image workflow が `vars.CRAWLER_REPO_URL` / `vars.CRAWLER_IMAGE_NAME` / `vars.GCP_GITHUB_WIF_PROVIDER` を読むことを確認する
+4. Crawler Deploy workflow が `vars.CRAWLER_REPO_URL` / `vars.CRAWLER_IMAGE_NAME` / `vars.GCP_GITHUB_WIF_PROVIDER` を読むことを確認する
 
 ## Related Documents
 
 - [[INFRA-ADR-004] Terraform State Project と Ops Project を分離する](./004-separate-tf-and-ops-projects.md)
 - [[INFRA-ADR-007] Artifact Registry リポジトリ戦略とワークロード用 Service Account 設計](./007-artifact-registry-and-sa-strategy.md)
 - [[INFRA-ADR-016] GitHub Actions から crawler image を Artifact Registry へ push する](./016-github-actions-wif-and-crawler-image-push.md)
-- [crawler image workflow](../../../.github/workflows/crawler-image.yml)
+- [Crawler Deploy workflow](../../../.github/workflows/crawler-deploy.yaml)
 - [crawler README](../../../workflows/crawler/README.md)
 - [Infrastructure README](../../../infra/README.md)
 - [issue #60](https://github.com/haru-256/devgist/issues/60)

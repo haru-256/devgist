@@ -1,4 +1,4 @@
-name: Crawler image
+name: Crawler Deploy
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - "workflows/crawler/**"
       - "!workflows/crawler/**/*.md"
       - "!workflows/crawler/docs/**"
-      - ".github/workflows/crawler-image.yml"
+      - ".github/workflows/crawler-deploy.yaml"
   workflow_dispatch:
 
 permissions:

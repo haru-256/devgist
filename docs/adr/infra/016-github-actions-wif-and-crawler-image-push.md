@@ -279,7 +279,7 @@ GitHub の repository variable は ops Terraform が書く（[INFRA-ADR-017](./0
 - [[INFRA-ADR-014] Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする](./014-cursor-oidc-wif-direct-resource-access.md)（superseded。認証モデルは 015 が維持する）
 - [[INFRA-ADR-015] data は箱とし、guest IAM は依存の下流が書く](./015-guest-iam-downstream.md)
 - [[INFRA-ADR-017] GitHub Actions の Terraform 由来設定は ops が repository variable として書く](./017-github-actions-terraform-managed-variables.md)
-- [crawler image workflow](../../../.github/workflows/crawler-image.yml)
+- [Crawler Deploy workflow](../../../.github/workflows/crawler-deploy.yaml)
 - [crawler README](../../../workflows/crawler/README.md)
 - [Infrastructure README](../../../infra/README.md)
 - [issue #60](https://github.com/haru-256/devgist/issues/60)
