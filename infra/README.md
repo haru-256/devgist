@@ -24,6 +24,7 @@
 - `INFRA-ADR-015`: [docs/adr/infra/015-guest-iam-downstream.md](../docs/adr/infra/015-guest-iam-downstream.md)
 - `INFRA-ADR-016`: [docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md](../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)
 - `INFRA-ADR-017`: [docs/adr/infra/017-github-actions-terraform-managed-variables.md](../docs/adr/infra/017-github-actions-terraform-managed-variables.md)
+- `INFRA-ADR-018`: [docs/adr/infra/018-artifact-registry-cost-controls.md](../docs/adr/infra/018-artifact-registry-cost-controls.md)
 
 このディレクトリ配下の `infra/docs/adr/` は互換性維持のための参照パスであり、正本は [docs/adr/](../docs/adr/) 側です。
 

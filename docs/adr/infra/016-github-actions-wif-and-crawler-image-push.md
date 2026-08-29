@@ -260,7 +260,7 @@ GitHub の repository variable は ops Terraform が書く（[INFRA-ADR-017](./0
 
 - public repo なので、この provider を呼ぶ workflow は default branch に入ったものが federate できる。`environment: dev` を付けた job は crawler AR writer を共有する。権限を分けたいときは GitHub Environment 名を分ける
 - GitHub Environment `dev` は OIDC claim と IAM の `attribute.environment` の契約であり、image の行き先ではない。protection rule は付けない。prod 用 Environment はまだ作らない。本体は ops Terraform が書く（[INFRA-ADR-017](./017-github-actions-terraform-managed-variables.md)）
-- Artifact Registry の retention は 010 のまま未決である
+- Artifact Registry の retention は [INFRA-ADR-018](./018-artifact-registry-cost-controls.md) で決めた（直近 5 世代 KEEP / 30 日超 DELETE。scanning は `DISABLED`）
 - apply の CI を足すときは、tfstate と Cloud Run の IAM がこの principalSet に乗る。そのときの blast radius を別 ADR で書く
 
 ## Next Steps
@@ -279,6 +279,7 @@ GitHub の repository variable は ops Terraform が書く（[INFRA-ADR-017](./0
 - [[INFRA-ADR-014] Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする](./014-cursor-oidc-wif-direct-resource-access.md)（superseded。認証モデルは 015 が維持する）
 - [[INFRA-ADR-015] data は箱とし、guest IAM は依存の下流が書く](./015-guest-iam-downstream.md)
 - [[INFRA-ADR-017] GitHub Actions の Terraform 由来設定は ops が repository variable として書く](./017-github-actions-terraform-managed-variables.md)
+- [[INFRA-ADR-018] Artifact Registry の vulnerability scanning と image retention](./018-artifact-registry-cost-controls.md)
 - [Crawler Deploy workflow](../../../.github/workflows/crawler-deploy.yaml)
 - [crawler README](../../../workflows/crawler/README.md)
 - [Infrastructure README](../../../infra/README.md)

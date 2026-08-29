@@ -24,6 +24,7 @@
 | `INFRA-ADR-015` | `infra` | data は箱とし、guest IAM は依存の下流が書く | Accepted | [docs/adr/infra/015-guest-iam-downstream.md](infra/015-guest-iam-downstream.md) |
 | `INFRA-ADR-016` | `infra` | GitHub Actions から crawler image を Artifact Registry へ push する | Accepted | [docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md](infra/016-github-actions-wif-and-crawler-image-push.md) |
 | `INFRA-ADR-017` | `infra` | GitHub Actions の Terraform 由来設定は ops が repository variable として書く | Accepted | [docs/adr/infra/017-github-actions-terraform-managed-variables.md](infra/017-github-actions-terraform-managed-variables.md) |
+| `INFRA-ADR-018` | `infra` | Artifact Registry の vulnerability scanning と image retention | Accepted | [docs/adr/infra/018-artifact-registry-cost-controls.md](infra/018-artifact-registry-cost-controls.md) |
 | `CRAWLER-ADR-001` | `crawler` | 論文収集クローラーの実装言語としてPythonを採用 | Accepted | [docs/adr/crawler/001-language-selection.md](crawler/001-language-selection.md) |
 | `CRAWLER-ADR-002` | `crawler` | XMLパースにdefusedxmlを採用 | Accepted | [docs/adr/crawler/002-xml-parsing-security.md](crawler/002-xml-parsing-security.md) |
 
