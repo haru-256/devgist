@@ -22,3 +22,13 @@ output "audience" {
   description = "Default JWT audience for this provider. Mint OIDC tokens with this aud value."
   value       = "https://iam.googleapis.com/${google_iam_workload_identity_pool_provider.oidc.name}"
 }
+
+output "issuer_uri" {
+  description = "OIDC issuer URI of this provider."
+  value       = google_iam_workload_identity_pool_provider.oidc.oidc[0].issuer_uri
+}
+
+output "attribute_condition" {
+  description = "CEL condition that tokens must satisfy."
+  value       = google_iam_workload_identity_pool_provider.oidc.attribute_condition
+}

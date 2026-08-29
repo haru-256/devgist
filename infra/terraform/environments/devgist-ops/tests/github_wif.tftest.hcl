@@ -52,4 +52,20 @@ run "grant_github_oidc_crawler_writer" {
     condition     = module.github_wif.provider_id == "oidc"
     error_message = "Expected GitHub WIF provider id to be oidc"
   }
+
+  assert {
+    condition     = module.github_wif.issuer_uri == "https://token.actions.githubusercontent.com"
+    error_message = "Expected GitHub WIF issuer to be GitHub Actions OIDC"
+  }
+
+  assert {
+    condition = (
+      strcontains(module.github_wif.attribute_condition, "assertion.repository_id == \"1106323394\"") &&
+      strcontains(module.github_wif.attribute_condition, "assertion.repository_owner_id == \"31652298\"") &&
+      !strcontains(module.github_wif.attribute_condition, "environment") &&
+      !strcontains(module.github_wif.attribute_condition, "workflow") &&
+      !strcontains(module.github_wif.attribute_condition, "assertion.ref")
+    )
+    error_message = "Expected GitHub WIF condition to be repository_id and repository_owner_id only"
+  }
 }
