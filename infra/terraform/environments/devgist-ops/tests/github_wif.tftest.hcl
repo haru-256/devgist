@@ -29,17 +29,17 @@ run "grant_github_oidc_crawler_writer" {
   command = plan
 
   assert {
-    condition     = google_artifact_registry_repository_iam_member.github_oidc_crawler_writer.member == "principalSet://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/github-devgist/attribute.environment/dev"
+    condition     = google_artifact_registry_repository_iam_member.github_oidc_dev.member == "principalSet://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/github-devgist/attribute.environment/dev"
     error_message = "Expected GitHub OIDC writer member to be the environment principalSet"
   }
 
   assert {
-    condition     = google_artifact_registry_repository_iam_member.github_oidc_crawler_writer.role == "roles/artifactregistry.writer"
+    condition     = google_artifact_registry_repository_iam_member.github_oidc_dev.role == "roles/artifactregistry.writer"
     error_message = "Expected GitHub OIDC IAM role to be artifactregistry.writer"
   }
 
   assert {
-    condition     = google_artifact_registry_repository_iam_member.github_oidc_crawler_writer.repository == "crawler"
+    condition     = google_artifact_registry_repository_iam_member.github_oidc_dev.repository == "crawler"
     error_message = "Expected GitHub OIDC writer on the crawler Artifact Registry repository"
   }
 

@@ -93,8 +93,8 @@ module "github_wif" {
   depends_on = [module.required_project_services]
 }
 
-# GitHub Actions → crawler AR writer（INFRA-ADR-016）。置き場は ops 同一 root（INFRA-ADR-015）
-resource "google_artifact_registry_repository_iam_member" "github_oidc_crawler_writer" {
+# GitHub Actions → （INFRA-ADR-016）。置き場は ops 同一 root（INFRA-ADR-015）
+resource "google_artifact_registry_repository_iam_member" "github_oidc_dev" {
   project    = data.google_project.project.project_id
   location   = module.artifact_registries["crawler"].location
   repository = module.artifact_registries["crawler"].repository_id
