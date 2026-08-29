@@ -90,8 +90,10 @@ type を `Runtime Secret` にすると、agent は値を `[REDACTED]` としか�
 
 | 項目 | 値 |
 |---|---|
-| `start` | `scripts/cursor-cloud/setup-adc.sh` |
+| `start` | `scripts/cursor-cloud/start.sh` |
 | Network（egress を制限しているときだけ） | Environment の network access に `sts.googleapis.com`、`iam.googleapis.com`、`storage.googleapis.com`、`www.googleapis.com`、`oauth2.googleapis.com` を足す |
+
+`start.sh` は [`scripts/cursor-cloud/setup-adc.sh`](../../scripts/cursor-cloud/setup-adc.sh) を必須で呼ぶ。ADC の配線に失敗したら boot も失敗させる。続けて CodeRabbit CLI の `coderabbit auth login` を best-effort で試す。失敗しても boot は落とさない。`coderabbit` CLI は agentic API key を要求するので、`CODERABBIT_API_KEY` が user API key だと `auth login` は失敗するが、それは非致命として警告だけ出す。`CODERABBIT_API_KEY` を使うなら type は `Environment Variable`。
 
 既存の `install` / snapshot は残す。リポジトリに `.cursor/environment.json` は置かない。`install` で export した変数は Build 後に残らない。mint 自体は VM 内の Unix socket で、allowlist は不要である。ネットワークの階層は [Secrets & Network](https://cursor.com/docs/cloud-agent/security-network#network-access) を見る。
 
