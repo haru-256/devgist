@@ -9,7 +9,7 @@ provider "google-beta" {
 }
 
 provider "github" {
-  owner = local.github_repository_owner
+  owner = var.github_repository_owner
 }
 
 terraform {

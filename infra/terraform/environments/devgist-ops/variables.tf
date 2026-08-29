@@ -22,14 +22,25 @@ variable "service_account_user_emails" {
   }
 }
 
-variable "cursor_oidc_repo_url" {
+variable "github_repository_owner" {
   type        = string
-  description = "GitHub repository URL claim that Cursor OIDC tokens must match (host/owner/repo, no scheme)."
-  default     = "github.com/haru-256/devgist"
+  description = "GitHub user or organization that owns the repository. Cursor OIDC repo_url is github.com/<owner>/<name>."
+  default     = "haru-256"
 
   validation {
-    condition     = can(regex("^github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.cursor_oidc_repo_url))
-    error_message = "cursor_oidc_repo_url must look like github.com/owner/repo without a scheme."
+    condition     = can(regex("^[A-Za-z0-9_.-]+$", var.github_repository_owner))
+    error_message = "github_repository_owner must be a GitHub login."
+  }
+}
+
+variable "github_repository_name" {
+  type        = string
+  description = "GitHub repository name without the owner. Cursor OIDC repo_url is github.com/<owner>/<name>."
+  default     = "devgist"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]+$", var.github_repository_name))
+    error_message = "github_repository_name must be a GitHub repository name."
   }
 }
 

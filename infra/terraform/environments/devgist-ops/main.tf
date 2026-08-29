@@ -37,8 +37,6 @@ locals {
   github_wif_pool_id              = "github-devgist"
   github_oidc_repository_id       = "1106323394"
   github_oidc_repository_owner_id = "31652298"
-  github_repository_owner         = split("/", var.cursor_oidc_repo_url)[1]
-  github_repository_name          = split("/", var.cursor_oidc_repo_url)[2]
   github_oidc_attribute_condition = <<-EOT
     assertion.repository_id == "${local.github_oidc_repository_id}" &&
     assertion.repository_owner_id == "${local.github_oidc_repository_owner_id}"
@@ -101,7 +99,7 @@ module "cursor_wif" {
     "attribute.runtime" = "assertion.agent_runtime"
   }
 
-  attribute_condition = "assertion.repo_url == \"${var.cursor_oidc_repo_url}\" && assertion.agent_runtime == \"managed\""
+  attribute_condition = "assertion.repo_url == \"github.com/${var.github_repository_owner}/${var.github_repository_name}\" && assertion.agent_runtime == \"managed\""
 
   depends_on = [module.required_project_services]
 }
