@@ -18,7 +18,7 @@ Accepted (承認済み) - 2026-08-28
 
 crawler image の push 先は ops の Artifact Registry である。URL は region、project、repository id から決まり、これらはすでに `devgist-ops` の Terraform が持っている（[INFRA-ADR-004](./004-separate-tf-and-ops-projects.md)、[INFRA-ADR-007](./007-artifact-registry-and-sa-strategy.md)、[INFRA-ADR-016](./016-github-actions-wif-and-crawler-image-push.md)）。
 
-016 では WIF provider 名を terraform output にし、GitHub の repository variable `GCP_GITHUB_WIF_PROVIDER` へ人手でコピーする運用だった。workflow の `REPO_URL` は YAML にベタ書きされていた。どちらも Terraform が正本なのに、GitHub 側が別管理になる。
+016 の WIF provider 名と AR URL は Terraform が正本であり、GitHub 側へ人手で移さない。workflow に URL をベタ書きすると、正本が割れる。
 
 GitHub Environment `dev` は 016 の IAM（`attribute.environment/dev`）に必要である。protection rule は付けない。public repo では初回 run でも作れるが、名前の正本が Terraform に無い。
 
@@ -90,7 +90,7 @@ region と project と repository id を YAML に書く方式。
 
 - AR URL、image 名、WIF provider 名が同じ apply で GitHub に載る
 - repository variable は Environment を跨いで読める。prod job も同じ WIF provider 名を使える
-- Environment `dev` の名前が IAM の `attribute.environment` と Terraform 上で同じ local になる
+- Environment `dev` の名前が IAM の `attribute.environment` と同じ値になる
 - GitHub 用の別 root を増やさない
 
 ## Decision (決定事項)
@@ -105,7 +105,7 @@ Terraform が正本の GitHub Actions 設定は、`devgist-ops` が GitHub provi
   - `GCP_GITHUB_WIF_PROVIDER` = GitHub WIF provider の resource name
   - `CRAWLER_REPO_URL` = crawler Artifact Registry の Docker URL
   - `CRAWLER_IMAGE_NAME` = crawler Artifact Registry の repository id。初期は image 名と repository id を一致させる
-- workflow は `vars.CRAWLER_REPO_URL` と `vars.CRAWLER_IMAGE_NAME` を script の `REPO_URL` / `IMAGE_NAME` に渡す。`configure-docker` の host は `REPO_URL` の先頭から取る。`GCP_PROJECT_ID` はまだ workflow に残す
+- workflow は `vars.CRAWLER_REPO_URL` と `vars.CRAWLER_IMAGE_NAME` を script の `REPO_URL` / `IMAGE_NAME` に渡す。`configure-docker` の host は `REPO_URL` の先頭から取る。project id は `google-github-actions/auth` の `project_id` 入力として workflow に残し、repository variable にはしない
 - 手元の `make build-push-image` は GitHub variable を読まない。Makefile の default は別経路として残す
 - ops を apply する前は repository variable が空なので、crawler image job は skip する。README だけの変更では workflow を起動しない
 
@@ -141,7 +141,7 @@ GitHub Actions crawler-image.yml
 ### Positive (メリット)
 
 - AR / WIF / GitHub variable の正本が ops の 1 apply に揃う
-- workflow から region と project と repository のベタ書きが消える
+- workflow から AR の region / project / repository のベタ書きが消える
 - Environment `dev` の名前が IAM と Terraform でずれない
 
 ### Negative (デメリット)
@@ -154,7 +154,7 @@ GitHub Actions crawler-image.yml
 
 - token の権限は Environments と Variables の write で足りる。repo の administration 全体は渡さない
 - public repo の Environment に protection を付けない方針は 016 のままである
-- `GCP_PROJECT_ID` も Terraform 由来だが、今回は WIF と image の行き先だけを移す
+- project id は Terraform 由来だが、この ADR では repository variable に移さない。auth action の `project_id` 入力のままにする（016）
 
 ## Next Steps
 
@@ -168,5 +168,7 @@ GitHub Actions crawler-image.yml
 - [[INFRA-ADR-004] Terraform State Project と Ops Project を分離する](./004-separate-tf-and-ops-projects.md)
 - [[INFRA-ADR-007] Artifact Registry リポジトリ戦略とワークロード用 Service Account 設計](./007-artifact-registry-and-sa-strategy.md)
 - [[INFRA-ADR-016] GitHub Actions から crawler image を Artifact Registry へ push する](./016-github-actions-wif-and-crawler-image-push.md)
+- [crawler image workflow](../../../.github/workflows/crawler-image.yml)
+- [crawler README](../../../workflows/crawler/README.md)
 - [Infrastructure README](../../../infra/README.md)
 - [issue #60](https://github.com/haru-256/devgist/issues/60)

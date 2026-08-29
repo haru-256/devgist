@@ -14,6 +14,8 @@ Accepted (承認済み) - 2026-08-28
 
 [INFRA-ADR-015](./015-guest-iam-downstream.md) の Next Steps 3 を、crawler image push の範囲で実装する。010 を supersede しない。
 
+[INFRA-ADR-007](./007-artifact-registry-and-sa-strategy.md) の AR 1 本 / SHA pin / workload SA は維持する。007 の「push する SA は `github-actions`」と「初期は全リポジトリ writer」は本 ADR が置き換える。007 本文は履歴として残す。
+
 ## Context (背景・課題)
 
 ### 背景
@@ -257,7 +259,7 @@ GitHub の repository variable は ops Terraform が書く（[INFRA-ADR-017](./0
 ### Risks / Future Review (将来の課題)
 
 - public repo なので、この provider を呼ぶ workflow は default branch に入ったものが federate できる。`environment: dev` を付けた job は crawler AR writer を共有する。権限を分けたいときは GitHub Environment 名を分ける
-- GitHub Environment `dev` は OIDC claim 用であり、GCP の app-dev / ops に対応する。protection rule は付けない。prod 用 Environment はまだ作らない。本体は ops Terraform が書く（[INFRA-ADR-017](./017-github-actions-terraform-managed-variables.md)）
+- GitHub Environment `dev` は OIDC claim と IAM の `attribute.environment` の契約であり、image の行き先ではない。protection rule は付けない。prod 用 Environment はまだ作らない。本体は ops Terraform が書く（[INFRA-ADR-017](./017-github-actions-terraform-managed-variables.md)）
 - Artifact Registry の retention は 010 のまま未決である
 - apply の CI を足すときは、tfstate と Cloud Run の IAM がこの principalSet に乗る。そのときの blast radius を別 ADR で書く
 
@@ -274,8 +276,10 @@ GitHub の repository variable は ops Terraform が書く（[INFRA-ADR-017](./0
 - [[INFRA-ADR-007] Artifact Registry リポジトリ戦略とワークロード用 Service Account 設計](./007-artifact-registry-and-sa-strategy.md)
 - [[INFRA-ADR-010] Cloud Run Job の管理責務を Terraform に集約する](./010-cloud-run-job-management.md)
 - [[INFRA-ADR-011] Terraform monorepo における CI 対象検出と検証方針](./011-terraform-ci-for-monorepo.md)
-- [[INFRA-ADR-014] Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする](./014-cursor-oidc-wif-direct-resource-access.md)
+- [[INFRA-ADR-014] Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする](./014-cursor-oidc-wif-direct-resource-access.md)（superseded。認証モデルは 015 が維持する）
 - [[INFRA-ADR-015] data は箱とし、guest IAM は依存の下流が書く](./015-guest-iam-downstream.md)
 - [[INFRA-ADR-017] GitHub Actions の Terraform 由来設定は ops が repository variable として書く](./017-github-actions-terraform-managed-variables.md)
+- [crawler image workflow](../../../.github/workflows/crawler-image.yml)
+- [crawler README](../../../workflows/crawler/README.md)
 - [Infrastructure README](../../../infra/README.md)
 - [issue #60](https://github.com/haru-256/devgist/issues/60)
