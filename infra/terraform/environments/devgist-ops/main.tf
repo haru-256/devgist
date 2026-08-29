@@ -104,6 +104,30 @@ resource "google_artifact_registry_repository_iam_member" "github_oidc_crawler_w
   depends_on = [module.github_wif]
 }
 
+# GitHub Actions の Terraform 由来設定（INFRA-ADR-017）
+resource "github_repository_environment" "dev" {
+  repository  = local.github_repository_name
+  environment = "dev"
+}
+
+resource "github_actions_variable" "gcp_github_wif_provider" {
+  repository    = local.github_repository_name
+  variable_name = "GCP_GITHUB_WIF_PROVIDER"
+  value         = module.github_wif.provider_name
+}
+
+resource "github_actions_variable" "crawler_repo_url" {
+  repository    = local.github_repository_name
+  variable_name = "CRAWLER_REPO_URL"
+  value         = module.artifact_registries["crawler"].repository_url
+}
+
+resource "github_actions_variable" "crawler_image_name" {
+  repository    = local.github_repository_name
+  variable_name = "CRAWLER_IMAGE_NAME"
+  value         = module.artifact_registries["crawler"].repository_id
+}
+
 # Cursor WIF → data-dev datalake。direct resource access（INFRA-ADR-014）。
 # 置き場は ops × data の下流（INFRA-ADR-015）。crawler runtime SA とは別 identity
 resource "google_storage_bucket_iam_member" "cursor_oidc" {
