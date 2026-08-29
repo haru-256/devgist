@@ -1,7 +1,7 @@
 # GitHub Actions の Terraform 由来設定（INFRA-ADR-017）
 resource "github_repository_environment" "dev" {
   repository  = local.github_repository_name
-  environment = local.github_environment_name
+  environment = "dev"
 }
 
 resource "github_actions_variable" "gcp_github_wif_provider" {

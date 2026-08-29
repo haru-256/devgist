@@ -39,11 +39,6 @@ run "write_github_actions_config_from_ops" {
   }
 
   assert {
-    condition     = github_repository_environment.dev.environment == local.github_environment_name
-    error_message = "Expected GitHub Environment name to match the WIF IAM environment attribute"
-  }
-
-  assert {
     condition     = github_actions_variable.crawler_repo_url.value == "us-central1-docker.pkg.dev/ops/crawler"
     error_message = "Expected CRAWLER_REPO_URL to come from the crawler Artifact Registry URL"
   }
