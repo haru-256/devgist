@@ -94,7 +94,7 @@ graph LR
 
 - `Cloud Run Job` は Terraform で管理する（[INFRA-ADR-010](../../docs/adr/infra/010-cloud-run-job-management.md)）
 - カンファレンス論文クロールは **単一の汎用 Cloud Run Job** で運用し、実行時に `CONFERENCE_NAMES` と `YEARS` を上書きする（[INFRA-ADR-012](../../docs/adr/infra/012-crawler-execution-parameters.md)）
-- コンテナイメージは `Artifact Registry` に保存する。`workflows/crawler` の image に効く変更、または crawler image workflow 自身が push されると GitHub Actions が build / push する。README だけでは走らない。ops を apply する前は repository variable が空なので job は skip する
+- コンテナイメージは `Artifact Registry` に保存する。`workflows/crawler` の image に効く変更、または Crawler Deploy workflow 自身が push されると GitHub Actions が build / push する。README だけでは走らない。ops を apply する前は repository variable が空なので job は skip する
 - GitHub Actions の image tag は `GITHUB_SHA`。同じ tag があっても build し直す
 - 手元の `make build-push-image` の tag は現在の HEAD の短縮 SHA（`IMAGE_TAG` で上書きできる）。CI の tag とは一致しないことがある
 - GitHub Actions からの image push の認証と IAM は [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md) に従う。`REPO_URL` / `IMAGE_NAME` / WIF provider は ops Terraform が GitHub の repository variable に書く（[INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)）
@@ -106,7 +106,7 @@ graph LR
 ### 実行例
 
 ```bash
-# 1. GitHub Actions の Crawler image workflow が image_ref を出す
+# 1. GitHub Actions の Crawler Deploy workflow が image_ref を出す
 #    workflow_dispatch でも同じ。ログと job summary を見る
 # image_ref: us-central1-docker.pkg.dev/haru256-devgist-ops/crawler/crawler@sha256:...
 
