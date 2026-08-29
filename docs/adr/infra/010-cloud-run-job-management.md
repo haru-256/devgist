@@ -269,7 +269,7 @@ Terraform は以下を担当する。
 ### Risks / Future Review (将来の課題)
 
 - Terraform apply の失敗時に、Artifact Registry に未使用 image が残る可能性がある
-- 古い image の retention policy を検討する必要がある
+- 古い image の retention policy は [INFRA-ADR-018](./018-artifact-registry-cost-controls.md) で決めた
 - CI/CD 用 Service Account の権限が広くなりすぎないようにする必要がある
 - Terraform state bucket の IAM を適切に分離する必要がある
 - 複数 job / 複数 environment に増えたとき、Terraform module の抽象化粒度を見直す必要がある
@@ -295,4 +295,5 @@ Terraform は以下を担当する。
 
 - [Design Doc: DevGist](../../../docs/design_doc.md)
 - [INFRA-ADR-003 Crawler実行基盤として Cloud Run Jobs を採用する](./003-crawler-execution-platform.md)
+- [[INFRA-ADR-018] Artifact Registry の vulnerability scanning と image retention](./018-artifact-registry-cost-controls.md)
 - [Infrastructure README](../../../infra/README.md)
