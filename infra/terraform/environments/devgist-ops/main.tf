@@ -1,4 +1,3 @@
-# 複数箇所で使う値だけ local にする。この root は haru-256/devgist 専用（INFRA-ADR-016 / 017）
 locals {
   cursor_wif_pool_id      = "cursor"
   github_wif_pool_id      = "github-devgist"
