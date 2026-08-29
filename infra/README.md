@@ -22,6 +22,8 @@
 - `INFRA-ADR-006`: [docs/adr/infra/006-cross-project-output-sharing.md](../docs/adr/infra/006-cross-project-output-sharing.md)
 - `INFRA-ADR-009`: [docs/adr/infra/009-cross-project-iam-ownership.md](../docs/adr/infra/009-cross-project-iam-ownership.md)
 - `INFRA-ADR-015`: [docs/adr/infra/015-guest-iam-downstream.md](../docs/adr/infra/015-guest-iam-downstream.md)
+- `INFRA-ADR-016`: [docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md](../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)
+- `INFRA-ADR-017`: [docs/adr/infra/017-github-actions-terraform-managed-variables.md](../docs/adr/infra/017-github-actions-terraform-managed-variables.md)
 
 このディレクトリ配下の `infra/docs/adr/` は互換性維持のための参照パスであり、正本は [docs/adr/](../docs/adr/) 側です。
 
@@ -48,6 +50,7 @@ graph TD
   - Artifact Registry
   - GitHub Actions 連携、WIF、共通 CI/CD 用 Service Account などの運用基盤
   - Cursor Cloud 用 OIDC WIF pool / provider（認証は [INFRA-ADR-014](../docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md)、guest IAM の置き場は [INFRA-ADR-015](../docs/adr/infra/015-guest-iam-downstream.md)）
+  - GitHub Actions 用 OIDC WIF pool / provider（認証は [INFRA-ADR-016](../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)。初期 IAM は crawler Artifact Registry への push のみ）
 
 - `haru256-devgist-data-{env}`
   - GCS datalake
@@ -95,8 +98,9 @@ graph LR
 2. `devgist-data/dev`
    - datalake など crawler の保存先を箱として作成する
 3. `devgist-ops`
-   - `Artifact Registry`、Cursor 用 WIF を作成する
+   - `Artifact Registry`、Cursor 用 WIF、GitHub Actions 用 WIF を作成する
    - Cursor Cloud の federated principal へ data-dev datalake の `objectViewer` / `objectCreator` を付与する
+   - GitHub Actions の federated principal へ crawler Artifact Registry の writer を付与する
 4. `devgist-app/dev`
    - `terraform_remote_state` で `ops/data` の outputs を参照しながら app 側 compute を作成する
    - crawler SA へ同じ datalake の読書きを付与する
@@ -108,4 +112,5 @@ graph LR
 - secret は Terraform outputs では渡さず、`GCP Secret Manager` を app runtime から参照する
 - 旧 `environments/crawler` は legacy 扱いで、最終的には `ops/app/data` 側へ整理する
 - Cursor Cloud の subject allowlist（`cursor_oidc_subjects`）は ops の gitignore 済み `terraform.tfvars` に書く。空なら datalake IAM member が付かない
-- Cursor 用 WIF は federated principal への direct resource access である。GitHub Actions 用 WIF は別物で、このディレクトリではまだ定義しない
+- Cursor 用 WIF は federated principal への direct resource access である。GitHub Actions 用 WIF も direct resource access だが、pool は分ける（[INFRA-ADR-016](../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)）。初期 IAM は crawler Artifact Registry の writer のみ。terraform apply の CI はまだ無い
+- GitHub Actions の `workload_identity_provider` と crawler image の `REPO_URL` / `IMAGE_NAME` は、ops Terraform が GitHub の repository variable として書く（[INFRA-ADR-017](../docs/adr/infra/017-github-actions-terraform-managed-variables.md)）

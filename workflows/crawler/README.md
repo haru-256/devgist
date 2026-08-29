@@ -13,6 +13,8 @@ crawler に関する Architecture Decision Record (ADR) は [docs/adr/](../../do
 - [INFRA-ADR-003](../../docs/adr/infra/003-crawler-execution-platform.md)
 - [INFRA-ADR-010](../../docs/adr/infra/010-cloud-run-job-management.md)
 - [INFRA-ADR-012](../../docs/adr/infra/012-crawler-execution-parameters.md)
+- [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)
+- [INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)
 - [CRAWLER-ADR-001](../../docs/adr/crawler/001-language-selection.md)
 - [CRAWLER-ADR-002](../../docs/adr/crawler/002-xml-parsing-security.md)
 
@@ -71,15 +73,15 @@ graph TD
 
 `crawler` の実行基盤は `Cloud Run Jobs` です（[INFRA-ADR-003](../../docs/adr/infra/003-crawler-execution-platform.md)、[INFRA-ADR-010](../../docs/adr/infra/010-cloud-run-job-management.md)、[INFRA-ADR-012](../../docs/adr/infra/012-crawler-execution-parameters.md) 参照）。
 
-現時点では **手動でのイメージビルド・push と Cloud Run Job 実行** が運用モデルです。
+イメージの build / push は GitHub Actions が行います（[INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)）。Cloud Run Job への反映は手元の Terraform apply です。
 
 ```mermaid
 graph LR
+    GHA[GitHub Actions] --> Script[scripts/build-push-image.sh]
     Dev[Developer / Operator] --> Make[make build-push-image]
-    Make --> Script[scripts/build-push-image.sh]
-    Script --> Build[docker buildx build]
-    Build --> AR[Artifact Registry]
-    AR --> TF[Terraform<br/>image digest 適用]
+    Make --> Script
+    Script --> AR[Artifact Registry]
+    AR --> TF[手元 Terraform<br/>image digest 適用]
     TF --> CRJ[Cloud Run Jobs<br/>single generic job]
     Operator[Operator] --> CRJ
     CRJ --> APIs[External source APIs<br/>DBLP / Semantic Scholar / Unpaywall / arXiv]
@@ -92,20 +94,27 @@ graph LR
 
 - `Cloud Run Job` は Terraform で管理する（[INFRA-ADR-010](../../docs/adr/infra/010-cloud-run-job-management.md)）
 - カンファレンス論文クロールは **単一の汎用 Cloud Run Job** で運用し、実行時に `CONFERENCE_NAMES` と `YEARS` を上書きする（[INFRA-ADR-012](../../docs/adr/infra/012-crawler-execution-parameters.md)）
-- コンテナイメージは `Artifact Registry` に保存し、`make build-push-image` でビルド・push して digest 参照を取得する
-- 取得した digest 参照を Terraform の `crawler_image` 変数に渡して apply し、Job のイメージを更新する
+- コンテナイメージは `Artifact Registry` に保存する。`workflows/crawler` の image に効く変更、または crawler image workflow 自身が push されると GitHub Actions が build / push する。README だけでは走らない。ops を apply する前は repository variable が空なので job は skip する
+- GitHub Actions の image tag は `GITHUB_SHA`。同じ tag があっても build し直す
+- 手元の `make build-push-image` の tag は現在の HEAD の短縮 SHA（`IMAGE_TAG` で上書きできる）。CI の tag とは一致しないことがある
+- GitHub Actions からの image push の認証と IAM は [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md) に従う。`REPO_URL` / `IMAGE_NAME` / WIF provider は ops Terraform が GitHub の repository variable に書く（[INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)）
+- workflow が出した digest 参照を Terraform の `crawler_image` 変数に渡して手元で apply し、Job のイメージを更新する
+- 手元の `make build-push-image` も同じ script を使う
 - crawler は HTTP サービスではなく完了まで走るバッチなので、`Cloud Run Service` ではなく `Cloud Run Jobs` を使う
 - 収集データの保存先は `GCS` をデータレイクとして使う
 
-### 手動実行例
+### 実行例
 
 ```bash
-# 1. イメージをビルド・push して digest 参照を取得
-make build-push-image
+# 1. GitHub Actions の Crawler image workflow が image_ref を出す
+#    workflow_dispatch でも同じ。ログと job summary を見る
 # image_ref: us-central1-docker.pkg.dev/haru256-devgist-ops/crawler/crawler@sha256:...
 
-# 2. Terraform で Cloud Run Job のイメージを更新
-cd infra/terraform/environments/devgist-ops  # 該当ディレクトリに合わせて変更
+# 手元で build / push する場合
+make build-push-image
+
+# 2. Terraform で Cloud Run Job のイメージを更新（手元 apply）
+cd infra/terraform/environments/devgist-app/dev
 cat > crawler_image.auto.tfvars <<EOF
 crawler_image = "us-central1-docker.pkg.dev/haru256-devgist-ops/crawler/crawler@sha256:..."
 EOF
@@ -364,7 +373,7 @@ make fmt               # フォーマッターを実行
 make build-push-image  # コンテナイメージをビルド・push し digest 参照を出力
 ```
 
-`build-push-image` は `scripts/build-push-image.sh` を呼び出し、単一プラットフォームのイメージをビルドして Artifact Registry に push したあと、`image_ref: <repo>/<name>@sha256:<digest>` 形式で出力します。出力した参照を Terraform の `crawler_image` 変数に渡してください。
+`build-push-image` は `scripts/build-push-image.sh` を呼び出し、単一プラットフォームのイメージをビルドして Artifact Registry に push したあと、`image_ref: <repo>/<name>@sha256:<digest>` 形式で出力します。docker の進捗は stderr、`image_ref:` だけが stdout です。出力した参照を Terraform の `crawler_image` 変数に渡して、手元で apply してください。GitHub Actions からの apply はありません。
 
 ### プログラムからの使用
 

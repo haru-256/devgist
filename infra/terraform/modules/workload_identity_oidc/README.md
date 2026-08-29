@@ -33,6 +33,8 @@ This module creates one pool and one OIDC provider. It does not create service a
 | `pool_name` | Full pool resource name |
 | `provider_name` | Full provider resource name |
 | `audience` | Default JWT audience (`https://iam.googleapis.com/<provider_name>`). Use this as `aud` when minting tokens |
+| `issuer_uri` | OIDC issuer URI |
+| `attribute_condition` | CEL condition that tokens must satisfy |
 
 ## Usage
 

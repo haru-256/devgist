@@ -22,6 +22,8 @@
 | `INFRA-ADR-013` | `infra` | Cursor Cloud から GCP への認証に Cursor OIDC と WIF を採用する | Superseded | [docs/adr/infra/013-cursor-oidc-workload-identity-federation.md](infra/013-cursor-oidc-workload-identity-federation.md) |
 | `INFRA-ADR-014` | `infra` | Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする | Superseded | [docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md](infra/014-cursor-oidc-wif-direct-resource-access.md) |
 | `INFRA-ADR-015` | `infra` | data は箱とし、guest IAM は依存の下流が書く | Accepted | [docs/adr/infra/015-guest-iam-downstream.md](infra/015-guest-iam-downstream.md) |
+| `INFRA-ADR-016` | `infra` | GitHub Actions から crawler image を Artifact Registry へ push する | Accepted | [docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md](infra/016-github-actions-wif-and-crawler-image-push.md) |
+| `INFRA-ADR-017` | `infra` | GitHub Actions の Terraform 由来設定は ops が repository variable として書く | Accepted | [docs/adr/infra/017-github-actions-terraform-managed-variables.md](infra/017-github-actions-terraform-managed-variables.md) |
 | `CRAWLER-ADR-001` | `crawler` | 論文収集クローラーの実装言語としてPythonを採用 | Accepted | [docs/adr/crawler/001-language-selection.md](crawler/001-language-selection.md) |
 | `CRAWLER-ADR-002` | `crawler` | XMLパースにdefusedxmlを採用 | Accepted | [docs/adr/crawler/002-xml-parsing-security.md](crawler/002-xml-parsing-security.md) |
 

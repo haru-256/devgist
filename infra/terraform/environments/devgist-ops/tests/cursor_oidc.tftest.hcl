@@ -1,5 +1,6 @@
 mock_provider "google" {}
 mock_provider "google-beta" {}
+mock_provider "github" {}
 
 override_data {
   target = data.google_project.project

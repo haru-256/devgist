@@ -57,3 +57,8 @@ output "cursor_wif_audience" {
   value       = module.cursor_wif.audience
   description = "Default JWT audience for the Cursor Cloud OIDC provider. Mint tokens with this aud value."
 }
+
+output "github_wif_provider_name" {
+  value       = module.github_wif.provider_name
+  description = "Full resource name of the GitHub Actions OIDC provider. ops Terraform also writes this to the GitHub repository variable GCP_GITHUB_WIF_PROVIDER."
+}

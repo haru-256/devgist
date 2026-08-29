@@ -1,37 +1,8 @@
 locals {
-  # このTerraform構成で必要な全APIをリスト化
-  required_services = [
-    "artifactregistry.googleapis.com", # Artifact Registry
-    "iam.googleapis.com",              # IAM
-    "sts.googleapis.com",              # Security Token Service (WIF)
-  ]
-
-  artifact_registries = {
-    crawler = {
-      description = "Docker images for the crawler job"
-    }
-  }
-
-  service_account_user_members = [
-    for email in var.service_account_user_emails : "user:${email}"
-  ]
-
-  cursor_wif_pool_id = "cursor"
-
-  cursor_oidc_datalake_roles = toset([
-    "roles/storage.objectViewer",
-    "roles/storage.objectCreator",
-  ])
-
-  cursor_oidc_datalake_bindings = {
-    for pair in setproduct(var.cursor_oidc_subjects, local.cursor_oidc_datalake_roles) :
-    "${pair[0]}|${pair[1]}" => {
-      subject = pair[0]
-      role    = pair[1]
-    }
-  }
-
-  cursor_wif_subject_prefix = "principal://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.cursor_wif_pool_id}/subject"
+  cursor_wif_pool_id      = "cursor"
+  github_wif_pool_id      = "github-devgist"
+  github_repository_owner = "haru-256"
+  github_repository_name  = "devgist"
 }
 
 data "google_project" "project" {
@@ -50,14 +21,22 @@ data "terraform_remote_state" "data_dev" {
 module "required_project_services" {
   source = "../../modules/google_project_services"
 
-  project_id        = data.google_project.project.project_id
-  required_services = local.required_services
-  wait_seconds      = 30
+  project_id = data.google_project.project.project_id
+  required_services = [
+    "artifactregistry.googleapis.com", # Artifact Registry
+    "iam.googleapis.com",              # IAM
+    "sts.googleapis.com",              # Security Token Service (WIF)
+  ]
+  wait_seconds = 30
 }
 
 // project 内で利用する Docker 用 Artifact Registry を作成
 module "artifact_registries" {
-  for_each = local.artifact_registries
+  for_each = {
+    crawler = {
+      description = "Docker images for the crawler job"
+    }
+  }
 
   source = "../../modules/artifact_registry"
 
@@ -84,24 +63,91 @@ module "cursor_wif" {
     "attribute.runtime" = "assertion.agent_runtime"
   }
 
-  attribute_condition = "assertion.repo_url == \"${var.cursor_oidc_repo_url}\" && assertion.agent_runtime == \"managed\""
+  attribute_condition = "assertion.repo_url == \"github.com/${local.github_repository_owner}/${local.github_repository_name}\" && assertion.agent_runtime == \"managed\""
 
   depends_on = [module.required_project_services]
+}
+
+# INFRA-ADR-016
+module "github_wif" {
+  source = "../../modules/workload_identity_oidc"
+
+  project_id  = data.google_project.project.project_id
+  pool_id     = local.github_wif_pool_id
+  provider_id = "oidc"
+  issuer_uri  = "https://token.actions.githubusercontent.com"
+  description = "OIDC federation for GitHub Actions"
+
+  attribute_mapping = {
+    "google.subject"                = "assertion.sub"
+    "attribute.repository_id"       = "assertion.repository_id"
+    "attribute.repository_owner_id" = "assertion.repository_owner_id"
+    "attribute.environment"         = "assertion.environment"
+  }
+
+  attribute_condition = <<-EOT
+    assertion.repository_id == "1106323394" &&
+    assertion.repository_owner_id == "31652298"
+  EOT
+
+  depends_on = [module.required_project_services]
+}
+
+# GitHub Actions → （INFRA-ADR-016）。置き場は ops 同一 root（INFRA-ADR-015）
+resource "google_artifact_registry_repository_iam_member" "github_oidc_dev" {
+  project    = data.google_project.project.project_id
+  location   = module.artifact_registries["crawler"].location
+  repository = module.artifact_registries["crawler"].repository_id
+  role       = "roles/artifactregistry.writer"
+  member     = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.github_wif_pool_id}/attribute.environment/dev"
+
+  depends_on = [module.github_wif]
+}
+
+# GitHub Actions の Terraform 由来設定（INFRA-ADR-017）
+resource "github_repository_environment" "dev" {
+  repository  = local.github_repository_name
+  environment = "dev"
+}
+
+resource "github_actions_variable" "gcp_github_wif_provider" {
+  repository    = local.github_repository_name
+  variable_name = "GCP_GITHUB_WIF_PROVIDER"
+  value         = module.github_wif.provider_name
+}
+
+resource "github_actions_variable" "crawler_repo_url" {
+  repository    = local.github_repository_name
+  variable_name = "CRAWLER_REPO_URL"
+  value         = module.artifact_registries["crawler"].repository_url
+}
+
+resource "github_actions_variable" "crawler_image_name" {
+  repository    = local.github_repository_name
+  variable_name = "CRAWLER_IMAGE_NAME"
+  value         = module.artifact_registries["crawler"].repository_id
 }
 
 # Cursor WIF → data-dev datalake。direct resource access（INFRA-ADR-014）。
 # 置き場は ops × data の下流（INFRA-ADR-015）。crawler runtime SA とは別 identity
 resource "google_storage_bucket_iam_member" "cursor_oidc" {
-  for_each = local.cursor_oidc_datalake_bindings
+  for_each = {
+    for pair in setproduct(var.cursor_oidc_subjects, toset([
+      "roles/storage.objectViewer",
+      "roles/storage.objectCreator",
+    ])) :
+    "${pair[0]}|${pair[1]}" => {
+      subject = pair[0]
+      role    = pair[1]
+    }
+  }
 
   bucket = data.terraform_remote_state.data_dev.outputs.datalake_bucket_name
   role   = each.value.role
-  member = "${local.cursor_wif_subject_prefix}/${each.value.subject}"
+  member = "principal://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.cursor_wif_pool_id}/subject/${each.value.subject}"
 }
 
-# GitHub Actions の CI/CD 用サービスアカウントを作成し、ops 環境の Artifact Registry
-# （crawler イメージ置き場）へイメージを push できるよう roles/artifactregistry.writer を付与。
-# service_account_users で指定されたユーザーがこの SA を借用（actAs）できる。
+# 既存の GitHub Actions 用 SA。INFRA-ADR-016 の image push では使わない。
 module "service_accounts" {
   source = "../../modules/service_accounts"
 
@@ -118,7 +164,7 @@ module "service_accounts" {
         }
       ]
 
-      service_account_users = local.service_account_user_members
+      service_account_users = [for email in var.service_account_user_emails : "user:${email}"]
     }
   }
 

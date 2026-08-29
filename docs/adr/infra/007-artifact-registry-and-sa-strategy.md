@@ -11,6 +11,8 @@
 
 Accepted (2026-04-23)
 
+イメージの push identity と writer の範囲は [INFRA-ADR-016](./016-github-actions-wif-and-crawler-image-push.md) が置き換える。AR 1 本 / SHA pin / workload SA の方針は本 ADR のまま。
+
 ## Context (背景・課題)
 
 ### 背景
@@ -194,5 +196,6 @@ api-prod-sa（devgist-app-prod）← 将来
 - [[INFRA-ADR-006] Cross-project Terraform output 共有戦略](./006-cross-project-output-sharing.md)
 - [[INFRA-ADR-008] Service Account 命名規則](./008-service-account-naming.md)
 - [[INFRA-ADR-009] Cross-project IAM binding の ownership](./009-cross-project-iam-ownership.md)
+- [[INFRA-ADR-016] GitHub Actions から crawler image を Artifact Registry へ push する](./016-github-actions-wif-and-crawler-image-push.md)
 - [ADR運用ガイド](../../../docs/adr/README.md)
 - [Infrastructure README](../../../infra/README.md)
