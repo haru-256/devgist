@@ -203,7 +203,7 @@ GitHub Actions から crawler image を Artifact Registry へ push するとき�
 - tfstate、datalake、app-dev、Cloud Run には付けない
 - 既存の `github-actions` SA には `workload_identity_users` を足さない
 - CI は image を build / push し、digest 参照を `image_ref:` として出す。Job の更新は手元で `crawler_image` に渡して apply する
-- image tag は `GITHUB_SHA`。同じ tag が Artifact Registry にあれば build しない
+- image tag は `GITHUB_SHA`。同じ tag があっても build し直す
 - `gcloud run jobs deploy` と `gcloud run jobs update` は使わない
 
 ### 初期構成
