@@ -49,12 +49,5 @@ jobs:
 
       - name: Build and push
         run: |
-          set -euo pipefail
-          log="$(mktemp)"
-          ./workflows/crawler/scripts/build-push-image.sh | tee "${log}"
-          image_ref="$(sed -n 's/^image_ref: //p' "${log}" | tail -n 1)"
-          if [[ -z "${image_ref}" ]]; then
-            echo "build-push-image.sh did not print image_ref" >&2
-            exit 1
-          fi
-          echo "image_ref: ${image_ref}" >> "${GITHUB_STEP_SUMMARY}"
+          set -o pipefail
+          ./workflows/crawler/scripts/build-push-image.sh | tee -a "${GITHUB_STEP_SUMMARY}"

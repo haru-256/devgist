@@ -373,7 +373,7 @@ make fmt               # フォーマッターを実行
 make build-push-image  # コンテナイメージをビルド・push し digest 参照を出力
 ```
 
-`build-push-image` は `scripts/build-push-image.sh` を呼び出し、単一プラットフォームのイメージをビルドして Artifact Registry に push したあと、`image_ref: <repo>/<name>@sha256:<digest>` 形式で出力します。出力した参照を Terraform の `crawler_image` 変数に渡して、手元で apply してください。GitHub Actions からの apply はありません。
+`build-push-image` は `scripts/build-push-image.sh` を呼び出し、単一プラットフォームのイメージをビルドして Artifact Registry に push したあと、`image_ref: <repo>/<name>@sha256:<digest>` 形式で出力します。docker の進捗は stderr、`image_ref:` だけが stdout です。出力した参照を Terraform の `crawler_image` 変数に渡して、手元で apply してください。GitHub Actions からの apply はありません。
 
 ### プログラムからの使用
 
