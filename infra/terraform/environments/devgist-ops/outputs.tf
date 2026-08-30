@@ -60,5 +60,10 @@ output "cursor_wif_audience" {
 
 output "github_wif_provider_name" {
   value       = module.github_wif.provider_name
-  description = "Full resource name of the GitHub Actions OIDC provider. ops Terraform also writes this to the GitHub repository variable GCP_GITHUB_WIF_PROVIDER."
+  description = "Full resource name of the GitHub Actions OIDC provider. The environments/github root writes this to the GitHub repository variable GCP_GITHUB_WIF_PROVIDER (INFRA-ADR-019)."
+}
+
+output "github_wif_pool_id" {
+  value       = module.github_wif.pool_id
+  description = "Workload identity pool ID for GitHub Actions OIDC. Used to build ci_scope principalSets in downstream roots (INFRA-ADR-019)."
 }

@@ -1,2 +1,3 @@
 .env.dev
-terraform.tfvars
+# terraform.tfvars は非 secret 値に限り version 管理する（INFRA-ADR-019）。
+# secret 値（cursor_oidc_subjects など）は secrets.auto.tfvars に書く（*.tfvars は root の .gitignore で ignore 済み）

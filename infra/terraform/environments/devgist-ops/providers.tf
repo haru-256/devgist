@@ -8,10 +8,6 @@ provider "google-beta" {
   region  = var.gcp_default_region
 }
 
-provider "github" {
-  owner = local.github_repository_owner
-}
-
 terraform {
   required_version = "~>1.14.4"
   required_providers {
@@ -22,10 +18,6 @@ terraform {
     google-beta = {
       source  = "hashicorp/google-beta"
       version = "~>7.18.0"
-    }
-    github = {
-      source  = "integrations/github"
-      version = "~> 6.12.0"
     }
   }
 }

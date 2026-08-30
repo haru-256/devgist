@@ -16,6 +16,12 @@ locals {
       repository_id = data.terraform_remote_state.ops.outputs.crawler_artifact_registry_repository_id
     }
   }
+
+  # INFRA-ADR-019: GitHub Actions CI の認可単位（operation × environment）
+  ci_scope_terraform_plan_dev  = "terraform-plan-dev"
+  ci_scope_terraform_apply_dev = "terraform-apply-dev"
+
+  github_ci_principal_set_prefix = "principalSet://iam.googleapis.com/projects/${data.terraform_remote_state.ops.outputs.ops_project_number}/locations/global/workloadIdentityPools/${data.terraform_remote_state.ops.outputs.github_wif_pool_id}/attribute.ci_scope"
 }
 
 data "google_project" "project" {
@@ -93,6 +99,45 @@ resource "google_storage_bucket_iam_member" "crawler" {
   bucket = data.terraform_remote_state.data_dev.outputs.datalake_bucket_name
   role   = each.value
   member = module.service_accounts.members["crawler"]
+}
+
+# ============================================================
+# GitHub Actions CI principals（INFRA-ADR-019）
+# identity=ops × resource=app は下流の app が書く（INFRA-ADR-015）。
+# これらの grant 自体の変更（setIamPolicy）は CI principal に付けない。
+# 差分が出たら CI apply は権限不足で失敗し、手元 apply（bootstrap）となる。
+# ============================================================
+
+resource "google_project_iam_member" "ci_plan_app_dev" {
+  for_each = toset([
+    "roles/viewer",
+    "roles/iam.securityReviewer",
+  ])
+
+  project = data.google_project.project.project_id
+  role    = each.value
+  member  = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_plan_dev}"
+}
+
+resource "google_project_iam_member" "ci_apply_app_dev" {
+  for_each = toset([
+    "roles/viewer",
+    "roles/iam.securityReviewer",
+    "roles/run.admin",                      # Cloud Run Job の作成・更新・削除
+    "roles/iam.serviceAccountAdmin",        # crawler SA の作成・削除と SA IAM
+    "roles/serviceusage.serviceUsageAdmin", # API 有効化
+  ])
+
+  project = data.google_project.project.project_id
+  role    = each.value
+  member  = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_apply_dev}"
+}
+
+# apply が Cloud Run Job の実行 SA として crawler SA を指定するための actAs
+resource "google_service_account_iam_member" "ci_apply_crawler_sa_user" {
+  service_account_id = module.service_accounts.names["crawler"]
+  role               = "roles/iam.serviceAccountUser"
+  member             = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_apply_dev}"
 }
 
 # Crawler用のCloud Run Job の作成
