@@ -107,7 +107,7 @@ graph LR
    - `terraform_remote_state` で `ops/data` の outputs を参照しながら app 側 compute を作成する
    - crawler SA へ同じ datalake の読書きを付与する
 5. `devgist-github`（ローカルのみ）
-   - GitHub Environment / repository variable を書く。`ops` の outputs を `terraform_remote_state` で参照する
+   - GitHub Environment / repository variable / repository secret を書く。variable の値は `ops` の outputs を `terraform_remote_state` で参照する。secret の値は gitignore 済み `secrets.auto.tfvars`
 
 `main` への merge 後は `devgist-data/dev` → `devgist-ops` → `devgist-app/dev` が CI で自動 apply される（[INFRA-ADR-019](../docs/adr/infra/019-github-actions-terraform-plan-apply.md)）。`devgist-tf` と `devgist-github` は CI に載せず、ローカルで apply する。
 
@@ -119,4 +119,4 @@ graph LR
 - 旧 `environments/crawler` は legacy 扱いで、最終的には `ops/app/data` 側へ整理する
 - Cursor Cloud の subject allowlist（`cursor_oidc_subjects`）は ops の gitignore 済み `secrets.auto.tfvars` に書く。空なら datalake IAM member が付かない
 - Cursor 用 WIF は federated principal への direct resource access である。GitHub Actions 用 WIF も direct resource access だが、pool は分ける（[INFRA-ADR-016](../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)）。GitHub Actions の認可は `attribute.ci_scope` 単位（[INFRA-ADR-019](../docs/adr/infra/019-github-actions-terraform-plan-apply.md)）。terraform plan / apply の CI は 019 を参照
-- GitHub Actions の `workload_identity_provider` と crawler image の `REPO_URL` / `IMAGE_NAME` は、`environments/devgist-github` root の Terraform が GitHub の repository variable として書く（[INFRA-ADR-017](../docs/adr/infra/017-github-actions-terraform-managed-variables.md)。置き場は 019 が ops から `devgist-github` root に変えた）
+- GitHub Actions の `workload_identity_provider` と crawler image の `REPO_URL` / `IMAGE_NAME` は、`environments/devgist-github` root の Terraform が GitHub の repository variable として書く（[INFRA-ADR-017](../docs/adr/infra/017-github-actions-terraform-managed-variables.md)。置き場は 019 が ops から `devgist-github` root に変えた）。`CURSOR_OIDC_SUBJECTS` / `SERVICE_ACCOUNT_USER_EMAILS` も同じ root が repository secret として書く。GitHub UI から secret を手で作らない
