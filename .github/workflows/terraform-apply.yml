@@ -1,0 +1,154 @@
+name: Terraform Apply
+
+# INFRA-ADR-019: protected main への push で dev を自動 apply する。
+# root ごとに plan job（environment 無し → terraform-plan-dev）と
+# apply job（environment: dev → terraform-apply-dev）を組みにし、
+# INFRA-ADR-015 の DAG に従い data-dev → ops → app-dev の直列で実行する。
+# apply は saved plan（tfplan artifact）に限り、bare terraform apply は使わない。
+# prod は環境作成時に terraform-apply-prod.yml として別 workflow で足す
+# （dispatch の input は JWT claim に載らず、同じファイルでは plan job の ci_scope を分けられないため）。
+
+on:
+  push:
+    branches:
+      - "main"
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform-apply.yml"
+      - ".github/actions/terraform-gcp-plan/**"
+      - ".github/actions/terraform-gcp-apply/**"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Apply target environment (prod は terraform-apply-prod.yml として別途追加する)"
+        required: true
+        type: choice
+        default: "dev"
+        options:
+          - "dev"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  plan_data_dev:
+    name: plan / devgist-data/dev
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Terraform plan
+        uses: ./.github/actions/terraform-gcp-plan
+        with:
+          working-directory: infra/terraform/environments/devgist-data/dev
+          workload-identity-provider: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
+          save-plan: "true"
+          plan-artifact-name: tfplan-devgist-data-dev
+
+  apply_data_dev:
+    name: apply / devgist-data/dev
+    needs: plan_data_dev
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Terraform apply
+        uses: ./.github/actions/terraform-gcp-apply
+        with:
+          working-directory: infra/terraform/environments/devgist-data/dev
+          workload-identity-provider: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
+          plan-artifact-name: tfplan-devgist-data-dev
+
+  plan_ops:
+    name: plan / devgist-ops
+    needs: apply_data_dev
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_VAR_cursor_oidc_subjects: ${{ secrets.CURSOR_OIDC_SUBJECTS }}
+      TF_VAR_service_account_user_emails: ${{ secrets.SERVICE_ACCOUNT_USER_EMAILS }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Terraform plan
+        uses: ./.github/actions/terraform-gcp-plan
+        with:
+          working-directory: infra/terraform/environments/devgist-ops
+          workload-identity-provider: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
+          save-plan: "true"
+          plan-artifact-name: tfplan-devgist-ops
+
+  apply_ops:
+    name: apply / devgist-ops
+    needs: plan_ops
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Terraform apply
+        uses: ./.github/actions/terraform-gcp-apply
+        with:
+          working-directory: infra/terraform/environments/devgist-ops
+          workload-identity-provider: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
+          plan-artifact-name: tfplan-devgist-ops
+
+  plan_app_dev:
+    name: plan / devgist-app/dev
+    needs: apply_ops
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_VAR_service_account_user_emails: ${{ secrets.SERVICE_ACCOUNT_USER_EMAILS }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Terraform plan
+        uses: ./.github/actions/terraform-gcp-plan
+        with:
+          working-directory: infra/terraform/environments/devgist-app/dev
+          workload-identity-provider: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
+          save-plan: "true"
+          plan-artifact-name: tfplan-devgist-app-dev
+
+  apply_app_dev:
+    name: apply / devgist-app/dev
+    needs: plan_app_dev
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Terraform apply
+        uses: ./.github/actions/terraform-gcp-apply
+        with:
+          working-directory: infra/terraform/environments/devgist-app/dev
+          workload-identity-provider: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}
+          plan-artifact-name: tfplan-devgist-app-dev
