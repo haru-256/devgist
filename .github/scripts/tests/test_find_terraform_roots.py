@@ -82,11 +82,11 @@ class TestFilterDeployRoots:
         touch(tmp_path / "environments" / "devgist-data" / "dev" / "providers.tf")
         touch(tmp_path / "environments" / "devgist-ops" / "providers.tf")
         touch(tmp_path / "environments" / "devgist-tf" / "providers.tf")
-        touch(tmp_path / "environments" / "github" / "providers.tf")
+        touch(tmp_path / "environments" / "devgist-github" / "providers.tf")
         roots = find_environment_roots(tmp_path)
 
         # Act
-        deploy_roots = filter_deploy_roots(roots, tmp_path, ["devgist-tf", "github"])
+        deploy_roots = filter_deploy_roots(roots, tmp_path, ["devgist-tf", "devgist-github"])
 
         # Assert
         assert deploy_roots == [

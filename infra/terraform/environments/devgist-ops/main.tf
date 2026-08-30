@@ -12,7 +12,7 @@ locals {
   github_ci_principal_set_prefix = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.github_wif_pool_id}/attribute.ci_scope"
 
   # CI apply が state を read/write する root の tfstate bucket キー
-  # （devgist-tf の tfstate_gcp_project_ids の要素）。tf 自身と github root の state は CI に載せない
+  # （devgist-tf の tfstate_gcp_project_ids の要素）。tf 自身と devgist-github root の state は CI に載せない
   ci_deploy_state_bucket_keys = toset([
     "haru256-devgist-ops",
     "haru256-devgist-data-dev",

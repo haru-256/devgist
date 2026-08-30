@@ -17,7 +17,7 @@ run "write_github_actions_config_from_github_root" {
 
   assert {
     condition     = github_repository_environment.dev.environment == "dev"
-    error_message = "Expected github root Terraform to manage GitHub Environment dev"
+    error_message = "Expected devgist-github root Terraform to manage GitHub Environment dev"
   }
 
   assert {
@@ -42,7 +42,7 @@ run "write_github_actions_config_from_github_root" {
 
   assert {
     condition     = github_actions_variable.gcp_github_wif_provider.variable_name == "GCP_GITHUB_WIF_PROVIDER"
-    error_message = "Expected GCP_GITHUB_WIF_PROVIDER to be a repository variable written by the github root"
+    error_message = "Expected GCP_GITHUB_WIF_PROVIDER to be a repository variable written by the devgist-github root"
   }
 
   assert {

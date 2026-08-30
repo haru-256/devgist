@@ -4,7 +4,7 @@
 
 - GitHub Actions から terraform plan / apply する。WIF は既存の pool `github-devgist` / provider `oidc` を維持する。用途の分離は provider を増やさず、custom attribute `ci_scope`（operation × environment）と IAM の `principalSet` で行う。`attribute.environment` は IAM の主キーから外す。
 - plan は same-repo PR で read-only の speculative plan を実行し、結果を PR コメントに出す。apply は protected `main` への push で dev を自動適用する。final plan は `terraform plan -out=tfplan` で保存し、`terraform apply tfplan` で確認した plan と同じ内容を適用する。
-- CI apply の対象 root は `devgist-ops` / `devgist-data/dev` / `devgist-app/dev`。`devgist-tf` と、GitHub リソースを管理する新 root `environments/github` はローカル apply に限定する。GitHub App は導入しない（作成・設定した App と `TF_GITHUB_APP_*` は削除する）。
+- CI apply の対象 root は `devgist-ops` / `devgist-data/dev` / `devgist-app/dev`。`devgist-tf` と、GitHub リソースを管理する新 root `environments/devgist-github` はローカル apply に限定する。GitHub App は導入しない（作成・設定した App と `TF_GITHUB_APP_*` は削除する）。
 - apply principal は WIF pool / provider / attribute mapping、CI principal 自身の IAM、tfstate 基盤（`devgist-tf`）、GitHub リソースを変更できない。これらの差分を含む CI apply は権限不足で失敗し、手元 apply（bootstrap）となる。
 - prod は環境が未作成のため器だけ用意する。`ci_scope` の mapping には prod 条件を先に入れるが、IAM binding と workflow ファイルは prod 環境作成時に足す。
 
@@ -12,7 +12,7 @@
 
 Accepted (承認済み) - 2026-08-30
 
-[INFRA-ADR-011](./011-terraform-ci-for-monorepo.md) が後続に送った plan / apply の設計である。[INFRA-ADR-016](./016-github-actions-wif-and-crawler-image-push.md) の認証モデル（GitHub 専用 pool、direct resource access、SA impersonation なし、condition は repository id）は維持する。016 の「IAM は `attribute.environment/dev`」「crawler image は branch を問わず」は本 ADR が置き換える。[INFRA-ADR-017](./017-github-actions-terraform-managed-variables.md) の「GitHub リソースは ops が書く」は、置き場を `environments/github` root に変える。「Terraform が正本の値は GitHub にベタ書きせず Terraform から書く」原則は維持する。016 / 017 本文は履歴として残す。
+[INFRA-ADR-011](./011-terraform-ci-for-monorepo.md) が後続に送った plan / apply の設計である。[INFRA-ADR-016](./016-github-actions-wif-and-crawler-image-push.md) の認証モデル（GitHub 専用 pool、direct resource access、SA impersonation なし、condition は repository id）は維持する。016 の「IAM は `attribute.environment/dev`」「crawler image は branch を問わず」は本 ADR が置き換える。[INFRA-ADR-017](./017-github-actions-terraform-managed-variables.md) の「GitHub リソースは ops が書く」は、置き場を `environments/devgist-github` root に変える。「Terraform が正本の値は GitHub にベタ書きせず Terraform から書く」原則は維持する。016 / 017 本文は履歴として残す。
 
 ## Context (背景・課題)
 
@@ -41,7 +41,7 @@ ops root の GitHub provider リソース（Environment、repository variable）
 - GitHub リソースの変更頻度は低く、自動化のメリットが小さい
 - 一方で再現性は欲しいので、Terraform 管理自体は続ける
 
-一般原則として、**CI にするとセキュリティ対処コストが高く、自動化のメリットが低いものはローカルで管理する**。GitHub リソースは新 root `environments/github` に分離し、plan / apply をローカルに限定する。これにより CI の workflow は GCP 認証だけを持ち、GitHub 側の credential を CI に置く問題自体が消える。
+一般原則として、**CI にするとセキュリティ対処コストが高く、自動化のメリットが低いものはローカルで管理する**。GitHub リソースは新 root `environments/devgist-github` に分離し、plan / apply をローカルに限定する。これにより CI の workflow は GCP 認証だけを持ち、GitHub 側の credential を CI に置く問題自体が消える。
 
 ### 要件と制約
 
@@ -55,7 +55,7 @@ ops root の GitHub provider リソース（Environment、repository variable）
 4. **既存の GitHub WIF 入口を維持する**
    - pool / provider / issuer は 016 のまま。Cursor 用 pool には触れない
 5. **CI apply の対象は ops / data / app。tf と github は載せない**
-   - state bucket を持つ `devgist-tf` と、GitHub リソースを持つ `environments/github` はローカル apply
+   - state bucket を持つ `devgist-tf` と、GitHub リソースを持つ `environments/devgist-github` はローカル apply
 6. **CI apply が自分の trust boundary を書き換えられない**
    - WIF pool / provider / attribute mapping、CI principal 自身の IAM、GitHub Ruleset の更新権限を apply principal に付けない
 7. **guest IAM の置き場は 015 の表**
@@ -97,7 +97,7 @@ ops root の GitHub provider リソース（Environment、repository variable）
 |---|---|---|---|---|
 | Option A: workflow の `GITHUB_TOKEN` で CI apply する | 追加 credential なしで済ませたい場合 | 秘密が増えない | `GITHUB_TOKEN` は Environments を write できない（GitHub App / PAT の `Administration: write` が必要）。必ず失敗する | 非採用 |
 | Option B: GitHub App を作り CI apply する | ops を丸ごと CI に載せたい場合 | GitHub リソースも自動化できる | PEM という長寿命の秘密を repo secret に置く。PR YAML から参照できる。GitHub リソースの変更頻度は低く自動化メリットが小さい | 非採用 |
-| Option C: `environments/github` root に分離しローカル apply に限定する | 再現性は Terraform で確保しつつ CI には載せない場合 | CI は GCP 認証だけを持つ。credential を CI に置く問題が消える | GitHub リソースの変更は手元 apply。state 移行（state rm + import）が要る | 採用 |
+| Option C: `environments/devgist-github` root に分離しローカル apply に限定する | 再現性は Terraform で確保しつつ CI には載せない場合 | CI は GCP 認証だけを持つ。credential を CI に置く問題が消える | GitHub リソースの変更は手元 apply。state 移行（state rm + import）が要る | 採用 |
 
 ### 選定観点
 
@@ -156,7 +156,7 @@ GitHub App を作成し、`TF_GITHUB_APP_ID` / `TF_GITHUB_APP_INSTALLATION_ID` /
 - GitHub リソース（Environment、repository variable）は変更頻度が低く、自動化のメリットが小さい
 - セキュリティ対処コストが自動化メリットを上回るものはローカル管理にする一般原則に従う
 
-作成済みの GitHub App と `TF_GITHUB_APP_*` は削除する。GitHub リソースは `environments/github` root に移し、ローカルから個人の `GITHUB_TOKEN` で apply する（017 の手元運用を維持）。
+作成済みの GitHub App と `TF_GITHUB_APP_*` は削除する。GitHub リソースは `environments/devgist-github` root に移し、ローカルから個人の `GITHUB_TOKEN` で apply する（017 の手元運用を維持）。
 
 ## Decision (決定事項)
 
@@ -220,7 +220,7 @@ fork の `pull_request` は GitHub が OIDC token を発行しない（fork で�
 
 静的検証は `.github/workflows/terraform-ci.yml` のまま。GCP 認証を足さない。
 
-- `.github/workflows/terraform-plan.yml` — `pull_request` のみ。same-repo PR 限定。`ci_scope=terraform-plan-dev`。`terraform plan -lock=false`（state に lock 用 write を持たせない）。結果は PR コメントに upsert する。`devgist-tf` と `environments/github` は対象外
+- `.github/workflows/terraform-plan.yml` — `pull_request` のみ。same-repo PR 限定。`ci_scope=terraform-plan-dev`。`terraform plan -lock=false`（state に lock 用 write を持たせない）。結果は PR コメントに upsert する。`devgist-tf` と `environments/devgist-github` は対象外
 - `.github/workflows/terraform-apply.yml` — `push` の `main` と `workflow_dispatch`（input `target` は `dev` のみ。prod は環境作成時に専用 workflow `terraform-apply-prod.yml` を足す）。root ごとに plan job（environment 無し → `terraform-plan-dev`）→ apply job（`environment: dev` → `terraform-apply-dev`）を組みにし、`data-dev` → `ops` → `app-dev` の順に `needs:` で直列にする
 - apply の「CI が pass したら」は Ruleset の required checks で担保する。merge できない commit は `main` に乗らず、apply も走らない。up-to-date 必須も設定済みなので、main に乗る内容は必ず CI 通過済みの組み合わせである
 - crawler-deploy の trigger を `main` に合わせる。feature branch では job を走らせない（走っても `ci_scope=none` で失敗する）
@@ -243,7 +243,7 @@ apply 順は 015 の DAG に合わせる。plan → apply を root ごとに int
 | `devgist-ops` | CI | CI（下記の例外あり） |
 | `devgist-app/dev` | CI | CI |
 | `devgist-tf` | しない | ローカル |
-| `environments/github` | しない | ローカル |
+| `environments/devgist-github` | しない | ローカル |
 
 ops は CI に載せる。ただし **apply principal に次を付けない**。
 
@@ -254,12 +254,12 @@ ops は CI に載せる。ただし **apply principal に次を付けない**。
 
 これらが差分に含まれる CI apply は権限不足で失敗する。その変更は手元（bootstrap）である。mapping が security-critical であるという Google の推奨に合わせる。CI apply の権限で完結する差分だけが CI で通る、という境界にする。
 
-#### `environments/github` root
+#### `environments/devgist-github` root
 
 - GitHub provider のリソース（`github_repository_environment`、`github_actions_variable`）を ops から移す。値は ops の `terraform_remote_state` から読む（006）
 - state bucket は `haru256-devgist-github-tfstate`。`devgist-tf` の `tfstate_gcp_project_ids` に `haru256-devgist-github` を足して tf を apply してから使う
 - 認証はローカルの `GITHUB_TOKEN`（017 の手元運用）。GitHub App は使わない
-- 移行は ops で `terraform state rm` してから github root で `terraform import` する
+- 移行は ops で `terraform state rm` してから `devgist-github` root で `terraform import` する
 - この root は `providers.tf` を持つため静的 CI（fmt / validate / tflint / test）の対象にはなるが、plan / apply の対象からは除外する
 
 #### IAM の置き場（015）
@@ -321,7 +321,7 @@ github-devgist / oidc
 
 ローカル / bootstrap
 ├─ devgist-tf（tfstate bucket、tfstateReader custom role）
-├─ environments/github（GitHub Environment / repository variable）
+├─ environments/devgist-github（GitHub Environment / repository variable）
 ├─ WIF mapping と pool/provider の変更
 └─ CI principal の IAM grant の作成・変更
 ```
@@ -329,7 +329,7 @@ github-devgist / oidc
 ### 再検討条件
 
 - federated identity 非対応 API が出て、その API だけ SA impersonation に寄せる場合
-- prod を足すとき。`terraform-apply-prod.yml` を作り、prod の principalSet に IAM を付ける。GitHub Environment `prod`（required reviewers 付き）は `environments/github` root に足す。個人開発なので deployment 開始者本人が承認する前提で `Prevent self-review` は付けない
+- prod を足すとき。`terraform-apply-prod.yml` を作り、prod の principalSet に IAM を付ける。GitHub Environment `prod`（required reviewers 付き）は `environments/devgist-github` root に足す。個人開発なので deployment 開始者本人が承認する前提で `Prevent self-review` は付けない
 - リポジトリ rename。`repository_id` は不変。`workflow_ref` は `assertion.repository` 結合なので通常は追従する。claim の形が変わったときだけ mapping を直す
 - collaborator を増やすとき。same-repo PR から repository secret が参照できるため、`CURSOR_OIDC_SUBJECTS` / `SERVICE_ACCOUNT_USER_EMAILS` の置き場と plan workflow の権限を見直す
 - Terraform root 数が増え、全 root の直列 apply が重い場合
@@ -368,7 +368,7 @@ github-devgist / oidc
 ## Next Steps
 
 1. `devgist-tf` の `tfstate_gcp_project_ids` に `haru256-devgist-github` を足し、`tfstateReader` custom role と `tf_project_id` output を追加して、ローカルで tf を apply する
-2. `environments/github` root を作り、ops から GitHub リソースを移す（ops で `terraform state rm` → github root で `terraform import`）。ローカルで github root を apply する
+2. `environments/devgist-github` root を作り、ops から GitHub リソースを移す（ops で `terraform state rm` → `devgist-github` root で `terraform import`）。ローカルで `devgist-github` root を apply する
 3. ops の GitHub WIF mapping に `ci_scope` を足し、condition に `ci_scope != "none"` を足し、`attribute.environment` を外す。新 principalSet の IAM を足してから、同一の手元 apply で旧 `attribute.environment/dev` を外す
 4. plan / apply principal の guest IAM を 015 の表どおり ops と app-dev に書く。tfstate bucket の IAM も含める。data-dev に `datalakeIamReader`、ops に `arRepoIamReader` を定義する。ローカルで data → ops → app の順に apply する
 5. 非 secret tfvars の commit 例外を入れ、allowlist を `secrets.auto.tfvars` に移す。repository secret `CURSOR_OIDC_SUBJECTS` / `SERVICE_ACCOUNT_USER_EMAILS` を作る。作成済みの GitHub App と `TF_GITHUB_APP_*` を削除する
@@ -384,7 +384,7 @@ github-devgist / oidc
 - [[INFRA-ADR-011] Terraform monorepo における CI 対象検出と検証方針](./011-terraform-ci-for-monorepo.md)
 - [[INFRA-ADR-015] data は箱とし、guest IAM は依存の下流が書く](./015-guest-iam-downstream.md)
 - [[INFRA-ADR-016] GitHub Actions から crawler image を Artifact Registry へ push する](./016-github-actions-wif-and-crawler-image-push.md)
-- [[INFRA-ADR-017] GitHub Actions の Terraform 由来設定は ops が repository variable として書く](./017-github-actions-terraform-managed-variables.md)（置き場は本 ADR が `environments/github` に変える）
+- [[INFRA-ADR-017] GitHub Actions の Terraform 由来設定は ops が repository variable として書く](./017-github-actions-terraform-managed-variables.md)（置き場は本 ADR が `environments/devgist-github` に変える）
 - [Terraform CI](../../../.github/workflows/terraform-ci.yml)
 - [Crawler Deploy workflow](../../../.github/workflows/crawler-deploy.yaml)
 - [Infrastructure README](../../../infra/README.md)

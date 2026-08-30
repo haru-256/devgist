@@ -60,7 +60,7 @@ output "cursor_wif_audience" {
 
 output "github_wif_provider_name" {
   value       = module.github_wif.provider_name
-  description = "Full resource name of the GitHub Actions OIDC provider. The environments/github root writes this to the GitHub repository variable GCP_GITHUB_WIF_PROVIDER (INFRA-ADR-019)."
+  description = "Full resource name of the GitHub Actions OIDC provider. The environments/devgist-github root writes this to the GitHub repository variable GCP_GITHUB_WIF_PROVIDER (INFRA-ADR-019)."
 }
 
 output "github_wif_pool_id" {

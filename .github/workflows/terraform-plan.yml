@@ -35,10 +35,10 @@ jobs:
         with:
           python-version: "3.13"
 
-      # devgist-tf（tfstate 基盤）と github（GitHub リソース）はローカル apply のため対象外（INFRA-ADR-019）
+      # devgist-tf（tfstate 基盤）と devgist-github（GitHub リソース）はローカル apply のため対象外（INFRA-ADR-019）
       - name: Find Terraform roots
         id: find-roots
-        run: python .github/scripts/find_terraform_roots.py --terraform-dir infra/terraform --deploy-exclude devgist-tf github
+        run: python .github/scripts/find_terraform_roots.py --terraform-dir infra/terraform --deploy-exclude devgist-tf devgist-github
 
   terraform_plan:
     name: terraform plan / ${{ matrix.root }}

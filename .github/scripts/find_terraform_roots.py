@@ -16,7 +16,7 @@ GitHub Actions, and prints the same key/value pairs to stdout for local use:
 
 When ``--deploy-exclude`` is given, environment roots whose path relative to
 ``environments/`` matches one of the excludes (e.g. ``devgist-tf`` or
-``github``) are additionally published as ``deploy_roots`` /
+``devgist-github``) are additionally published as ``deploy_roots`` /
 ``deploy_roots_count``. Deploy roots are the subset of environment roots that
 CI is allowed to plan / apply (INFRA-ADR-019). Without excludes, deploy roots
 equal environment roots.
