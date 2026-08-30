@@ -25,6 +25,12 @@ locals {
     for bucket in local.tfstate_buckets : bucket.bucket_id
     if contains(local.ci_deploy_state_bucket_keys, bucket.project_id)
   ])
+  # CI が読むのは deploy 対象 root の state と、remote state 参照が載る tf 自身の state。
+  # devgist-github の state（repository secret の plaintext を含む）は CI から読ませない
+  ci_read_state_bucket_ids = toset(concat(
+    [for bucket in local.tfstate_buckets : bucket.bucket_id if bucket.project_id == "haru256-devgist-tf"],
+    tolist(local.ci_deploy_state_bucket_ids),
+  ))
 }
 
 data "google_project" "project" {
@@ -190,14 +196,15 @@ moved {
 
 # --- tfstate bucket（tf project）: identity=ops × resource=tf は下流の ops が書く（INFRA-ADR-015） ---
 
-# plan / apply ともに全 tfstate bucket の read。
+# plan / apply ともに deploy 対象 root と tf 自身の tfstate bucket の read。
+# devgist-github の state（repository secret の plaintext を含む）は読ませない（INFRA-ADR-019）。
 # tfstateReader は devgist-tf が定義する custom role。predefined の read-only role には
 # storage.buckets.getIamPolicy が無く、plan が bucket IAM member を refresh できないため
 resource "google_storage_bucket_iam_member" "ci_tfstate_read" {
   for_each = {
     for pair in setproduct(
       [local.ci_scope_terraform_plan_dev, local.ci_scope_terraform_apply_dev],
-      local.all_tfstate_bucket_ids,
+      local.ci_read_state_bucket_ids,
       ) : "${pair[0]}|${pair[1]}" => {
       scope  = pair[0]
       bucket = pair[1]
