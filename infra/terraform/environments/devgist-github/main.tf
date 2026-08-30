@@ -9,7 +9,7 @@
 #
 # state bucket は haru256-devgist-github-tfstate。使う前に devgist-tf の
 # tfstate_gcp_project_ids に haru256-devgist-github を足して tf を apply すること。
-# repository secret の正本は gitignore 済み secrets.tfvars。GitHub UI からは作らない。
+# repository secret の正本は gitignore 済み secrets.auto.tfvars。GitHub UI からは作らない。
 
 locals {
   github_repository_owner = "haru-256"
@@ -56,7 +56,7 @@ resource "github_actions_variable" "crawler_image_name" {
 }
 
 # CI の terraform plan / apply が ops / app-dev に渡す TF_VAR_* の器（INFRA-ADR-019）。
-# GitHub API は secret 値を読めないので、正本は secrets.tfvars。state に plaintext が残るが、
+# GitHub API は secret 値を読めないので、正本は secrets.auto.tfvars。state に plaintext が残るが、
 # この root の state は CI から読まない。
 resource "github_actions_secret" "cursor_oidc_subjects" {
   repository  = local.github_repository_name

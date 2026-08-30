@@ -256,7 +256,7 @@ ops は CI に載せる。ただし **apply principal に次を付けない**。
 
 #### `environments/devgist-github` root
 
-- GitHub provider のリソース（`github_repository_environment`、`github_actions_variable`、`github_actions_secret`）をこの root が書く。variable の値は ops の `terraform_remote_state` から読む（006）。secret の値は gitignore 済み `secrets.tfvars` が正本で、GitHub API は secret を読めない
+- GitHub provider のリソース（`github_repository_environment`、`github_actions_variable`、`github_actions_secret`）をこの root が書く。variable の値は ops の `terraform_remote_state` から読む（006）。secret の値は gitignore 済み `secrets.auto.tfvars` が正本で、GitHub API は secret を読めない
 - state bucket は `haru256-devgist-github-tfstate`。`devgist-tf` の `tfstate_gcp_project_ids` に `haru256-devgist-github` を足して tf を apply してから使う
 - 認証はローカルの `GITHUB_TOKEN`（017 の手元運用）。GitHub App は使わない
 - 移行は ops で `terraform state rm` してから `devgist-github` root で `terraform import` する
@@ -291,8 +291,7 @@ plan は上記 read に加えて各 project の `roles/viewer` と `roles/iam.se
 gitignore の `*.tfvars` のままだと CI は plan も apply もできない。空の値で ops を apply すると `cursor_oidc_subjects` が空になり、Cursor の GCS IAM が消える。
 
 - 非 secret（`gcp_project_id`、region、`crawler_image` digest、conference 名など）は `environments/**/terraform.tfvars` に限り version 管理する。gitignore にそのパスの例外を置く。それ以外の `*.tfvars` は引き続き ignore する
-- 人が特定される値（`cursor_oidc_subjects`、`service_account_user_emails`）は commit しない。正本は gitignore 済みの `secrets.tfvars` である。`environments/devgist-github` が同じ値を repository secret `CURSOR_OIDC_SUBJECTS` / `SERVICE_ACCOUNT_USER_EMAILS` として書く（`jsonencode` した list。CI の `TF_VAR_*` が `set(string)` として読める形）。GitHub UI から secret を手で作らない。ops / app-dev のローカル apply は各 root の `secrets.tfvars`、CI は repository secret 経由の `TF_VAR_*` で渡す
-- `secrets.tfvars` は `*.auto.tfvars` と違い Terraform が自動では読まない。ローカルは `make plan` / `make apply` がファイルがあれば `-var-file=secrets.tfvars` を付ける。`terraform` を直接叩くなら同じフラグが要る
+- 人が特定される値（`cursor_oidc_subjects`、`service_account_user_emails`）は commit しない。正本は gitignore 済みの `secrets.auto.tfvars` である（`*.auto.tfvars` なので Terraform が自動で読む）。`environments/devgist-github` が同じ値を repository secret `CURSOR_OIDC_SUBJECTS` / `SERVICE_ACCOUNT_USER_EMAILS` として書く（`jsonencode` した list。CI の `TF_VAR_*` が `set(string)` として読める形）。GitHub UI から secret を手で作らない。ops / app-dev のローカル apply は各 root の `secrets.auto.tfvars`、CI は repository secret 経由の `TF_VAR_*` で渡す
 - これらの variable から `default = []` を外す。未設定なら terraform が "No value for required variable" で落ちるため、値が無いまま apply して grant を消す事故を防ぐ
 - `crawler_image` は variable を維持し、値は committed tfvars に置く。image の更新は「build（crawler-deploy が main で push）→ digest を tfvars に書き換える infra PR → merge で apply」の 2 PR 運用とする。digest を書き換える PR の自動作成 CI は別タスク（issue #60 の後続）とする
 
@@ -369,10 +368,10 @@ github-devgist / oidc
 ## Next Steps
 
 1. `devgist-tf` の `tfstate_gcp_project_ids` に `haru256-devgist-github` を足し、`tfstateReader` custom role と `tf_project_id` output を追加して、ローカルで tf を apply する
-2. `environments/devgist-github` root を作り、ops から GitHub リソースを移す（ops で `terraform state rm` → `devgist-github` root で `terraform import`）。gitignore 済み `secrets.tfvars` を書いてローカル apply し、repository secret を Terraform が書く
+2. `environments/devgist-github` root を作り、ops から GitHub リソースを移す（ops で `terraform state rm` → `devgist-github` root で `terraform import`）。gitignore 済み `secrets.auto.tfvars` を書いてローカル apply し、repository secret を Terraform が書く
 3. ops の GitHub WIF mapping に `ci_scope` を足し、condition に `ci_scope != "none"` を足し、`attribute.environment` を外す。新 principalSet の IAM を足してから、同一の手元 apply で旧 `attribute.environment/dev` を外す
 4. plan / apply principal の guest IAM を 015 の表どおり ops と app-dev に書く。tfstate bucket の IAM も含める。data-dev に `datalakeIamReader`、ops に `arRepoIamReader` を定義する。ローカルで data → ops → app の順に apply する
-5. 非 secret tfvars の commit 例外を入れ、allowlist を `secrets.tfvars` に移す。`devgist-github` の `secrets.tfvars` にも同じ allowlist を書き、ローカル apply で repository secret を Terraform が書く。作成済みの GitHub App と `TF_GITHUB_APP_*` を削除する。GitHub UI から secret を手で作らない
+5. 非 secret tfvars の commit 例外を入れ、allowlist を `secrets.auto.tfvars` に移す。`devgist-github` の `secrets.auto.tfvars` にも同じ allowlist を書き、ローカル apply で repository secret を Terraform が書く。作成済みの GitHub App と `TF_GITHUB_APP_*` を削除する。GitHub UI から secret を手で作らない
 6. `terraform-plan.yml` と `terraform-apply.yml` を追加する。crawler-deploy の trigger を `main` にする
 7. ops の tftest を `ci_scope` に更新する。plan / apply 対象 root の検出には 011 の root 検出に除外フィルタを足したものを使う
 8. merge 後、初回の CI plan / apply が通ることを確認し、権限不足があればロールを足す（手元 apply を挟む）

@@ -10,7 +10,7 @@ variable "gcp_default_region" {
 
 variable "service_account_user_emails" {
   type        = set(string)
-  description = "Email addresses of users allowed to attach / actAs managed service accounts. No default on purpose: set it in the gitignored secrets.tfvars (local) or TF_VAR_service_account_user_emails (CI; repository secret written by the devgist-github root) so that an unset value fails instead of wiping grants (INFRA-ADR-019)."
+  description = "Email addresses of users allowed to attach / actAs managed service accounts. No default on purpose: set it in the gitignored secrets.auto.tfvars (local) or TF_VAR_service_account_user_emails (CI; repository secret written by the devgist-github root) so that an unset value fails instead of wiping grants (INFRA-ADR-019)."
 
   validation {
     condition = alltrue([
@@ -23,7 +23,7 @@ variable "service_account_user_emails" {
 
 variable "cursor_oidc_subjects" {
   type        = set(string)
-  description = "Cursor OIDC subject claims allowed to access the data-dev datalake via WIF direct resource access. Empty means no federated principal gets GCS IAM. No default on purpose: set it in the gitignored secrets.tfvars (local) or TF_VAR_cursor_oidc_subjects (CI; repository secret written by the devgist-github root) so that an unset value fails instead of wiping grants (INFRA-ADR-019)."
+  description = "Cursor OIDC subject claims allowed to access the data-dev datalake via WIF direct resource access. Empty means no federated principal gets GCS IAM. No default on purpose: set it in the gitignored secrets.auto.tfvars (local) or TF_VAR_cursor_oidc_subjects (CI; repository secret written by the devgist-github root) so that an unset value fails instead of wiping grants (INFRA-ADR-019)."
 
   validation {
     condition = alltrue([
