@@ -196,7 +196,7 @@ EOT
 | `ci_scope` | 条件（概念） | IAM |
 |---|---|---|
 | `terraform-apply-dev` | `workflow_ref == assertion.repository + "/.github/workflows/terraform-apply.yml@refs/heads/main"` かつ `ref == "refs/heads/main"` かつ (`event_name == "push"` または `workflow_dispatch`) かつ `environment == "dev"` | ops / data-dev / app-dev の必要な write、対象 tfstate の read/write |
-| `terraform-plan-dev` | 同上の workflow / ref / event で environment 無し。または `event_name == "pull_request"` かつ `workflow_ref` が `assertion.repository + "/.github/workflows/terraform-plan.yml@refs/pull/"` で始まる | 全 tfstate の read、ops / data-dev / app-dev / tf の get/list と IAM policy の read。create / update / delete と IAM 変更と WIF 変更は付けない |
+| `terraform-plan-dev` | 同上の workflow / ref / event で environment 無し。または `event_name == "pull_request"` かつ `workflow_ref` が `assertion.repository + "/.github/workflows/terraform-plan.yml@refs/pull/"` で始まる | deploy 対象 root と tf 自身の tfstate の read、ops / data-dev / app-dev / tf の get/list と IAM policy の read。create / update / delete と IAM 変更と WIF 変更は付けない |
 | `terraform-apply-prod` | `terraform-apply-prod.yml` かつ `event_name == "workflow_dispatch"` かつ `ref == "refs/heads/main"` かつ `environment == "prod"` | prod 環境作成時に付ける。今は付けない |
 | `terraform-plan-prod` | `terraform-apply-prod.yml` かつ `workflow_dispatch` かつ `main` で environment 無し | 同上 |
 | `crawler-push-dev` | `event_name == "push"` かつ `ref == "refs/heads/main"` かつ `workflow_ref == assertion.repository + "/.github/workflows/crawler-deploy.yaml@refs/heads/main"` | crawler Artifact Registry の `roles/artifactregistry.writer` のみ |
@@ -278,7 +278,7 @@ resource の IAM policy の read（`getIamPolicy`）は、predefined の read-on
 
 | custom role | 定義する root | permissions | 付与先 |
 |---|---|---|---|
-| `tfstateReader` | `devgist-tf` | `storage.buckets.get` / `storage.buckets.getIamPolicy` / `storage.objects.get` / `storage.objects.list` | 全 tfstate bucket × plan-dev / apply-dev |
+| `tfstateReader` | `devgist-tf` | `storage.buckets.get` / `storage.buckets.getIamPolicy` / `storage.objects.get` / `storage.objects.list` | deploy 対象 root と tf 自身の tfstate bucket × plan-dev / apply-dev（`devgist-github` の state は secret の plaintext を含むので CI から読ませない） |
 | `datalakeIamReader` | `devgist-data/dev` | `storage.buckets.get` / `storage.buckets.getIamPolicy` | datalake bucket × plan-dev |
 | `arRepoIamReader` | `devgist-ops` | `artifactregistry.repositories.get` / `artifactregistry.repositories.getIamPolicy` | crawler AR repository × plan-dev |
 
