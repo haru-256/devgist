@@ -159,3 +159,4 @@ backend を無効化した init を使い、`mock_provider` と `override_data` 
 
 - [INFRA-ADR-002] Terraform 構成: ドメイン駆動モジュールとマルチプロジェクト戦略の採用
 - [INFRA-ADR-005] Terraform environments は GCP project ごとに分割する
+- [INFRA-ADR-019] GitHub Actions から terraform plan / apply する
