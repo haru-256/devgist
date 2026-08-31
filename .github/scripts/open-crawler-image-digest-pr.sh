@@ -37,9 +37,9 @@ cd "${REPO_ROOT}"
 
 printf 'Resetting %s from origin/main\n' "${BRANCH}"
 git fetch origin main
-# Lease compares against origin/<branch>. actions/checkout does not fetch it.
-git fetch origin "${BRANCH}" 2>/dev/null || true
-git checkout -B "${BRANCH}" origin/main
+# Lease needs origin/<branch>. checkout often narrows remote.origin.fetch to main.
+git fetch origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}" || true
+git checkout --no-track -B "${BRANCH}" origin/main
 
 matches="$(grep -c -E '^crawler_image[[:space:]]*=' "${TFVARS}" || true)"
 if [[ "${matches}" != 1 ]]; then
@@ -60,7 +60,12 @@ git config user.name "github-actions[bot]"
 git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 git add -- "${TFVARS}"
 git commit -m "${COMMIT_MSG}"
-git push --force-with-lease origin "HEAD:${BRANCH}"
+if git rev-parse --verify "refs/remotes/origin/${BRANCH}" >/dev/null 2>&1; then
+  git push --force-with-lease="refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}" \
+    origin "HEAD:${BRANCH}"
+else
+  git push --force-with-lease="refs/heads/${BRANCH}:" origin "HEAD:${BRANCH}"
+fi
 
 body="$(sed \
   -e "s|{{IMAGE_REF}}|${IMAGE_REF}|g" \
