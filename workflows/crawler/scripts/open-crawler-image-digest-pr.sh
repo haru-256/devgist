@@ -34,6 +34,8 @@ cd "${REPO_ROOT}"
 
 printf 'Resetting %s from origin/main\n' "${BRANCH}"
 git fetch origin main
+# Lease compares against origin/<branch>. actions/checkout does not fetch it.
+git fetch origin "${BRANCH}" 2>/dev/null || true
 git checkout -B "${BRANCH}" origin/main
 
 matches="$(grep -c -E '^crawler_image[[:space:]]*=' "${TFVARS}" || true)"
