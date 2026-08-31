@@ -152,7 +152,7 @@ GitHub App を作成し、`TF_GITHUB_APP_ID` / `TF_GITHUB_APP_INSTALLATION_ID` /
 却下理由:
 
 - PEM は長寿命の秘密であり、「長寿命の秘密を GitHub に置かない」の要件と緊張する
-- repo secret は same-repo PR の workflow YAML から参照できる。plan を PR に載せる以上、Credential の露出面が増える
+- repo secret は same-repo PR の workflow YAML から参照できる。plan を CI で回す以上、Credential の露出面が増える
 - GitHub リソース（Environment、repository variable）は変更頻度が低く、自動化のメリットが小さい
 - セキュリティ対処コストが自動化メリットを上回るものはローカル管理にする一般原則に従う
 
