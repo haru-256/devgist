@@ -53,9 +53,10 @@ module "required_project_services" {
 
   project_id = data.google_project.project.project_id
   required_services = [
-    "artifactregistry.googleapis.com", # Artifact Registry
-    "iam.googleapis.com",              # IAM
-    "sts.googleapis.com",              # Security Token Service (WIF)
+    "artifactregistry.googleapis.com",      # Artifact Registry
+    "iam.googleapis.com",                   # IAM
+    "sts.googleapis.com",                   # Security Token Service (WIF)
+    "cloudresourcemanager.googleapis.com",  # data.google_project と project IAM。CI の quota project（ops）で必要
   ]
   wait_seconds = 30
 }
