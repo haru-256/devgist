@@ -1,6 +1,7 @@
 name: Crawler Deploy
 
 # INFRA-ADR-019: write 系の ci_scope は protected main に閉じる。
+# INFRA-ADR-021: push 後に create-digest-pr が crawler_image digest PR を作る。
 on:
   push:
     branches:
@@ -26,6 +27,8 @@ jobs:
     if: ${{ vars.GCP_GITHUB_WIF_PROVIDER != '' && vars.CRAWLER_REPO_URL != '' && vars.CRAWLER_IMAGE_NAME != '' }}
     runs-on: ubuntu-latest
     environment: dev
+    outputs:
+      image_ref: ${{ steps.build.outputs.image_ref }}
     env:
       REPO_URL: ${{ vars.CRAWLER_REPO_URL }}
       IMAGE_NAME: ${{ vars.CRAWLER_IMAGE_NAME }}
@@ -51,6 +54,34 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build and push
+        id: build
         run: |
-          set -o pipefail
-          ./workflows/crawler/scripts/build-push-image.sh | tee -a "${GITHUB_STEP_SUMMARY}"
+          set -euo pipefail
+          image_line="$(./workflows/crawler/scripts/build-push-image.sh | tee -a "${GITHUB_STEP_SUMMARY}" | grep '^image_ref: ')"
+          image_ref="${image_line#image_ref: }"
+          image_ref="${image_ref%"${image_ref##*[![:space:]]}"}"
+          if [[ ! "${image_ref}" =~ @sha256:[a-f0-9]{64}$ ]]; then
+            printf 'Unexpected image_ref: %s\n' "${image_ref}" >&2
+            exit 1
+          fi
+          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+
+  create-digest-pr:
+    name: Create crawler image digest PR
+    needs: build-and-push
+    if: ${{ needs.build-and-push.outputs.image_ref != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Open or update digest PR
+        env:
+          IMAGE_REF: ${{ needs.build-and-push.outputs.image_ref }}
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: ./workflows/crawler/scripts/open-crawler-image-digest-pr.sh
