@@ -26,6 +26,7 @@
 - `INFRA-ADR-017`: [docs/adr/infra/017-github-actions-terraform-managed-variables.md](../docs/adr/infra/017-github-actions-terraform-managed-variables.md)
 - `INFRA-ADR-018`: [docs/adr/infra/018-artifact-registry-cost-controls.md](../docs/adr/infra/018-artifact-registry-cost-controls.md)
 - `INFRA-ADR-019`: [docs/adr/infra/019-github-actions-terraform-plan-apply.md](../docs/adr/infra/019-github-actions-terraform-plan-apply.md)
+- `INFRA-ADR-020`: [docs/adr/infra/020-terraform-cicd-secret-management.md](../docs/adr/infra/020-terraform-cicd-secret-management.md)
 
 このディレクトリ配下の `infra/docs/adr/` は互換性維持のための参照パスであり、正本は [docs/adr/](../docs/adr/) 側です。
 

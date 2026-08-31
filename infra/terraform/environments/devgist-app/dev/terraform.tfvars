@@ -1,5 +1,5 @@
 # 非 secret の設定値のみ。service_account_user_emails も true secret ではないので
-# ここに書く（INFRA-ADR-019）
+# ここに書く（INFRA-ADR-020）
 gcp_project_id     = "haru256-devgist-app-dev"
 gcp_default_region = "us-central1"
 

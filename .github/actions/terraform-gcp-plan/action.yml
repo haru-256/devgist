@@ -84,7 +84,8 @@ runs:
           echo '```'
         } >> "${GITHUB_STEP_SUMMARY}"
 
-    # tfplan は planned values を含み得る sensitive artifact。retention は 1 日（INFRA-ADR-019）
+    # saved plan は apply job へ渡す短寿命 artifact。retention は 1 日（INFRA-ADR-019）。
+    # true secret の payload は Terraform に渡さない（INFRA-ADR-020）
     - name: Upload plan artifact
       if: ${{ inputs.save-plan == 'true' }}
       uses: actions/upload-artifact@v7

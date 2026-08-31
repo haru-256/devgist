@@ -230,7 +230,7 @@ apply 順は 015 の DAG に合わせる。plan → apply を root ごとに int
 #### final plan と apply の一致
 
 - plan job は `terraform plan -no-color -input=false -lock=false -out=tfplan` を実行し、`terraform show -no-color tfplan` を Actions Summary に出す
-- `tfplan` は artifact として plan job から apply job へ受け渡す。`retention-days: 1`。public repo でも artifact の download は GitHub login 必須だが、planned values / variables を含み得るので sensitive artifact として扱う
+- `tfplan` は artifact として plan job から apply job へ受け渡す。apply 用の短寿命バイナリなので `retention-days: 1`。true secret の payload は Terraform に渡さない（[INFRA-ADR-020](./020-terraform-cicd-secret-management.md)）
 - apply job は同じ commit を checkout し、同じ Terraform / provider version（lock file）で `terraform init` した上で `terraform apply -input=false tfplan` を実行する。bare `terraform apply` は使わない
 - PR で生成した plan artifact を merge 後の apply に流用しない
 - saved plan の apply 中に state が変わっていれば Terraform が "Saved plan is stale" で失敗する。concurrency は workflow 単位で `cancel-in-progress: false` とし、apply の並行実行と中断を防ぐ
@@ -278,7 +278,7 @@ resource の IAM policy の read（`getIamPolicy`）は、predefined の read-on
 
 | custom role | 定義する root | permissions | 付与先 |
 |---|---|---|---|
-| `tfstateReader` | `devgist-tf` | `storage.buckets.get` / `storage.buckets.getIamPolicy` / `storage.objects.get` / `storage.objects.list` | deploy 対象 root と tf 自身の tfstate bucket × plan-dev / apply-dev（`devgist-github` の state は secret の plaintext を含むので CI から読ませない） |
+| `tfstateReader` | `devgist-tf` | `storage.buckets.get` / `storage.buckets.getIamPolicy` / `storage.objects.get` / `storage.objects.list` | deploy 対象 root と tf 自身の tfstate bucket × plan-dev / apply-dev（`devgist-github` はローカル apply のため CI から読ませない） |
 | `datalakeIamReader` | `devgist-data/dev` | `storage.buckets.get` / `storage.buckets.getIamPolicy` | datalake bucket × plan-dev |
 | `arRepoIamReader` | `devgist-ops` | `artifactregistry.repositories.get` / `artifactregistry.repositories.getIamPolicy` | crawler AR repository × plan-dev |
 
@@ -333,7 +333,7 @@ github-devgist / oidc
 - リポジトリ rename。`repository_id` は不変。`workflow_ref` は `assertion.repository` 結合なので通常は追従する。claim の形が変わったときだけ mapping を直す
 - collaborator を増やすとき。same-repo PR から repository variable と plan の read 権限が参照できるため、plan workflow の権限を見直す
 - Terraform root 数が増え、全 root の直列 apply が重い場合
-- tfvars に secret 値が入る見込みが出た場合。tfplan artifact の中身も見直す
+- true secret が必要になった場合。[INFRA-ADR-020](./020-terraform-cicd-secret-management.md) の decision tree を適用する。tfvars / saved plan に payload を載せるのは最後の手段
 
 ## Consequences (結果・影響)
 
@@ -360,7 +360,7 @@ github-devgist / oidc
 
 - apply principal が project IAM admin を後から付与されると、自分で WIF を緩められる。ロール追加の PR を見る
 - plan 結果を public の PR コメントに出す。識別子は公開されるが secret は含めない。Actions log も login 済みユーザーには見えるので、秘匿性はコメントでも log でも変わらない
-- tfplan artifact は login 必須だが sensitive 扱いとし、`retention-days: 1` にする。tfvars に secret が入る見込みが出たら再検討する
+- tfplan artifact は apply 用の短寿命バイナリとして `retention-days: 1` にする。true secret の payload は Terraform に渡さない（[INFRA-ADR-020](./020-terraform-cicd-secret-management.md)）
 - 直列 apply の途中失敗で data だけ新しい、があり得る。再実行で揃える
 - IAM ロールの初期セットは実際の CI plan / apply で不足が出たら権限エラーのメッセージに従って足す。初回の CI 実行で調整する
 - GitHub App を再導入したくなった場合は、本 ADR の Option D の却下理由を再評価する

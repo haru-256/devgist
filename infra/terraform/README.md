@@ -65,7 +65,6 @@ infra/terraform/
 │       ├── config.gcs.tfbackend
 │       ├── main.tf
 │       ├── providers.tf
-│       ├── variables.tf
 │       └── tests/
 ├── modules/
 │   ├── artifact_registry/
@@ -142,7 +141,7 @@ GCP project ごとに root module を配置し、必要に応じて `dev/` な�
 - `terraform.tfstate` は環境ごとの状態を保持します。リモート backend を使う場合は `backend.tf` で設定します。
 - Cursor Cloud 用 WIF（pool `cursor` / provider `oidc`）は `devgist-ops` で定義する。datalake への `objectViewer` / `objectCreator` は依存の下流（ops）が federated principal に直接付与する（[INFRA-ADR-015](../../docs/adr/infra/015-guest-iam-downstream.md)）。apply 順は data → ops → app。`cursor_wif_audience` は後続の OIDC mint で使う。credential config に SA impersonation は入れない。
 - GitHub Actions 用 WIF（pool `github-devgist` / provider `oidc`）も `devgist-ops` で定義する。issuer は GitHub。IAM の identity class は `attribute.ci_scope`（plan / apply / crawler）である（[INFRA-ADR-019](../../docs/adr/infra/019-github-actions-terraform-plan-apply.md)）。crawler Artifact Registry への writer は `crawler-push-dev` に直接付与する。GitHub Environment `dev` と repository variable（`GCP_GITHUB_WIF_PROVIDER`、`CRAWLER_REPO_URL`、`CRAWLER_IMAGE_NAME`）は `environments/devgist-github` root が書く（[INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)。置き場は 019 が ops から `devgist-github` root に変えた）。GitHub リソースの write と WIF mapping の変更は手元。credential config に SA impersonation は入れない。terraform plan / apply の CI は 019。
-- `environments/**/terraform.tfvars` は非 secret 値に限り version 管理する（019）。`cursor_oidc_subjects` / `service_account_user_emails` は true secret ではなく principal identifier なので、通常の設定値として `terraform.tfvars` に書く。これらの variable は `default = []` を持ち、空なら grant が付かないだけで plan / apply は失敗しない。
+- `environments/**/terraform.tfvars` は非 secret 値に限り version 管理する（019）。`cursor_oidc_subjects` / `service_account_user_emails` は true secret ではなく principal identifier なので、通常の設定値として `terraform.tfvars` に書く（020）。これらの variable は `default = []` を持ち、空なら grant が付かないだけで plan / apply は失敗しない。
 
 ## for_each を使う場合の outputs 出力
 
