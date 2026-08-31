@@ -12,6 +12,22 @@ override_data {
   }
 }
 
+override_resource {
+  target = github_repository_environment.dev
+}
+
+override_resource {
+  target = github_actions_variable.gcp_github_wif_provider
+}
+
+override_resource {
+  target = github_actions_variable.crawler_repo_url
+}
+
+override_resource {
+  target = github_actions_variable.crawler_image_name
+}
+
 run "write_github_actions_config_from_github_root" {
   command = plan
 

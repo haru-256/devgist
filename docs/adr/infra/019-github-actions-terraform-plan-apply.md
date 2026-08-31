@@ -97,7 +97,7 @@ ops root の GitHub provider リソース（Environment、repository variable）
 |---|---|---|---|---|
 | Option A: workflow の `GITHUB_TOKEN` で CI apply する | 追加 credential なしで済ませたい場合 | 秘密が増えない | `GITHUB_TOKEN` は Environments を write できない（GitHub App / PAT の `Administration: write` が必要）。必ず失敗する | 非採用 |
 | Option B: GitHub App を作り CI apply する | ops を丸ごと CI に載せたい場合 | GitHub リソースも自動化できる | PEM という長寿命の秘密を repo secret に置く。PR YAML から参照できる。GitHub リソースの変更頻度は低く自動化メリットが小さい | 非採用 |
-| Option C: `environments/devgist-github` root に分離しローカル apply に限定する | 再現性は Terraform で確保しつつ CI には載せない場合 | CI は GCP 認証だけを持つ。credential を CI に置く問題が消える | GitHub リソースの変更は手元 apply。state 移行（state rm + import）が要る | 採用 |
+| Option C: `environments/devgist-github` root に分離しローカル apply に限定する | 再現性は Terraform で確保しつつ CI には載せない場合 | CI は GCP 認証だけを持つ。credential を CI に置く問題が消える | GitHub リソースの変更は手元 apply。state 移行（`removed` + `import`）が要る | 採用 |
 
 ### 選定観点
 
@@ -270,7 +270,7 @@ ops は CI に載せる。ただし **apply principal に次を付けない**。
 - GitHub provider のリソース（`github_repository_environment`、`github_actions_variable`）をこの root が書く。値は ops の `terraform_remote_state` から読む（006）
 - state bucket は `haru256-devgist-github-tfstate`。`devgist-tf` の `tfstate_gcp_project_ids` に `haru256-devgist-github` を足して tf を apply してから使う
 - 認証はローカルの `GITHUB_TOKEN`（017 の手元運用）。GitHub App は使わない
-- 移行は ops で `terraform state rm` してから `devgist-github` root で `terraform import` する
+- 移行は ops の `removed`（`destroy = false`）と `devgist-github` の `import` で行う。ops を先に apply して state から外し、続けて github root を apply して取り込む。実体は消さない
 - この root は `providers.tf` を持つため静的 CI（fmt / validate / tflint / test）の対象にはなるが、plan / apply の対象からは除外する
 
 #### IAM の置き場（015）
@@ -359,7 +359,7 @@ github-devgist / oidc
 - mapping 変更、CI principal の IAM 変更、GitHub リソース、`devgist-tf` は手元が残る
 - crawler は feature branch から image を push できない（016 からの行動変）
 - `workflow_ref` はファイルパスに結合する。workflow のリネームは mapping の更新（手元 apply）が要る
-- GitHub リソースの root 分離で state 移行（state rm + import）が一度だけ要る
+- GitHub リソースの root 分離で state 移行（`removed` + `import`）が一度だけ要る
 - tf project の `viewer` は同一 project の github tfstate object も読める。write は `objectUser` を deploy bucket にだけ付けることで閉じる。中身は true secret ではない（[INFRA-ADR-020](./020-terraform-cicd-secret-management.md)）
 
 ### Risks / Future Review (将来の課題)
@@ -374,7 +374,7 @@ github-devgist / oidc
 ## Next Steps
 
 1. `devgist-tf` の `terraform.tfvars` に `haru256-devgist-github` を含めた `tfstate_gcp_project_ids` と `tf_project_id` output がある。ローカルで tf を apply して `haru256-devgist-github-tfstate` を作る
-2. `environments/devgist-github` root を作り、ops から GitHub リソースを移す（ops で `terraform state rm` → `devgist-github` root で `terraform import`）。ローカルで `devgist-github` root を apply する
+2. `environments/devgist-github` root を作り、ops から GitHub リソースを移す。ops を apply して `removed`（`destroy = false`）し、続けて github root を apply して `import` する。実体は消さない
 3. ops の GitHub WIF mapping に `ci_scope` を足し、condition に `ci_scope != "none"` を足し、`attribute.environment` を外す。新 principalSet の IAM を足してから、同一の手元 apply で旧 `attribute.environment/dev` を外す
 4. plan / apply principal の guest IAM を 015 の表どおり ops と app-dev に書く。tf / data-dev / ops / app-dev の `viewer` + `securityReviewer` と、deploy 対象 tfstate bucket の `objectUser`（apply のみ）を含める。ローカルで data → ops → app の順に apply する
 5. 非 secret tfvars の commit 例外を入れる。作成済みの GitHub App と `TF_GITHUB_APP_*` を削除する

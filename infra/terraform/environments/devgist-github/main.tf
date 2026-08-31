@@ -22,10 +22,21 @@ data "terraform_remote_state" "ops" {
 
 # GitHub Actions の Terraform 由来設定（INFRA-ADR-017）。
 # Environment は OIDC claim と IAM の契約ではなくなった（INFRA-ADR-019）が、
-# deployment 履歴と将来の protection の器として維持する
+# deployment 履歴と将来の protection の器として維持する。
+# ops の state から removed（destroy = false）した実体をこの root が引き継ぐ。
+import {
+  to = github_repository_environment.dev
+  id = "${local.github_repository_name}:dev"
+}
+
 resource "github_repository_environment" "dev" {
   repository  = local.github_repository_name
   environment = "dev"
+}
+
+import {
+  to = github_actions_variable.gcp_github_wif_provider
+  id = "${local.github_repository_name}:GCP_GITHUB_WIF_PROVIDER"
 }
 
 resource "github_actions_variable" "gcp_github_wif_provider" {
@@ -34,10 +45,20 @@ resource "github_actions_variable" "gcp_github_wif_provider" {
   value         = data.terraform_remote_state.ops.outputs.github_wif_provider_name
 }
 
+import {
+  to = github_actions_variable.crawler_repo_url
+  id = "${local.github_repository_name}:CRAWLER_REPO_URL"
+}
+
 resource "github_actions_variable" "crawler_repo_url" {
   repository    = local.github_repository_name
   variable_name = "CRAWLER_REPO_URL"
   value         = data.terraform_remote_state.ops.outputs.crawler_artifact_registry_repository_url
+}
+
+import {
+  to = github_actions_variable.crawler_image_name
+  id = "${local.github_repository_name}:CRAWLER_IMAGE_NAME"
 }
 
 resource "github_actions_variable" "crawler_image_name" {

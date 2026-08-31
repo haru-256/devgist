@@ -179,6 +179,40 @@ moved {
   to   = google_artifact_registry_repository_iam_member.crawler_push_dev
 }
 
+# GitHub リソースは environments/devgist-github へ移す（INFRA-ADR-019）。
+# 実体は消さず ops の state から外す。github root の import が引き継ぐ。
+removed {
+  from = github_repository_environment.dev
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = github_actions_variable.gcp_github_wif_provider
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = github_actions_variable.crawler_repo_url
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = github_actions_variable.crawler_image_name
+
+  lifecycle {
+    destroy = false
+  }
+}
+
 # ============================================================
 # GitHub Actions CI principals（INFRA-ADR-019）
 # ci_scope ごとの principalSet に direct resource access で付与する。
