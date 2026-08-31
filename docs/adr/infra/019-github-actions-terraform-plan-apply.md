@@ -291,7 +291,7 @@ plan は上記 read に加えて各 project の `roles/viewer` と `roles/iam.se
 gitignore の `*.tfvars` のままだと CI は plan も apply もできない。空の値で ops を apply すると `cursor_oidc_subjects` が空になり、Cursor の GCS IAM が消える。
 
 - 非 secret（`gcp_project_id`、region、`crawler_image` digest、conference 名など）は `environments/**/terraform.tfvars` に限り version 管理する。gitignore にそのパスの例外を置く。それ以外の `*.tfvars` は引き続き ignore する
-- 人が特定される値（`cursor_oidc_subjects`、`service_account_user_emails`）は true secret ではなく principal identifier である。値を知っても OIDC token の偽造や IAM principal としての認証はできない。通常の設定値として `environments/**/terraform.tfvars` に version 管理する。GitHub Repository Secret や `TF_VAR_*` は使わない
+- 人が特定される値（`cursor_oidc_subjects`、`service_account_user_emails`）は true secret ではなく principal identifier である。値を知っても OIDC token の偽造や IAM principal としての認証はできない。通常の設定値として `environments/**/terraform.tfvars` に version 管理する（[INFRA-ADR-020](./020-terraform-cicd-secret-management.md)）。GitHub Repository Secret や `TF_VAR_*` は使わない
 - これらの variable は `default = []` を持つ。空なら grant が付かないだけで、plan / apply は失敗しない
 - `crawler_image` は variable を維持し、値は committed tfvars に置く。image の更新は「build（crawler-deploy が main で push）→ digest を tfvars に書き換える infra PR → merge で apply」の 2 PR 運用とする。digest を書き換える PR の自動作成 CI は別タスク（issue #60 の後続）とする
 
@@ -385,6 +385,7 @@ github-devgist / oidc
 - [[INFRA-ADR-015] data は箱とし、guest IAM は依存の下流が書く](./015-guest-iam-downstream.md)
 - [[INFRA-ADR-016] GitHub Actions から crawler image を Artifact Registry へ push する](./016-github-actions-wif-and-crawler-image-push.md)
 - [[INFRA-ADR-017] GitHub Actions の Terraform 由来設定は ops が repository variable として書く](./017-github-actions-terraform-managed-variables.md)（置き場は本 ADR が `environments/devgist-github` に変える）
+- [[INFRA-ADR-020] Terraform CI/CD と Secret Management 方針](./020-terraform-cicd-secret-management.md)
 - [Terraform CI](../../../.github/workflows/terraform-ci.yml)
 - [Crawler Deploy workflow](../../../.github/workflows/crawler-deploy.yaml)
 - [Infrastructure README](../../../infra/README.md)
