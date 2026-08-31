@@ -5,7 +5,7 @@
 - crawler-deploy が Artifact Registry へ push したあと、`GITHUB_TOKEN` で `crawler_image` digest を書き換える infra PR を作る。Cloud Run の更新は既存の terraform-apply.yml に任せる。
 - GitHub App / PAT は使わない。後続 CI は `workflow_dispatch` しない。人が digest PR 上で Approve workflows to run してから merge する。
 - ブランチは `ci/crawler-image-digest` に固定し、毎回 `origin/main` から作り直す。自動 merge しない。
-- git / gh / tfvars 置換は `workflows/crawler/scripts/open-crawler-image-digest-pr.sh` が行う。workflow は env を渡して呼ぶ。
+- git / gh / tfvars 置換は `.github/scripts/open-crawler-image-digest-pr.sh` が行う。workflow は env を渡して呼ぶ。
 
 ## Status (ステータス)
 
@@ -25,13 +25,13 @@ crawler image の更新は「crawler-deploy が main で push → digest を tfv
 2. CI に GitHub App PEM / PAT を置かない（019 / 020）
 3. crawler-push-dev の AR writer と GitHub write を同じ job に載せない
 4. `actions: write` で任意 workflow を dispatch しない
-5. build-push と同じく、仕事は `workflows/crawler/scripts/` に置く
+5. git / gh / PR 作成は `.github/scripts/` に置く（`find_terraform_roots.py` / `find_target_project.js` と同じ）。image build/push は crawler の `workflows/crawler/scripts/build-push-image.sh` に残す（Makefile からも使う）
 
 ### 比較した選択肢
 
 | 選択肢 | 向いている用途 | メリット | デメリット | 今回の評価 |
 |---|---|---|---|---|
-| Option A: crawler-deploy 末尾 job + `GITHUB_TOKEN` + crawler script。CI は人が Approve | digest PR を自動化し、秘密を増やさない場合 | 新しい credential が無い。build-push と同じ置き場 | 人が Approve workflows する | 採用 |
+| Option A: crawler-deploy 末尾 job + `GITHUB_TOKEN` + `.github/scripts`。CI は人が Approve | digest PR を自動化し、秘密を増やさない場合 | 新しい credential が無い。CI helper を `.github/scripts` に揃える | 人が Approve workflows する | 採用 |
 | Option B: 同じ job から terraform-ci / python-ci を `workflow_dispatch` | required checks を自動で緑にしたい場合 | 承認クリックが減る | `actions: write` が terraform-apply.yml の dispatch まで届く | 非採用 |
 | Option C: GitHub App / PAT で PR を作り、`pull_request` CI を自動起動 | 承認なしで checks を走らせたい場合 | 通常の PR と同じ | 019 / 020 が却下した長寿命 GitHub 秘密を戻す | 非採用 |
 
@@ -51,7 +51,7 @@ digest PR はもともと人が merge する。approval-required の workflow ru
 
 ## Decision (決定事項)
 
-crawler-deploy に `create-digest-pr` job を足す。`contents: write` と `pull-requests: write` だけを持つ。`id-token` も `environment` も付けない。実作業は `workflows/crawler/scripts/open-crawler-image-digest-pr.sh`。
+crawler-deploy に `create-digest-pr` job を足す。`contents: write` と `pull-requests: write` だけを持つ。`id-token` も `environment` も付けない。実作業は `.github/scripts/open-crawler-image-digest-pr.sh`。
 
 ### 採用方針
 
@@ -63,8 +63,8 @@ crawler-deploy に `create-digest-pr` job を足す。`contents: write` と `pul
 ### 初期構成
 
 - workflow: `.github/workflows/crawler-deploy.yaml`
-- script: `workflows/crawler/scripts/open-crawler-image-digest-pr.sh`
-- PR 本文: `workflows/crawler/scripts/crawler-image-digest-pr.md`
+- script: `.github/scripts/open-crawler-image-digest-pr.sh`
+- PR 本文: `.github/scripts/crawler-image-digest-pr.md`
 - 対象ファイル: `infra/terraform/environments/devgist-app/dev/terraform.tfvars`
 - 後続: 人が Approve workflows → merge → terraform-apply.yml
 
@@ -104,6 +104,6 @@ crawler-deploy に `create-digest-pr` job を足す。`contents: write` と `pul
 - [[INFRA-ADR-016] GitHub Actions から crawler image を Artifact Registry へ push する](./016-github-actions-wif-and-crawler-image-push.md)
 - [[INFRA-ADR-020] Terraform CI/CD と Secret Management 方針](./020-terraform-cicd-secret-management.md)
 - [Crawler Deploy workflow](../../../.github/workflows/crawler-deploy.yaml)
-- [open-crawler-image-digest-pr.sh](../../../workflows/crawler/scripts/open-crawler-image-digest-pr.sh)
+- [open-crawler-image-digest-pr.sh](../../../.github/scripts/open-crawler-image-digest-pr.sh)
 - [issue #60](https://github.com/haru-256/devgist/issues/60)
 - [Triggering a workflow (GITHUB_TOKEN)](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)

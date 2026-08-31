@@ -24,7 +24,7 @@ fi
 PR_TITLE="${COMMIT_MSG}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BODY_TEMPLATE="${SCRIPT_DIR}/crawler-image-digest-pr.md"
 TFVARS="${REPO_ROOT}/${TFVARS_REL}"
 

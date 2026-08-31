@@ -75,7 +75,7 @@ graph TD
 
 `crawler` の実行基盤は `Cloud Run Jobs` です（[INFRA-ADR-003](../../docs/adr/infra/003-crawler-execution-platform.md)、[INFRA-ADR-010](../../docs/adr/infra/010-cloud-run-job-management.md)、[INFRA-ADR-012](../../docs/adr/infra/012-crawler-execution-parameters.md) 参照）。
 
-イメージの build / push は GitHub Actions が行います（[INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)）。Cloud Run Job への反映は、crawler-deploy が [`open-crawler-image-digest-pr.sh`](scripts/open-crawler-image-digest-pr.sh) で digest PR を出し、merge 後に terraform-apply.yml が更新します（[INFRA-ADR-019](../../docs/adr/infra/019-github-actions-terraform-plan-apply.md)、[INFRA-ADR-021](../../docs/adr/infra/021-crawler-image-digest-pr.md)）。
+イメージの build / push は GitHub Actions が行います（[INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)）。Cloud Run Job への反映は、crawler-deploy が [`.github/scripts/open-crawler-image-digest-pr.sh`](../../.github/scripts/open-crawler-image-digest-pr.sh) で digest PR を出し、merge 後に terraform-apply.yml が更新します（[INFRA-ADR-019](../../docs/adr/infra/019-github-actions-terraform-plan-apply.md)、[INFRA-ADR-021](../../docs/adr/infra/021-crawler-image-digest-pr.md)）。
 
 ```mermaid
 graph LR
@@ -100,7 +100,7 @@ graph LR
 - GitHub Actions の image tag は `GITHUB_SHA`。同じ tag があっても build し直す
 - 手元の `make build-push-image` の tag は現在の HEAD の短縮 SHA（`IMAGE_TAG` で上書きできる）。CI の tag とは一致しないことがある
 - GitHub Actions からの image push の認証と IAM は [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md) に従う。`REPO_URL` / `IMAGE_NAME` / WIF provider は ops Terraform が GitHub の repository variable に書く（[INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)）
-- crawler-deploy が `open-crawler-image-digest-pr.sh` で `crawler_image` digest PR を出す。merge 後に terraform-apply.yml が Cloud Run Job の image を更新する（[INFRA-ADR-021](../../docs/adr/infra/021-crawler-image-digest-pr.md)）
+- crawler-deploy が `.github/scripts/open-crawler-image-digest-pr.sh` で `crawler_image` digest PR を出す。merge 後に terraform-apply.yml が Cloud Run Job の image を更新する（[INFRA-ADR-021](../../docs/adr/infra/021-crawler-image-digest-pr.md)）
 - 手元の `make build-push-image` も同じ script を使う
 - crawler は HTTP サービスではなく完了まで走るバッチなので、`Cloud Run Service` ではなく `Cloud Run Jobs` を使う
 - 収集データの保存先は `GCS` をデータレイクとして使う
@@ -109,7 +109,7 @@ graph LR
 
 ```bash
 # 1. crawler 変更が main に入ると Crawler Deploy が image を push する
-# 2. 同じ run が open-crawler-image-digest-pr.sh で
+# 2. 同じ run が .github/scripts/open-crawler-image-digest-pr.sh で
 #    infra/terraform/environments/devgist-app/dev/terraform.tfvars の
 #    crawler_image を書き換えた PR を出す（ブランチ ci/crawler-image-digest）
 # 3. PR で Approve workflows to run し、チェック後に merge する
