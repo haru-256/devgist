@@ -203,7 +203,9 @@ resource "google_storage_bucket_iam_member" "ci_apply_tfstate_write" {
   member = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_apply_dev}"
 }
 
-# --- tf project: この root が書く project レベルの IAM member を plan が refresh するための read ---
+# --- tf project: identity=ops × resource=tf の project ロール（INFRA-ADR-015） ---
+# CI は devgist-tf root を apply しない。これは apply principal が tf root を書くためではなく、
+# ops の plan / apply が terraform_remote_state.tf と、ops が書く tf 上の guest IAM を読むため。
 # tf project には write を付けない（tfstate 基盤は CI に載せない）
 resource "google_project_iam_member" "ci_plan_tf" {
   for_each = toset([

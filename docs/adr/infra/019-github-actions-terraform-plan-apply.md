@@ -285,7 +285,7 @@ ops は CI に載せる。ただし **apply principal に次を付けない**。
 
 plan の read は project の predefined に寄せる。`roles/editor` は付けない。resource 単位の custom role は作らない。
 
-plan / apply は tf / data-dev / ops / app-dev に `roles/viewer` と `roles/iam.securityReviewer` を付ける。`viewer` が tfstate object の get/list と `buckets.get` を、`securityReviewer` が `storage.buckets.getIamPolicy` と `artifactregistry.repositories.getIamPolicy` を含む。これで plan が `_*_iam_member` を refresh できる。apply の tfstate write だけ resource-level の `roles/storage.objectUser` を deploy 対象 bucket（ops / data-dev / app-dev）に付ける。github と tf 自身の state bucket には object write を付けない。
+plan / apply は tf / data-dev / ops / app-dev に `roles/viewer` と `roles/iam.securityReviewer` を付ける。`viewer` が tfstate object の get/list と `buckets.get` を、`securityReviewer` が `storage.buckets.getIamPolicy` と `artifactregistry.repositories.getIamPolicy` を含む。これで plan が `_*_iam_member` を refresh できる。apply principal の tf project grant は `devgist-tf` root を CI apply するためではない。ops の apply が `terraform_remote_state.tf` と、ops が書く tf 上の guest IAM を読むためである。apply の tfstate write だけ resource-level の `roles/storage.objectUser` を deploy 対象 bucket（ops / data-dev / app-dev）に付ける。github と tf 自身の state bucket には object write を付けない。
 
 tf project の `viewer` は同一 project の `haru256-devgist-github-tfstate` の object も読める。github root は CI apply しない。中身は GitHub Environment / variable の識別子で true secret ではない（[INFRA-ADR-020](./020-terraform-cicd-secret-management.md)）。collaborator なしなので許容する。github の state object を CI から隠したい場合は tf project の `viewer` を外し、deploy / tf 自身の bucket 単位の `objectViewer` に戻す。
 
