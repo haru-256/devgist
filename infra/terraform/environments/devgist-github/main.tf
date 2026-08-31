@@ -6,8 +6,8 @@
 # CI の workflow はこの root を対象にしない（.github/workflows/terraform-plan.yml /
 # terraform-apply.yml の deploy 対象外）。
 #
-# state bucket は haru256-devgist-github-tfstate。使う前に devgist-tf の
-# tfstate_gcp_project_ids に haru256-devgist-github を足して tf を apply すること。
+# state bucket は haru256-devgist-github-tfstate。devgist-tf の
+# tfstate_gcp_project_ids が作る。初回は tf を apply してからこの root を init する。
 
 locals {
   github_repository_owner = "haru-256"

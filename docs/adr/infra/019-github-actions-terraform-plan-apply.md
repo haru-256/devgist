@@ -373,7 +373,7 @@ github-devgist / oidc
 
 ## Next Steps
 
-1. `devgist-tf` の `tfstate_gcp_project_ids` に `haru256-devgist-github` を足し、`tf_project_id` output を追加して、ローカルで tf を apply する
+1. `devgist-tf` の `terraform.tfvars` に `haru256-devgist-github` を含めた `tfstate_gcp_project_ids` と `tf_project_id` output がある。ローカルで tf を apply して `haru256-devgist-github-tfstate` を作る
 2. `environments/devgist-github` root を作り、ops から GitHub リソースを移す（ops で `terraform state rm` → `devgist-github` root で `terraform import`）。ローカルで `devgist-github` root を apply する
 3. ops の GitHub WIF mapping に `ci_scope` を足し、condition に `ci_scope != "none"` を足し、`attribute.environment` を外す。新 principalSet の IAM を足してから、同一の手元 apply で旧 `attribute.environment/dev` を外す
 4. plan / apply principal の guest IAM を 015 の表どおり ops と app-dev に書く。tf / data-dev / ops / app-dev の `viewer` + `securityReviewer` と、deploy 対象 tfstate bucket の `objectUser`（apply のみ）を含める。ローカルで data → ops → app の順に apply する
