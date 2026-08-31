@@ -79,11 +79,11 @@ graph TD
 
 ```mermaid
 graph LR
-    GHA[GitHub Actions] --> Script[scripts/build-push-image.sh]
+    GHA[GitHub Actions crawler-deploy] --> Script[scripts/build-push-image.sh]
+    GHA --> DigestPR[digest PR merge / terraform-apply]
     Dev[Developer / Operator] --> Make[make build-push-image]
     Make --> Script
     Script --> AR[Artifact Registry]
-    AR --> DigestPR[digest PR merge / terraform-apply]
     DigestPR --> CRJ[Cloud Run Jobs<br/>single generic job]
     Operator[Operator] --> CRJ
     CRJ --> APIs[External source APIs<br/>DBLP / Semantic Scholar / Unpaywall / arXiv]
@@ -101,13 +101,14 @@ graph LR
 - 手元の `make build-push-image` の tag は現在の HEAD の短縮 SHA（`IMAGE_TAG` で上書きできる）。CI の tag とは一致しないことがある
 - GitHub Actions からの image push の認証と IAM は [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md) に従う。`REPO_URL` / `IMAGE_NAME` / WIF provider は ops Terraform が GitHub の repository variable に書く（[INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)）
 - crawler-deploy が `.github/scripts/open-crawler-image-digest-pr.sh` で `crawler_image` digest PR を出す。merge 後に terraform-apply.yml が Cloud Run Job の image を更新する（[INFRA-ADR-021](../../docs/adr/infra/021-crawler-image-digest-pr.md)）
-- 手元の `make build-push-image` も同じ script を使う
+- 手元の `make build-push-image` も同じ build script を使うが、digest PR は出さない。Cloud Run は committed tfvars の `crawler_image` のまま
 - crawler は HTTP サービスではなく完了まで走るバッチなので、`Cloud Run Service` ではなく `Cloud Run Jobs` を使う
 - 収集データの保存先は `GCS` をデータレイクとして使う
 
 ### 実行例
 
 ```bash
+# 通常運用（crawler-deploy が main で走ったとき）
 # 1. crawler 変更が main に入ると Crawler Deploy が image を push する
 # 2. 同じ run が .github/scripts/open-crawler-image-digest-pr.sh で
 #    infra/terraform/environments/devgist-app/dev/terraform.tfvars の
@@ -115,15 +116,16 @@ graph LR
 # 3. PR で Approve workflows to run し、チェック後に merge する
 # 4. terraform-apply.yml が Cloud Run Job の image を更新する
 
-# 手元で build / push する場合（escape hatch。通常運用は digest PR）
-make build-push-image
-
-# 5. 実行時パラメータを上書きしてジョブを実行
+# 実行時パラメータを上書きしてジョブを実行
 # 値にカンマを含む場合は、gcloud のリスト構文と衝突するため
 # 先頭に ^@^ を付けて @ を区切り文字にする（キーや値に @ が含まれないことを確認）
 gcloud run jobs execute crawler \
   --region us-central1 \
   --update-env-vars='^@^CONFERENCE_NAMES=recsys,kdd@YEARS=2024,2025'
+
+# 手元の build / push（escape hatch）。digest PR は出ない。
+# Cloud Run は最後に merge した crawler_image のまま。
+make build-push-image
 ```
 
 ## ディレクトリ構成
@@ -371,7 +373,7 @@ make fmt               # フォーマッターを実行
 make build-push-image  # コンテナイメージをビルド・push し digest 参照を出力
 ```
 
-`build-push-image` は `scripts/build-push-image.sh` を呼び出し、単一プラットフォームのイメージをビルドして Artifact Registry に push したあと、`image_ref: <repo>/<name>@sha256:<digest>` 形式で出力します。docker の進捗は stderr、`image_ref:` だけが stdout です。通常運用では crawler-deploy が digest PR を作り、merge 後に terraform-apply.yml が Cloud Run Job を更新します。手元の `make build-push-image` は escape hatch です。crawler-deploy から apply はしません。
+`build-push-image` は `scripts/build-push-image.sh` を呼び出し、単一プラットフォームのイメージをビルドして Artifact Registry に push したあと、`image_ref: <repo>/<name>@sha256:<digest>` 形式で出力します。docker の進捗は stderr、`image_ref:` だけが stdout です。digest PR は出ません。Cloud Run Job は committed tfvars の `crawler_image` のままです。通常運用では crawler-deploy が digest PR を作り、merge 後に terraform-apply.yml が Job を更新します。crawler-deploy から apply はしません。
 
 ### プログラムからの使用
 
