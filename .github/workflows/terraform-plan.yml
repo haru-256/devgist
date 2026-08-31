@@ -1,8 +1,9 @@
 name: Terraform Plan
 
 # INFRA-ADR-019: same-repo PR で speculative plan を実行し、結果を PR コメントに出す。
-# read-only の terraform-plan-dev principal。fork PR は OIDC token を取得できないうえ、
-# head repo ガードで auth 自体をスキップする。ここで生成した plan は apply には使わない。
+# read-only の terraform-plan-dev principal。DevGist は same-repo PR author を owner に
+# 限定する（INFRA-ADR-020）。fork PR には secrets も OIDC token も出ない。
+# ここで生成した plan は apply には使わない。
 
 on:
   pull_request:
@@ -43,8 +44,7 @@ jobs:
   terraform_plan:
     name: terraform plan / ${{ matrix.root }}
     needs: find_terraform_roots
-    # same-repo PR のみ authenticated plan を許可する（fork PR には secrets も OIDC token も出ない）
-    if: ${{ needs.find_terraform_roots.outputs.deploy_roots_count != '0' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ needs.find_terraform_roots.outputs.deploy_roots_count != '0' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
