@@ -8,5 +8,5 @@ output "tfstate_buckets" {
 
 output "tf_project_id" {
   value       = data.google_project.project.project_id
-  description = "The GCP project ID that hosts the tfstate buckets. Downstream roots reference project-level custom roles via this ID (INFRA-ADR-019)"
+  description = "The GCP project ID that hosts the tfstate buckets. Downstream roots grant CI project IAM here (INFRA-ADR-019)"
 }

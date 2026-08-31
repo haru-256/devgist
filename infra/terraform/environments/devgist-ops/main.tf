@@ -24,12 +24,6 @@ locals {
     for bucket in local.tfstate_buckets : bucket.bucket_id
     if contains(local.ci_deploy_state_bucket_keys, bucket.project_id)
   ])
-  # CI が読むのは deploy 対象 root の state と、remote state 参照が載る tf 自身の state。
-  # devgist-github はローカル apply のため CI から読ませない
-  ci_read_state_bucket_ids = toset(concat(
-    [for bucket in local.tfstate_buckets : bucket.bucket_id if bucket.project_id == "haru256-devgist-tf"],
-    tolist(local.ci_deploy_state_bucket_ids),
-  ))
 }
 
 data "google_project" "project" {
@@ -195,26 +189,11 @@ moved {
 
 # --- tfstate bucket（tf project）: identity=ops × resource=tf は下流の ops が書く（INFRA-ADR-015） ---
 
-# plan / apply ともに deploy 対象 root と tf 自身の tfstate bucket の read。
-# devgist-github はローカル apply のため読ませない（INFRA-ADR-019）。
-# tfstateReader は devgist-tf が定義する custom role。predefined の read-only role には
-# storage.buckets.getIamPolicy が無く、plan が bucket IAM member を refresh できないため
-resource "google_storage_bucket_iam_member" "ci_tfstate_read" {
-  for_each = {
-    for pair in setproduct(
-      [local.ci_scope_terraform_plan_dev, local.ci_scope_terraform_apply_dev],
-      local.ci_read_state_bucket_ids,
-      ) : "${pair[0]}|${pair[1]}" => {
-      scope  = pair[0]
-      bucket = pair[1]
-    }
-  }
-
-  bucket = each.value.bucket
-  role   = "projects/${data.terraform_remote_state.tf.outputs.tf_project_id}/roles/tfstateReader"
-  member = "${local.github_ci_principal_set_prefix}/${each.value.scope}"
-}
-
+# plan / apply の tfstate object 読みと bucket getIamPolicy は、tf project の
+# roles/viewer + roles/iam.securityReviewer がカバーする。resource 単位の custom role は
+# これらと重複するので作らない（INFRA-ADR-019）。
+# tf project の Viewer は同一 project の github tfstate bucket の object も読める。
+# github root は CI apply しない。write は objectUser を deploy bucket にだけ付ける。
 # apply は deploy 対象 root の state bucket に object の read/write（GCS backend の state と lock file）
 resource "google_storage_bucket_iam_member" "ci_apply_tfstate_write" {
   for_each = local.ci_deploy_state_bucket_ids
@@ -273,15 +252,6 @@ resource "google_project_iam_member" "ci_apply_data_dev" {
   member  = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_apply_dev}"
 }
 
-# --- datalake bucket（data-dev project） ---
-# plan が cursor / crawler の bucket IAM member を refresh するための read-only custom role。
-# datalakeIamReader は devgist-data/dev が定義する。apply は project の roles/storage.admin がカバーする
-resource "google_storage_bucket_iam_member" "ci_plan_datalake_iam_read" {
-  bucket = data.terraform_remote_state.data_dev.outputs.datalake_bucket_name
-  role   = "projects/${data.terraform_remote_state.data_dev.outputs.datalake_project_id}/roles/datalakeIamReader"
-  member = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_plan_dev}"
-}
-
 # --- ops project（同一 root） ---
 resource "google_project_iam_member" "ci_plan_ops" {
   for_each = toset([
@@ -308,28 +278,6 @@ resource "google_project_iam_member" "ci_apply_ops" {
   project = data.google_project.project.project_id
   role    = each.value
   member  = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_apply_dev}"
-}
-
-# plan が AR repository の IAM member を refresh するための read-only custom role。
-# predefined の read-only role には artifactregistry.repositories.getIamPolicy が無い。
-# 定義の変更は CI では通らない（apply principal に iam.roles.update を付けない）
-resource "google_project_iam_custom_role" "ar_repo_iam_reader" {
-  project     = data.google_project.project.project_id
-  role_id     = "arRepoIamReader"
-  title       = "Artifact Registry repository IAM reader"
-  description = "Read-only access to Artifact Registry repository IAM policies for terraform plan (INFRA-ADR-019)"
-  permissions = [
-    "artifactregistry.repositories.get",
-    "artifactregistry.repositories.getIamPolicy",
-  ]
-}
-
-resource "google_artifact_registry_repository_iam_member" "ci_plan_crawler_repo_iam_read" {
-  project    = data.google_project.project.project_id
-  location   = module.artifact_registries["crawler"].location
-  repository = module.artifact_registries["crawler"].repository_id
-  role       = google_project_iam_custom_role.ar_repo_iam_reader.name
-  member     = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_plan_dev}"
 }
 
 # Cursor WIF → data-dev datalake。direct resource access（INFRA-ADR-014）。

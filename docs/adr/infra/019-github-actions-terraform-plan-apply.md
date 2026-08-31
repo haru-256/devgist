@@ -158,6 +158,17 @@ GitHub App を作成し、`TF_GITHUB_APP_ID` / `TF_GITHUB_APP_INSTALLATION_ID` /
 
 作成済みの GitHub App と `TF_GITHUB_APP_*` は削除する。GitHub リソースは `environments/devgist-github` root に移し、ローカルから個人の `GITHUB_TOKEN` で apply する（017 の手元運用を維持）。
 
+### Option E: resource 単位の custom role で plan の getIamPolicy を賄う [却下]
+
+`tfstateReader` / `datalakeIamReader` / `arRepoIamReader` を各 resource 側の root で定義し、bucket / AR repository にだけ付ける方式。predefined の `objectViewer` / AR `reader` / project `viewer` 単体には `storage.buckets.getIamPolicy` や `artifactregistry.repositories.getIamPolicy` が無い、という事実が動機である。
+
+却下理由:
+
+- plan / apply はすでに各 project の `roles/viewer` と `roles/iam.securityReviewer` を持つ。`securityReviewer` が bucket / AR の `getIamPolicy` を含み、tf project の `viewer` が tfstate object の get/list を含む。custom role は同じ permission への二本目のパスになる
+- custom role は定義と bind が root をまたぎ、権限変更は `iam.roles.update` が CI に無いので毎回 bootstrap、Google がメンテしない permission セットを抱える
+- trust boundary は protected `main` と collaborator なし（[INFRA-ADR-020](./020-terraform-cicd-secret-management.md)）である。plan の write 面は mutation を付けないことで既に閉じている。Viewer の上に狭い custom role を重ねても blast radius は下がらない
+- project Viewer を捨てて bucket 単位の read に戻すときだけ、custom role（または `objectViewer` + `securityReviewer`）が代替として意味を持つ。個人オーナー・project 数が少ない現状ではその最適化は後回しにする
+
 ## Decision (決定事項)
 
 GitHub Actions の terraform plan / apply と crawler image push は、既存の GitHub WIF 1 組を入口にし、`attribute.ci_scope` ごとの principalSet で認可する。
@@ -272,19 +283,13 @@ ops は CI に載せる。ただし **apply principal に次を付けない**。
 | 同上 | ops 同一 root の AR など | ops |
 | 同上 | app-dev の project ロール・crawler SA の actAs | app-dev |
 
-ロールは resource-level を優先し、だめなら project の predefined、その次に custom role である。`roles/editor` は付けない。
+plan の read は project の predefined に寄せる。`roles/editor` は付けない。resource 単位の custom role は作らない。
 
-resource の IAM policy の read（`getIamPolicy`）は、predefined の read-only role では bucket / AR repository 分を賄えない（`roles/viewer` は project の `getIamPolicy` 系を含むが、`storage.buckets.getIamPolicy` や `artifactregistry.repositories.getIamPolicy` は含まない）。plan が `_*_iam_member` を refresh するにはこれらが要るので、次の custom role を各 resource 側の root で定義する。
+plan / apply は tf / data-dev / ops / app-dev に `roles/viewer` と `roles/iam.securityReviewer` を付ける。`viewer` が tfstate object の get/list と `buckets.get` を、`securityReviewer` が `storage.buckets.getIamPolicy` と `artifactregistry.repositories.getIamPolicy` を含む。これで plan が `_*_iam_member` を refresh できる。apply の tfstate write だけ resource-level の `roles/storage.objectUser` を deploy 対象 bucket（ops / data-dev / app-dev）に付ける。github と tf 自身の state bucket には object write を付けない。
 
-| custom role | 定義する root | permissions | 付与先 |
-|---|---|---|---|
-| `tfstateReader` | `devgist-tf` | `storage.buckets.get` / `storage.buckets.getIamPolicy` / `storage.objects.get` / `storage.objects.list` | deploy 対象 root と tf 自身の tfstate bucket × plan-dev / apply-dev（`devgist-github` はローカル apply のため CI から読ませない） |
-| `datalakeIamReader` | `devgist-data/dev` | `storage.buckets.get` / `storage.buckets.getIamPolicy` | datalake bucket × plan-dev |
-| `arRepoIamReader` | `devgist-ops` | `artifactregistry.repositories.get` / `artifactregistry.repositories.getIamPolicy` | crawler AR repository × plan-dev |
+tf project の `viewer` は同一 project の `haru256-devgist-github-tfstate` の object も読める。github root は CI apply しない。中身は GitHub Environment / variable の識別子で true secret ではない（[INFRA-ADR-020](./020-terraform-cicd-secret-management.md)）。collaborator なしなので許容する。github の state object を CI から隠したい場合は tf project の `viewer` を外し、deploy / tf 自身の bucket 単位の `objectViewer` に戻す。
 
-custom role の定義変更は CI apply では通らない（apply principal に `iam.roles.update` を付けない）。定義の作成・変更は bootstrap である。
-
-plan は上記 read に加えて各 project の `roles/viewer` と `roles/iam.securityReviewer`（project の `getIamPolicy` と SA / custom role / WIF pool の read）。apply は対象 deploy bucket の `roles/storage.objectUser` と、app-dev / data-dev / ops の必要な mutation（`run.admin`、`storage.admin`、`artifactregistry.admin`、`iam.serviceAccountAdmin`、`serviceusage.serviceUsageAdmin` など）に、crawler SA への `roles/iam.serviceAccountUser` を足す。crawler-push は AR writer だけである。
+apply はこれに加えて app-dev / data-dev / ops の必要な mutation（`run.admin`、`storage.admin`、`artifactregistry.admin`、`iam.serviceAccountAdmin`、`serviceusage.serviceUsageAdmin` など）と、crawler SA への `roles/iam.serviceAccountUser` を足す。crawler-push は AR writer だけである。plan に `storage.admin` / `legacyBucketOwner` など mutation を含む role は付けない。
 
 #### tfvars
 
@@ -320,7 +325,7 @@ github-devgist / oidc
          → crawler-push-dev → AR writer
 
 ローカル / bootstrap
-├─ devgist-tf（tfstate bucket、tfstateReader custom role）
+├─ devgist-tf（tfstate bucket）
 ├─ environments/devgist-github（GitHub Environment / repository variable）
 ├─ WIF mapping と pool/provider の変更
 └─ CI principal の IAM grant の作成・変更
@@ -331,7 +336,7 @@ github-devgist / oidc
 - federated identity 非対応 API が出て、その API だけ SA impersonation に寄せる場合
 - prod を足すとき。`terraform-apply-prod.yml` を作り、prod の principalSet に IAM を付ける。GitHub Environment `prod`（required reviewers 付き）は `environments/devgist-github` root に足す。個人開発なので deployment 開始者本人が承認する前提で `Prevent self-review` は付けない
 - リポジトリ rename。`repository_id` は不変。`workflow_ref` は `assertion.repository` 結合なので通常は追従する。claim の形が変わったときだけ mapping を直す
-- collaborator を増やすとき。same-repo PR から repository variable と plan の read 権限が参照できるため、plan workflow の権限を見直す
+- collaborator を増やすとき。same-repo PR から repository variable と plan の read 権限が参照できるため、plan workflow の権限を見直す。そのとき project `viewer` を捨てて bucket 単位の read に戻すかも再評価する
 - Terraform root 数が増え、全 root の直列 apply が重い場合
 - true secret が必要になった場合。[INFRA-ADR-020](./020-terraform-cicd-secret-management.md) の decision tree を適用する。tfvars / saved plan に payload を載せるのは最後の手段
 
@@ -355,6 +360,7 @@ github-devgist / oidc
 - crawler は feature branch から image を push できない（016 からの行動変）
 - `workflow_ref` はファイルパスに結合する。workflow のリネームは mapping の更新（手元 apply）が要る
 - GitHub リソースの root 分離で state 移行（state rm + import）が一度だけ要る
+- tf project の `viewer` は同一 project の github tfstate object も読める。write は `objectUser` を deploy bucket にだけ付けることで閉じる。中身は true secret ではない（[INFRA-ADR-020](./020-terraform-cicd-secret-management.md)）
 
 ### Risks / Future Review (将来の課題)
 
@@ -367,10 +373,10 @@ github-devgist / oidc
 
 ## Next Steps
 
-1. `devgist-tf` の `tfstate_gcp_project_ids` に `haru256-devgist-github` を足し、`tfstateReader` custom role と `tf_project_id` output を追加して、ローカルで tf を apply する
+1. `devgist-tf` の `tfstate_gcp_project_ids` に `haru256-devgist-github` を足し、`tf_project_id` output を追加して、ローカルで tf を apply する
 2. `environments/devgist-github` root を作り、ops から GitHub リソースを移す（ops で `terraform state rm` → `devgist-github` root で `terraform import`）。ローカルで `devgist-github` root を apply する
 3. ops の GitHub WIF mapping に `ci_scope` を足し、condition に `ci_scope != "none"` を足し、`attribute.environment` を外す。新 principalSet の IAM を足してから、同一の手元 apply で旧 `attribute.environment/dev` を外す
-4. plan / apply principal の guest IAM を 015 の表どおり ops と app-dev に書く。tfstate bucket の IAM も含める。data-dev に `datalakeIamReader`、ops に `arRepoIamReader` を定義する。ローカルで data → ops → app の順に apply する
+4. plan / apply principal の guest IAM を 015 の表どおり ops と app-dev に書く。tf / data-dev / ops / app-dev の `viewer` + `securityReviewer` と、deploy 対象 tfstate bucket の `objectUser`（apply のみ）を含める。ローカルで data → ops → app の順に apply する
 5. 非 secret tfvars の commit 例外を入れる。作成済みの GitHub App と `TF_GITHUB_APP_*` を削除する
 6. `terraform-plan.yml` と `terraform-apply.yml` を追加する。crawler-deploy の trigger を `main` にする
 7. ops の tftest を `ci_scope` に更新する。plan / apply 対象 root の検出には 011 の root 検出に除外フィルタを足したものを使う

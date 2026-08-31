@@ -42,32 +42,28 @@ variables {
   service_account_user_emails = []
 }
 
-run "ci_principals_get_tfstate_read_on_deploy_and_tf_buckets" {
+run "ci_tf_project_roles_are_predefined_read_only" {
   command = plan
 
   assert {
-    condition     = length(google_storage_bucket_iam_member.ci_tfstate_read) == 8
-    error_message = "Expected tfstate read grants for plan/apply scopes on tf + ops/data-dev/app-dev buckets only"
+    condition = toset([for binding in values(google_project_iam_member.ci_plan_tf) : binding.role]) == toset([
+      "roles/viewer",
+      "roles/iam.securityReviewer",
+    ])
+    error_message = "Expected plan principal to use predefined Viewer + securityReviewer on the tf project"
   }
 
   assert {
-    condition     = google_storage_bucket_iam_member.ci_tfstate_read["terraform-plan-dev|haru256-devgist-ops-tfstate"].role == "projects/mock-tf-project/roles/tfstateReader"
-    error_message = "Expected tfstate read to use the tfstateReader custom role defined in the tf project"
+    condition = toset([for binding in values(google_project_iam_member.ci_apply_tf) : binding.role]) == toset([
+      "roles/viewer",
+      "roles/iam.securityReviewer",
+    ])
+    error_message = "Expected apply principal to use predefined Viewer + securityReviewer on the tf project (no write)"
   }
 
   assert {
-    condition     = google_storage_bucket_iam_member.ci_tfstate_read["terraform-apply-dev|haru256-devgist-ops-tfstate"].member == "principalSet://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/github-devgist/attribute.ci_scope/terraform-apply-dev"
-    error_message = "Expected tfstate read member to be the terraform-apply-dev ci_scope principalSet"
-  }
-
-  assert {
-    condition     = !contains(keys(google_storage_bucket_iam_member.ci_tfstate_read), "terraform-plan-dev|haru256-devgist-github-tfstate")
-    error_message = "Plan principal must not read the devgist-github tfstate bucket"
-  }
-
-  assert {
-    condition     = !contains(keys(google_storage_bucket_iam_member.ci_tfstate_read), "terraform-apply-dev|haru256-devgist-github-tfstate")
-    error_message = "Apply principal must not read the devgist-github tfstate bucket"
+    condition     = !contains([for binding in values(google_project_iam_member.ci_apply_tf) : binding.role], "roles/storage.admin")
+    error_message = "Apply principal must not get storage.admin on the tf project"
   }
 }
 
@@ -128,6 +124,14 @@ run "ci_principals_data_dev_project_roles" {
   }
 
   assert {
+    condition = toset([for binding in values(google_project_iam_member.ci_plan_data_dev) : binding.role]) == toset([
+      "roles/viewer",
+      "roles/iam.securityReviewer",
+    ])
+    error_message = "Expected plan principal to use predefined Viewer + securityReviewer on the data-dev project"
+  }
+
+  assert {
     condition = toset([for binding in values(google_project_iam_member.ci_apply_data_dev) : binding.role]) == toset([
       "roles/viewer",
       "roles/iam.securityReviewer",
@@ -135,32 +139,5 @@ run "ci_principals_data_dev_project_roles" {
       "roles/serviceusage.serviceUsageAdmin",
     ])
     error_message = "Expected apply principal roles on the data-dev project"
-  }
-}
-
-run "ci_plan_reads_datalake_and_ar_repo_iam_via_custom_roles" {
-  command = plan
-
-  assert {
-    condition     = google_storage_bucket_iam_member.ci_plan_datalake_iam_read.role == "projects/mock-data-project/roles/datalakeIamReader"
-    error_message = "Expected datalake IAM read to use the datalakeIamReader custom role defined in the data-dev root"
-  }
-
-  assert {
-    condition     = google_storage_bucket_iam_member.ci_plan_datalake_iam_read.bucket == "mock-datalake-bucket"
-    error_message = "Expected datalake IAM read on the data-dev datalake bucket"
-  }
-
-  assert {
-    condition = toset(google_project_iam_custom_role.ar_repo_iam_reader.permissions) == toset([
-      "artifactregistry.repositories.get",
-      "artifactregistry.repositories.getIamPolicy",
-    ])
-    error_message = "Expected arRepoIamReader to be read-only on repository IAM policies"
-  }
-
-  assert {
-    condition     = google_artifact_registry_repository_iam_member.ci_plan_crawler_repo_iam_read.member == "principalSet://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/github-devgist/attribute.ci_scope/terraform-plan-dev"
-    error_message = "Expected AR repo IAM read member to be the terraform-plan-dev ci_scope principalSet"
   }
 }
