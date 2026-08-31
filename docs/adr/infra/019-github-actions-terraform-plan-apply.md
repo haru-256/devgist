@@ -153,7 +153,7 @@ GitHub App を作成し、`TF_GITHUB_APP_ID` / `TF_GITHUB_APP_INSTALLATION_ID` /
 
 - PEM は長寿命の秘密であり、「長寿命の秘密を GitHub に置かない」の要件と緊張する
 - repo secret は same-repo PR の workflow YAML から参照できる。plan を PR に載せる以上、Credential の露出面が増える
-- GitHub リソース（Environment、repository variable、repository secret）は変更頻度が低く、自動化のメリットが小さい
+- GitHub リソース（Environment、repository variable）は変更頻度が低く、自動化のメリットが小さい
 - セキュリティ対処コストが自動化メリットを上回るものはローカル管理にする一般原則に従う
 
 作成済みの GitHub App と `TF_GITHUB_APP_*` は削除する。GitHub リソースは `environments/devgist-github` root に移し、ローカルから個人の `GITHUB_TOKEN` で apply する（017 の手元運用を維持）。
@@ -250,13 +250,13 @@ ops は CI に載せる。ただし **apply principal に次を付けない**。
 - WIF pool / provider の更新（`iam.workloadIdentityPools.update` 相当。`workloadIdentityPoolViewer` 相当の read は付ける）
 - project 全体の IAM 管理（`roles/owner`、`roles/iam.securityAdmin`、`roles/resourcemanager.projectIamAdmin`）
 - CI principal 自身の IAM 変更（tfstate bucket の `setIamPolicy`、data-dev / ops / app-dev project の `setIamPolicy` は付けない）
-- GitHub Ruleset / Environment / repository variable / repository secret の変更（CI は GitHub 向け credential を持たない）
+- GitHub Ruleset / Environment / repository variable の変更（CI は GitHub 向け credential を持たない）
 
 これらが差分に含まれる CI apply は権限不足で失敗する。その変更は手元（bootstrap）である。mapping が security-critical であるという Google の推奨に合わせる。CI apply の権限で完結する差分だけが CI で通る、という境界にする。
 
 #### `environments/devgist-github` root
 
-- GitHub provider のリソース（`github_repository_environment`、`github_actions_variable`、`github_actions_secret`）をこの root が書く。variable の値は ops の `terraform_remote_state` から読む（006）。secret の値は gitignore 済み `secrets.auto.tfvars` が正本で、GitHub API は secret を読めない
+- GitHub provider のリソース（`github_repository_environment`、`github_actions_variable`）をこの root が書く。値は ops の `terraform_remote_state` から読む（006）
 - state bucket は `haru256-devgist-github-tfstate`。`devgist-tf` の `tfstate_gcp_project_ids` に `haru256-devgist-github` を足して tf を apply してから使う
 - 認証はローカルの `GITHUB_TOKEN`（017 の手元運用）。GitHub App は使わない
 - 移行は ops で `terraform state rm` してから `devgist-github` root で `terraform import` する
@@ -291,8 +291,8 @@ plan は上記 read に加えて各 project の `roles/viewer` と `roles/iam.se
 gitignore の `*.tfvars` のままだと CI は plan も apply もできない。空の値で ops を apply すると `cursor_oidc_subjects` が空になり、Cursor の GCS IAM が消える。
 
 - 非 secret（`gcp_project_id`、region、`crawler_image` digest、conference 名など）は `environments/**/terraform.tfvars` に限り version 管理する。gitignore にそのパスの例外を置く。それ以外の `*.tfvars` は引き続き ignore する
-- 人が特定される値（`cursor_oidc_subjects`、`service_account_user_emails`）は commit しない。正本は gitignore 済みの `secrets.auto.tfvars` である（`*.auto.tfvars` なので Terraform が自動で読む）。`environments/devgist-github` が同じ値を repository secret `CURSOR_OIDC_SUBJECTS` / `SERVICE_ACCOUNT_USER_EMAILS` として書く（`jsonencode` した list。CI の `TF_VAR_*` が `set(string)` として読める形）。GitHub UI から secret を手で作らない。ops / app-dev のローカル apply は各 root の `secrets.auto.tfvars`、CI は repository secret 経由の `TF_VAR_*` で渡す
-- これらの variable から `default = []` を外す。未設定なら terraform が "No value for required variable" で落ちるため、値が無いまま apply して grant を消す事故を防ぐ
+- 人が特定される値（`cursor_oidc_subjects`、`service_account_user_emails`）は true secret ではなく principal identifier である。値を知っても OIDC token の偽造や IAM principal としての認証はできない。通常の設定値として `environments/**/terraform.tfvars` に version 管理する。GitHub Repository Secret や `TF_VAR_*` は使わない
+- これらの variable は `default = []` を持つ。空なら grant が付かないだけで、plan / apply は失敗しない
 - `crawler_image` は variable を維持し、値は committed tfvars に置く。image の更新は「build（crawler-deploy が main で push）→ digest を tfvars に書き換える infra PR → merge で apply」の 2 PR 運用とする。digest を書き換える PR の自動作成 CI は別タスク（issue #60 の後続）とする
 
 ### 初期構成
@@ -321,7 +321,7 @@ github-devgist / oidc
 
 ローカル / bootstrap
 ├─ devgist-tf（tfstate bucket、tfstateReader custom role）
-├─ environments/devgist-github（GitHub Environment / repository variable / repository secret）
+├─ environments/devgist-github（GitHub Environment / repository variable）
 ├─ WIF mapping と pool/provider の変更
 └─ CI principal の IAM grant の作成・変更
 ```
@@ -331,7 +331,7 @@ github-devgist / oidc
 - federated identity 非対応 API が出て、その API だけ SA impersonation に寄せる場合
 - prod を足すとき。`terraform-apply-prod.yml` を作り、prod の principalSet に IAM を付ける。GitHub Environment `prod`（required reviewers 付き）は `environments/devgist-github` root に足す。個人開発なので deployment 開始者本人が承認する前提で `Prevent self-review` は付けない
 - リポジトリ rename。`repository_id` は不変。`workflow_ref` は `assertion.repository` 結合なので通常は追従する。claim の形が変わったときだけ mapping を直す
-- collaborator を増やすとき。same-repo PR から repository secret が参照できるため、`CURSOR_OIDC_SUBJECTS` / `SERVICE_ACCOUNT_USER_EMAILS` の置き場と plan workflow の権限を見直す
+- collaborator を増やすとき。same-repo PR から repository variable と plan の read 権限が参照できるため、plan workflow の権限を見直す
 - Terraform root 数が増え、全 root の直列 apply が重い場合
 - tfvars に secret 値が入る見込みが出た場合。tfplan artifact の中身も見直す
 
@@ -368,10 +368,10 @@ github-devgist / oidc
 ## Next Steps
 
 1. `devgist-tf` の `tfstate_gcp_project_ids` に `haru256-devgist-github` を足し、`tfstateReader` custom role と `tf_project_id` output を追加して、ローカルで tf を apply する
-2. `environments/devgist-github` root を作り、ops から GitHub リソースを移す（ops で `terraform state rm` → `devgist-github` root で `terraform import`）。gitignore 済み `secrets.auto.tfvars` を書いてローカル apply し、repository secret を Terraform が書く
+2. `environments/devgist-github` root を作り、ops から GitHub リソースを移す（ops で `terraform state rm` → `devgist-github` root で `terraform import`）。ローカルで `devgist-github` root を apply する
 3. ops の GitHub WIF mapping に `ci_scope` を足し、condition に `ci_scope != "none"` を足し、`attribute.environment` を外す。新 principalSet の IAM を足してから、同一の手元 apply で旧 `attribute.environment/dev` を外す
 4. plan / apply principal の guest IAM を 015 の表どおり ops と app-dev に書く。tfstate bucket の IAM も含める。data-dev に `datalakeIamReader`、ops に `arRepoIamReader` を定義する。ローカルで data → ops → app の順に apply する
-5. 非 secret tfvars の commit 例外を入れ、allowlist を `secrets.auto.tfvars` に移す。`devgist-github` の `secrets.auto.tfvars` にも同じ allowlist を書き、ローカル apply で repository secret を Terraform が書く。作成済みの GitHub App と `TF_GITHUB_APP_*` を削除する。GitHub UI から secret を手で作らない
+5. 非 secret tfvars の commit 例外を入れる。作成済みの GitHub App と `TF_GITHUB_APP_*` を削除する
 6. `terraform-plan.yml` と `terraform-apply.yml` を追加する。crawler-deploy の trigger を `main` にする
 7. ops の tftest を `ci_scope` に更新する。plan / apply 対象 root の検出には 011 の root 検出に除外フィルタを足したものを使う
 8. merge 後、初回の CI plan / apply が通ることを確認し、権限不足があればロールを足す（手元 apply を挟む）

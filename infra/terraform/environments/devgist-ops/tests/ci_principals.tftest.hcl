@@ -62,12 +62,12 @@ run "ci_principals_get_tfstate_read_on_deploy_and_tf_buckets" {
 
   assert {
     condition     = !contains(keys(google_storage_bucket_iam_member.ci_tfstate_read), "terraform-plan-dev|haru256-devgist-github-tfstate")
-    error_message = "Plan principal must not read the devgist-github tfstate bucket (it holds repository secret plaintext)"
+    error_message = "Plan principal must not read the devgist-github tfstate bucket"
   }
 
   assert {
     condition     = !contains(keys(google_storage_bucket_iam_member.ci_tfstate_read), "terraform-apply-dev|haru256-devgist-github-tfstate")
-    error_message = "Apply principal must not read the devgist-github tfstate bucket (it holds repository secret plaintext)"
+    error_message = "Apply principal must not read the devgist-github tfstate bucket"
   }
 }
 

@@ -12,11 +12,6 @@ override_data {
   }
 }
 
-variables {
-  cursor_oidc_subjects        = ["user:308716925"]
-  service_account_user_emails = ["owner@example.com"]
-}
-
 run "write_github_actions_config_from_github_root" {
   command = plan
 
@@ -59,36 +54,4 @@ run "write_github_actions_config_from_github_root" {
     condition     = github_actions_variable.crawler_repo_url.repository == "devgist"
     error_message = "Expected crawler image variables to be repository variables, not environment variables"
   }
-
-  assert {
-    condition     = github_actions_secret.cursor_oidc_subjects.secret_name == "CURSOR_OIDC_SUBJECTS" && github_actions_secret.cursor_oidc_subjects.repository == "devgist"
-    error_message = "Expected CURSOR_OIDC_SUBJECTS to be a repository secret written by the devgist-github root"
-  }
-
-  assert {
-    condition     = github_actions_secret.service_account_user_emails.secret_name == "SERVICE_ACCOUNT_USER_EMAILS" && github_actions_secret.service_account_user_emails.repository == "devgist"
-    error_message = "Expected SERVICE_ACCOUNT_USER_EMAILS to be a repository secret written by the devgist-github root"
-  }
-
-  assert {
-    condition     = github_actions_secret.cursor_oidc_subjects.value == jsonencode(["user:308716925"])
-    error_message = "Expected CURSOR_OIDC_SUBJECTS value to be JSON for TF_VAR_cursor_oidc_subjects"
-  }
-
-  assert {
-    condition     = github_actions_secret.service_account_user_emails.value == jsonencode(["owner@example.com"])
-    error_message = "Expected SERVICE_ACCOUNT_USER_EMAILS value to be JSON for TF_VAR_service_account_user_emails"
-  }
-}
-
-run "reject_cursor_oidc_subject_without_prefix" {
-  command = plan
-
-  variables {
-    cursor_oidc_subjects = ["308716925"]
-  }
-
-  expect_failures = [
-    var.cursor_oidc_subjects,
-  ]
 }

@@ -79,9 +79,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      TF_VAR_cursor_oidc_subjects: ${{ secrets.CURSOR_OIDC_SUBJECTS }}
-      TF_VAR_service_account_user_emails: ${{ secrets.SERVICE_ACCOUNT_USER_EMAILS }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -120,8 +117,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      TF_VAR_service_account_user_emails: ${{ secrets.SERVICE_ACCOUNT_USER_EMAILS }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

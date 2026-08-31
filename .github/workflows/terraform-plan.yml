@@ -54,10 +54,6 @@ jobs:
       fail-fast: false
       matrix:
         root: ${{ fromJson(needs.find_terraform_roots.outputs.deploy_roots) }}
-    env:
-      # ops / app-dev root の必須変数（INFRA-ADR-019）。宣言していない root では warning のみ
-      TF_VAR_cursor_oidc_subjects: ${{ secrets.CURSOR_OIDC_SUBJECTS }}
-      TF_VAR_service_account_user_emails: ${{ secrets.SERVICE_ACCOUNT_USER_EMAILS }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
