@@ -3,7 +3,7 @@
 ## Conclusion (結論)
 
 - GitHub Actions から terraform plan / apply する。WIF は既存の pool `github-devgist` / provider `oidc` を維持する。用途の分離は provider を増やさず、custom attribute `ci_scope`（operation × environment）と IAM の `principalSet` で行う。`attribute.environment` は IAM の主キーから外す。
-- plan は same-repo PR で read-only の speculative plan を実行し、結果を PR コメントに出す。apply は protected `main` への push で dev を自動適用する。final plan は `terraform plan -out=tfplan` で保存し、`terraform apply tfplan` で確認した plan と同じ内容を適用する。
+- plan は same-repo PR で read-only の speculative plan を実行し、結果は Actions の job log で確認する。apply は protected `main` への push で dev を自動適用する。final plan は `terraform plan -out=tfplan` で保存し、`terraform apply tfplan` で確認した plan と同じ内容を適用する。
 - CI apply の対象 root は `devgist-ops` / `devgist-data/dev` / `devgist-app/dev`。`devgist-tf` と、GitHub リソースを管理する新 root `environments/devgist-github` はローカル apply に限定する。GitHub App は導入しない（作成・設定した App と `TF_GITHUB_APP_*` は削除する）。
 - apply principal は WIF pool / provider / attribute mapping、CI principal 自身の IAM、tfstate 基盤（`devgist-tf`）、GitHub リソースを変更できない。これらの差分を含む CI apply は権限不足で失敗し、手元 apply（bootstrap）となる。
 - prod は環境が未作成のため器だけ用意する。`ci_scope` の mapping には prod 条件を先に入れるが、IAM binding と workflow ファイルは prod 環境作成時に足す。
@@ -220,7 +220,7 @@ fork の `pull_request` は GitHub が OIDC token を発行しない（fork で�
 
 静的検証は `.github/workflows/terraform-ci.yml` のまま。GCP 認証を足さない。
 
-- `.github/workflows/terraform-plan.yml` — `pull_request` のみ。`ci_scope=terraform-plan-dev`。`terraform plan -lock=false`（state に lock 用 write を持たせない）。結果は PR コメントに upsert する。`devgist-tf` と `environments/devgist-github` は対象外
+- `.github/workflows/terraform-plan.yml` — `pull_request` のみ。`ci_scope=terraform-plan-dev`。`terraform plan -lock=false`（state に lock 用 write を持たせない）。結果は Actions の job log で確認する。`devgist-tf` と `environments/devgist-github` は対象外
 - `.github/workflows/terraform-apply.yml` — `push` の `main` と `workflow_dispatch`（input `target` は `dev` のみ。prod は環境作成時に専用 workflow `terraform-apply-prod.yml` を足す）。root ごとに plan job（environment 無し → `terraform-plan-dev`）→ apply job（`environment: dev` → `terraform-apply-dev`）を組みにし、`data-dev` → `ops` → `app-dev` の順に `needs:` で直列にする
 - apply の「CI が pass したら」は Ruleset の required checks で担保する。merge できない commit は `main` に乗らず、apply も走らない。up-to-date 必須も設定済みなので、main に乗る内容は必ず CI 通過済みの組み合わせである
 - crawler-deploy の trigger を `main` に合わせる。feature branch では job を走らせない（走っても `ci_scope=none` で失敗する）
@@ -308,7 +308,7 @@ github-devgist / oidc
     │
     ├─ terraform-plan.yml
     │    PR (same-repo)
-    │    → terraform-plan-dev → state/GCP READ → PR コメント
+    │    → terraform-plan-dev → state/GCP READ → Actions job log
     │
     ├─ terraform-apply.yml
     │    push main / workflow_dispatch(target=dev)
@@ -359,7 +359,7 @@ github-devgist / oidc
 ### Risks / Future Review (将来の課題)
 
 - apply principal が project IAM admin を後から付与されると、自分で WIF を緩められる。ロール追加の PR を見る
-- plan 結果を public の PR コメントに出す。識別子は公開されるが secret は含めない。Actions log も login 済みユーザーには見えるので、秘匿性はコメントでも log でも変わらない
+- plan 結果は Actions の job log に出る。識別子は見えるが secret は含めない（[INFRA-ADR-020](./020-terraform-cicd-secret-management.md)）
 - tfplan artifact は apply 用の短寿命バイナリとして `retention-days: 1` にする。true secret の payload は Terraform に渡さない（[INFRA-ADR-020](./020-terraform-cicd-secret-management.md)）
 - 直列 apply の途中失敗で data だけ新しい、があり得る。再実行で揃える
 - IAM ロールの初期セットは実際の CI plan / apply で不足が出たら権限エラーのメッセージに従って足す。初回の CI 実行で調整する
