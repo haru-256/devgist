@@ -181,6 +181,7 @@ moved {
 
 # GitHub リソースは environments/devgist-github へ移す（INFRA-ADR-019）。
 # 実体は消さず ops の state から外す。github root の import が引き継ぐ。
+# state に残っているあいだは providers.tf の github provider が要る。
 removed {
   from = github_repository_environment.dev
 
