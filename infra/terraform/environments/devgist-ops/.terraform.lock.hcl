@@ -68,6 +68,7 @@ provider "registry.terraform.io/integrations/github" {
   constraints = "~> 6.12.0"
   hashes = [
     "h1:bGz4LIep/7PVrqy6P8cTYbAJpdxXGrupUJjkCczlzIs=",
+    "h1:hHOwf554tYL9pQS2uRPbaAGSXRbbBJ/+HtQAoT9mtuA=",
     "zh:3e1a4081ecb9518fdf0074db83c16ad00dc81ffe8249a6e3cf1894e947e28df6",
     "zh:4cb8224b7f530795b674ac044675f6b22a7c9154f55eb9f76c5af6c7534056a4",
     "zh:560bc08637926191f6871a89e986022ca67c70afda5bebca34b5216e6fac69c9",
