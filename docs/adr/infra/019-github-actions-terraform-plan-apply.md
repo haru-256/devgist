@@ -206,7 +206,7 @@ EOT
 
 prod の plan / apply を別 workflow ファイル（`terraform-apply-prod.yml`）にするのは、`workflow_dispatch` の input は JWT claim に載らず、同じファイルでは prod 用 plan job（environment 無し）と dev 用 plan job を `ci_scope` で区別できないからである。prod の Environment 承認は apply job にだけ付け、plan job は承認なしで先に走らせて plan を確認できるようにする。
 
-fork の `pull_request` は GitHub が OIDC token を発行しない（fork では `id-token: write` が効かず `ACTIONS_ID_TOKEN_REQUEST_URL` が出ない）。plan workflow は加えて `head` repository が `github.repository` のときだけ auth する。authenticated plan は same-repo PR に限る。
+fork の `pull_request` は GitHub が OIDC token を発行しない（fork では `id-token: write` が効かず `ACTIONS_ID_TOKEN_REQUEST_URL` が出ない）。DevGist は same-repo PR author を owner に限定する（[INFRA-ADR-020](./020-terraform-cicd-secret-management.md)）ため、workflow に追加の head repo ガードは置かない。
 
 #### `attribute.environment` を外すこと
 
@@ -220,7 +220,7 @@ fork の `pull_request` は GitHub が OIDC token を発行しない（fork で�
 
 静的検証は `.github/workflows/terraform-ci.yml` のまま。GCP 認証を足さない。
 
-- `.github/workflows/terraform-plan.yml` — `pull_request` のみ。same-repo PR 限定。`ci_scope=terraform-plan-dev`。`terraform plan -lock=false`（state に lock 用 write を持たせない）。結果は PR コメントに upsert する。`devgist-tf` と `environments/devgist-github` は対象外
+- `.github/workflows/terraform-plan.yml` — `pull_request` のみ。`ci_scope=terraform-plan-dev`。`terraform plan -lock=false`（state に lock 用 write を持たせない）。結果は PR コメントに upsert する。`devgist-tf` と `environments/devgist-github` は対象外
 - `.github/workflows/terraform-apply.yml` — `push` の `main` と `workflow_dispatch`（input `target` は `dev` のみ。prod は環境作成時に専用 workflow `terraform-apply-prod.yml` を足す）。root ごとに plan job（environment 無し → `terraform-plan-dev`）→ apply job（`environment: dev` → `terraform-apply-dev`）を組みにし、`data-dev` → `ops` → `app-dev` の順に `needs:` で直列にする
 - apply の「CI が pass したら」は Ruleset の required checks で担保する。merge できない commit は `main` に乗らず、apply も走らない。up-to-date 必須も設定済みなので、main に乗る内容は必ず CI 通過済みの組み合わせである
 - crawler-deploy の trigger を `main` に合わせる。feature branch では job を走らせない（走っても `ci_scope=none` で失敗する）
