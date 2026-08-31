@@ -3,6 +3,27 @@ locals {
   github_wif_pool_id      = "github-devgist"
   github_repository_owner = "haru-256"
   github_repository_name  = "devgist"
+
+  # INFRA-ADR-019: GitHub Actions CI の認可単位（operation × environment）
+  ci_scope_terraform_plan_dev  = "terraform-plan-dev"
+  ci_scope_terraform_apply_dev = "terraform-apply-dev"
+  ci_scope_crawler_push_dev    = "crawler-push-dev"
+
+  github_ci_principal_set_prefix = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.github_wif_pool_id}/attribute.ci_scope"
+
+  # CI apply が state を read/write する root の tfstate bucket キー
+  # （devgist-tf の tfstate_gcp_project_ids の要素）。tf 自身と devgist-github root の state は CI に載せない
+  ci_deploy_state_bucket_keys = toset([
+    "haru256-devgist-ops",
+    "haru256-devgist-data-dev",
+    "haru256-devgist-app-dev",
+  ])
+
+  tfstate_buckets = data.terraform_remote_state.tf.outputs.tfstate_buckets
+  ci_deploy_state_bucket_ids = toset([
+    for bucket in local.tfstate_buckets : bucket.bucket_id
+    if contains(local.ci_deploy_state_bucket_keys, bucket.project_id)
+  ])
 }
 
 data "google_project" "project" {
@@ -18,14 +39,24 @@ data "terraform_remote_state" "data_dev" {
   }
 }
 
+# tfstate bucket の識別子と tf project id を借りる。tf は最上流なので循環しない（INFRA-ADR-015 / INFRA-ADR-019）
+data "terraform_remote_state" "tf" {
+  backend = "gcs"
+
+  config = {
+    bucket = "haru256-devgist-tf-tfstate"
+  }
+}
+
 module "required_project_services" {
   source = "../../modules/google_project_services"
 
   project_id = data.google_project.project.project_id
   required_services = [
-    "artifactregistry.googleapis.com", # Artifact Registry
-    "iam.googleapis.com",              # IAM
-    "sts.googleapis.com",              # Security Token Service (WIF)
+    "artifactregistry.googleapis.com",     # Artifact Registry
+    "iam.googleapis.com",                  # IAM
+    "sts.googleapis.com",                  # Security Token Service (WIF)
+    "cloudresourcemanager.googleapis.com", # data.google_project と project IAM。CI の quota project（ops）で必要
   ]
   wait_seconds = 30
 }
@@ -68,7 +99,7 @@ module "cursor_wif" {
   depends_on = [module.required_project_services]
 }
 
-# INFRA-ADR-016
+# INFRA-ADR-016（認証モデル）/ INFRA-ADR-019（ci_scope による認可）
 module "github_wif" {
   source = "../../modules/workload_identity_oidc"
 
@@ -78,54 +109,213 @@ module "github_wif" {
   issuer_uri  = "https://token.actions.githubusercontent.com"
   description = "OIDC federation for GitHub Actions"
 
+  # ci_scope は GitHub が署名した claim から合成する。workflow の YAML が名乗る文字列ではない。
+  # environment は optional claim なので has() で guard する。
+  # apply 系は environment も条件に含め、GitHub Environment の protection（prod の承認）と identity を結合する。
   attribute_mapping = {
     "google.subject"                = "assertion.sub"
     "attribute.repository_id"       = "assertion.repository_id"
     "attribute.repository_owner_id" = "assertion.repository_owner_id"
-    "attribute.environment"         = "assertion.environment"
+    "attribute.ci_scope"            = <<-EOT
+      assertion.workflow_ref == assertion.repository + "/.github/workflows/terraform-apply.yml@refs/heads/main" &&
+      assertion.event_name == "push" &&
+      assertion.ref == "refs/heads/main" &&
+      has(assertion.environment) && assertion.environment == "dev"
+        ? "terraform-apply-dev"
+      : assertion.workflow_ref == assertion.repository + "/.github/workflows/terraform-apply.yml@refs/heads/main" &&
+        assertion.event_name == "workflow_dispatch" &&
+        assertion.ref == "refs/heads/main" &&
+        has(assertion.environment) && assertion.environment == "dev"
+        ? "terraform-apply-dev"
+      : assertion.workflow_ref == assertion.repository + "/.github/workflows/terraform-apply.yml@refs/heads/main" &&
+        (assertion.event_name == "push" || assertion.event_name == "workflow_dispatch") &&
+        assertion.ref == "refs/heads/main" &&
+        !has(assertion.environment)
+        ? "terraform-plan-dev"
+      : assertion.event_name == "pull_request" &&
+        assertion.workflow_ref.startsWith(assertion.repository + "/.github/workflows/terraform-plan.yml@refs/pull/")
+        ? "terraform-plan-dev"
+      : assertion.workflow_ref == assertion.repository + "/.github/workflows/terraform-apply-prod.yml@refs/heads/main" &&
+        assertion.event_name == "workflow_dispatch" &&
+        assertion.ref == "refs/heads/main" &&
+        has(assertion.environment) && assertion.environment == "prod"
+        ? "terraform-apply-prod"
+      : assertion.workflow_ref == assertion.repository + "/.github/workflows/terraform-apply-prod.yml@refs/heads/main" &&
+        assertion.event_name == "workflow_dispatch" &&
+        assertion.ref == "refs/heads/main" &&
+        !has(assertion.environment)
+        ? "terraform-plan-prod"
+      : assertion.workflow_ref == assertion.repository + "/.github/workflows/crawler-deploy.yaml@refs/heads/main" &&
+        assertion.event_name == "push" &&
+        assertion.ref == "refs/heads/main"
+        ? "crawler-push-dev"
+      : "none"
+    EOT
   }
 
   attribute_condition = <<-EOT
     assertion.repository_id == "1106323394" &&
-    assertion.repository_owner_id == "31652298"
+    assertion.repository_owner_id == "31652298" &&
+    attribute.ci_scope != "none"
   EOT
 
   depends_on = [module.required_project_services]
 }
 
-# GitHub Actions → （INFRA-ADR-016）。置き場は ops 同一 root（INFRA-ADR-015）
-resource "google_artifact_registry_repository_iam_member" "github_oidc_dev" {
+# crawler Artifact Registry の writer は crawler-push-dev に限る（INFRA-ADR-019）。
+# 置き場は ops 同一 root（INFRA-ADR-015）
+resource "google_artifact_registry_repository_iam_member" "crawler_push_dev" {
   project    = data.google_project.project.project_id
   location   = module.artifact_registries["crawler"].location
   repository = module.artifact_registries["crawler"].repository_id
   role       = "roles/artifactregistry.writer"
-  member     = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${local.github_wif_pool_id}/attribute.environment/dev"
+  member     = "${local.github_ci_principal_set_prefix}/${local.ci_scope_crawler_push_dev}"
 
   depends_on = [module.github_wif]
 }
 
-# GitHub Actions の Terraform 由来設定（INFRA-ADR-017）
-resource "github_repository_environment" "dev" {
-  repository  = local.github_repository_name
-  environment = "dev"
+# 016 からのリネーム（member は attribute.environment/dev から attribute.ci_scope/crawler-push-dev へ）
+moved {
+  from = google_artifact_registry_repository_iam_member.github_oidc_dev
+  to   = google_artifact_registry_repository_iam_member.crawler_push_dev
 }
 
-resource "github_actions_variable" "gcp_github_wif_provider" {
-  repository    = local.github_repository_name
-  variable_name = "GCP_GITHUB_WIF_PROVIDER"
-  value         = module.github_wif.provider_name
+# GitHub リソースは environments/devgist-github へ移す（INFRA-ADR-019）。
+# 実体は消さず ops の state から外す。github root の import が引き継ぐ。
+# state に残っているあいだは providers.tf の github provider が要る。
+removed {
+  from = github_repository_environment.dev
+
+  lifecycle {
+    destroy = false
+  }
 }
 
-resource "github_actions_variable" "crawler_repo_url" {
-  repository    = local.github_repository_name
-  variable_name = "CRAWLER_REPO_URL"
-  value         = module.artifact_registries["crawler"].repository_url
+removed {
+  from = github_actions_variable.gcp_github_wif_provider
+
+  lifecycle {
+    destroy = false
+  }
 }
 
-resource "github_actions_variable" "crawler_image_name" {
-  repository    = local.github_repository_name
-  variable_name = "CRAWLER_IMAGE_NAME"
-  value         = module.artifact_registries["crawler"].repository_id
+removed {
+  from = github_actions_variable.crawler_repo_url
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = github_actions_variable.crawler_image_name
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+# ============================================================
+# GitHub Actions CI principals（INFRA-ADR-019）
+# ci_scope ごとの principalSet に direct resource access で付与する。
+# plan は read-only、apply は deploy 対象 root の write。
+# これらの grant 自体の変更（setIamPolicy）は CI principal に付けない。
+# 差分が出たら CI apply は権限不足で失敗し、手元 apply（bootstrap）となる。
+# ============================================================
+
+# --- tfstate bucket（tf project）: identity=ops × resource=tf は下流の ops が書く（INFRA-ADR-015） ---
+
+# plan / apply の tfstate object 読みと bucket getIamPolicy は、tf project の
+# roles/viewer + roles/iam.securityReviewer がカバーする。resource 単位の custom role は
+# これらと重複するので作らない（INFRA-ADR-019）。
+# tf project の Viewer は同一 project の github tfstate bucket の object も読める。
+# github root は CI apply しない。write は objectUser を deploy bucket にだけ付ける。
+# apply は deploy 対象 root の state bucket に object の read/write（GCS backend の state と lock file）
+resource "google_storage_bucket_iam_member" "ci_apply_tfstate_write" {
+  for_each = local.ci_deploy_state_bucket_ids
+
+  bucket = each.value
+  role   = "roles/storage.objectUser"
+  member = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_apply_dev}"
+}
+
+# --- tf project: identity=ops × resource=tf の project ロール（INFRA-ADR-015） ---
+# CI は devgist-tf root を apply しない。これは apply principal が tf root を書くためではなく、
+# ops の plan / apply が terraform_remote_state.tf と、ops が書く tf 上の guest IAM を読むため。
+# tf project には write を付けない（tfstate 基盤は CI に載せない）
+resource "google_project_iam_member" "ci_plan_tf" {
+  for_each = toset([
+    "roles/viewer",
+    "roles/iam.securityReviewer",
+  ])
+
+  project = data.terraform_remote_state.tf.outputs.tf_project_id
+  role    = each.value
+  member  = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_plan_dev}"
+}
+
+resource "google_project_iam_member" "ci_apply_tf" {
+  for_each = toset([
+    "roles/viewer",
+    "roles/iam.securityReviewer",
+  ])
+
+  project = data.terraform_remote_state.tf.outputs.tf_project_id
+  role    = each.value
+  member  = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_apply_dev}"
+}
+
+# --- data-dev project: identity=ops × resource=data は ops が書く（INFRA-ADR-015） ---
+resource "google_project_iam_member" "ci_plan_data_dev" {
+  for_each = toset([
+    "roles/viewer",
+    "roles/iam.securityReviewer",
+  ])
+
+  project = data.terraform_remote_state.data_dev.outputs.datalake_project_id
+  role    = each.value
+  member  = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_plan_dev}"
+}
+
+resource "google_project_iam_member" "ci_apply_data_dev" {
+  for_each = toset([
+    "roles/viewer",
+    "roles/iam.securityReviewer",
+    "roles/storage.admin",                  # bucket の作成・更新・削除（data-dev の主リソース）
+    "roles/serviceusage.serviceUsageAdmin", # API 有効化
+  ])
+
+  project = data.terraform_remote_state.data_dev.outputs.datalake_project_id
+  role    = each.value
+  member  = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_apply_dev}"
+}
+
+# --- ops project（同一 root） ---
+resource "google_project_iam_member" "ci_plan_ops" {
+  for_each = toset([
+    "roles/viewer",
+    "roles/iam.securityReviewer",
+    "roles/serviceusage.serviceUsageConsumer", # WIF direct access の quota project 利用
+  ])
+
+  project = data.google_project.project.project_id
+  role    = each.value
+  member  = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_plan_dev}"
+}
+
+resource "google_project_iam_member" "ci_apply_ops" {
+  for_each = toset([
+    "roles/viewer",
+    "roles/iam.securityReviewer",
+    "roles/artifactregistry.admin",            # repository の作成・削除と repository IAM
+    "roles/iam.serviceAccountAdmin",           # SA の作成・削除と SA IAM
+    "roles/serviceusage.serviceUsageAdmin",    # API 有効化
+    "roles/serviceusage.serviceUsageConsumer", # WIF direct access の quota project 利用
+  ])
+
+  project = data.google_project.project.project_id
+  role    = each.value
+  member  = "${local.github_ci_principal_set_prefix}/${local.ci_scope_terraform_apply_dev}"
 }
 
 # Cursor WIF → data-dev datalake。direct resource access（INFRA-ADR-014）。

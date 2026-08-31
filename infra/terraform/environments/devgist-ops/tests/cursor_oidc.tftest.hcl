@@ -1,6 +1,5 @@
 mock_provider "google" {}
 mock_provider "google-beta" {}
-mock_provider "github" {}
 
 override_data {
   target = data.google_project.project
@@ -20,9 +19,27 @@ override_data {
   }
 }
 
+override_data {
+  target = data.terraform_remote_state.tf
+  values = {
+    outputs = {
+      tf_project_id = "mock-tf-project"
+      tfstate_buckets = [
+        { project_id = "haru256-devgist-tf", bucket_id = "haru256-devgist-tf-tfstate" },
+        { project_id = "haru256-devgist-ops", bucket_id = "haru256-devgist-ops-tfstate" },
+        { project_id = "haru256-devgist-data-dev", bucket_id = "haru256-devgist-data-dev-tfstate" },
+        { project_id = "haru256-devgist-app-dev", bucket_id = "haru256-devgist-app-dev-tfstate" },
+        { project_id = "haru256-devgist-github", bucket_id = "haru256-devgist-github-tfstate" },
+      ]
+    }
+  }
+}
+
 variables {
-  gcp_project_id     = "ops"
-  gcp_default_region = "us-central1"
+  gcp_project_id              = "ops"
+  gcp_default_region          = "us-central1"
+  cursor_oidc_subjects        = []
+  service_account_user_emails = []
 }
 
 run "grant_cursor_oidc_datalake_read_write" {
@@ -50,10 +67,6 @@ run "grant_cursor_oidc_datalake_read_write" {
 
 run "skip_cursor_oidc_datalake_when_allowlist_empty" {
   command = plan
-
-  variables {
-    cursor_oidc_subjects = []
-  }
 
   assert {
     condition     = length(google_storage_bucket_iam_member.cursor_oidc) == 0

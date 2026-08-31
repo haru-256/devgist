@@ -1,7 +1,10 @@
 name: Crawler Deploy
 
+# INFRA-ADR-019: write 系の ci_scope は protected main に閉じる。
 on:
   push:
+    branches:
+      - "main"
     paths:
       - "workflows/crawler/**"
       - "!workflows/crawler/**/*.md"

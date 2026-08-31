@@ -32,3 +32,8 @@ output "attribute_condition" {
   description = "CEL condition that tokens must satisfy."
   value       = google_iam_workload_identity_pool_provider.oidc.attribute_condition
 }
+
+output "attribute_mapping" {
+  description = "CEL expressions that map IdP claims to Google STS attributes."
+  value       = google_iam_workload_identity_pool_provider.oidc.attribute_mapping
+}

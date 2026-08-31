@@ -259,6 +259,10 @@ crash.*.log
 *.tfvars
 *.tfvars.json
 
+# 例外: environments 配下の terraform.tfvars は非 secret 値（project id、region、image digest、
+# principal identifier など）だけを置き、version 管理する（INFRA-ADR-019）。
+!infra/terraform/environments/**/terraform.tfvars
+
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
 override.tf

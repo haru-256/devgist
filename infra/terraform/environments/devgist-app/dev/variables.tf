@@ -10,8 +10,8 @@ variable "gcp_default_region" {
 
 variable "service_account_user_emails" {
   type        = set(string)
-  description = "Email addresses of users allowed to attach / actAs managed service accounts."
   default     = []
+  description = "Email addresses of users allowed to attach / actAs managed service accounts. Set in terraform.tfvars (INFRA-ADR-020)."
 
   validation {
     condition = alltrue([

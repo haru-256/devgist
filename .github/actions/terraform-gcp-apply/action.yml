@@ -1,0 +1,54 @@
+name: "Terraform GCP Apply"
+description: "Authenticate via GitHub WIF (direct access), init with the GCS backend, download the saved plan artifact, and apply it. Never runs a bare terraform apply (INFRA-ADR-019)."
+
+inputs:
+  working-directory:
+    description: "Terraform root directory"
+    required: true
+  terraform-version:
+    description: "Terraform version"
+    required: false
+    default: "1.14.8"
+  workload-identity-provider:
+    description: "WIF provider resource name (vars.GCP_GITHUB_WIF_PROVIDER)"
+    required: true
+  gcp-project-id:
+    description: "GCP project ID used as the quota project by the auth action"
+    required: false
+    default: "haru256-devgist-ops"
+  plan-artifact-name:
+    description: "Artifact name of the saved plan produced by terraform-gcp-plan"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v3
+      with:
+        project_id: ${{ inputs.gcp-project-id }}
+        workload_identity_provider: ${{ inputs.workload-identity-provider }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v4
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        terraform_wrapper: false
+
+    - name: Terraform init
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: terraform init -backend-config=config.gcs.tfbackend -input=false
+
+    - name: Download plan artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: ${{ inputs.plan-artifact-name }}
+        path: ${{ inputs.working-directory }}
+
+    # saved plan を apply するので variable の再入力は不要。
+    # state が plan 後に変わっていれば Terraform が stale plan として失敗させる
+    - name: Terraform apply
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: terraform apply -input=false -no-color tfplan

@@ -8,6 +8,10 @@ provider "google-beta" {
   region  = var.gcp_default_region
 }
 
+# GitHub リソースは environments/devgist-github へ移す。ops の state に
+# github_repository_environment / github_actions_variable が残っているあいだは
+# removed（destroy = false）の解釈にこの provider が要る。init し直すだけでは足りない。
+# forget が終わったら provider と required_providers の github は消してよい。
 provider "github" {
   owner = local.github_repository_owner
 }

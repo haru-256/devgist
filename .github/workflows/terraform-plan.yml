@@ -1,0 +1,64 @@
+name: Terraform Plan
+
+# INFRA-ADR-019: same-repo PR で speculative plan を実行する。結果は Actions の job log で確認する。
+# read-only の terraform-plan-dev principal。DevGist は same-repo PR author を owner に
+# 限定する（INFRA-ADR-020）。fork PR には secrets も OIDC token も出ない。
+# ここで生成した plan は apply には使わない。
+
+on:
+  pull_request:
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform-plan.yml"
+      - ".github/actions/terraform-gcp-plan/**"
+      - ".github/scripts/find_terraform_roots.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  find_terraform_roots:
+    name: Find Terraform deploy roots
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_roots: ${{ steps.find-roots.outputs.deploy_roots }}
+      deploy_roots_count: ${{ steps.find-roots.outputs.deploy_roots_count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      # devgist-tf（tfstate 基盤）と devgist-github（GitHub リソース）はローカル apply のため対象外（INFRA-ADR-019）
+      - name: Find Terraform roots
+        id: find-roots
+        run: python .github/scripts/find_terraform_roots.py --terraform-dir infra/terraform --deploy-exclude devgist-tf devgist-github
+
+  terraform_plan:
+    name: terraform plan / ${{ matrix.root }}
+    needs: find_terraform_roots
+    if: ${{ needs.find_terraform_roots.outputs.deploy_roots_count != '0' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        root: ${{ fromJson(needs.find_terraform_roots.outputs.deploy_roots) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Terraform plan
+        uses: ./.github/actions/terraform-gcp-plan
+        with:
+          working-directory: ${{ matrix.root }}
+          workload-identity-provider: ${{ vars.GCP_GITHUB_WIF_PROVIDER }}

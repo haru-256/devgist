@@ -5,6 +5,8 @@ override_data {
   values = {
     outputs = {
       ops_project_id                                = "mock-ops-project"
+      ops_project_number                            = "123456789"
+      github_wif_pool_id                            = "github-devgist"
       crawler_artifact_registry_repository_id       = "mock-crawler-repo"
       crawler_artifact_registry_repository_location = "us-central1"
     }
@@ -22,9 +24,10 @@ override_data {
 }
 
 variables {
-  gcp_project_id     = "app-dev"
-  gcp_default_region = "us-central1"
-  crawler_image      = "us-central1-docker.pkg.dev/ops/crawler/crawler@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  gcp_project_id              = "app-dev"
+  gcp_default_region          = "us-central1"
+  crawler_image               = "us-central1-docker.pkg.dev/ops/crawler/crawler@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  service_account_user_emails = []
 }
 
 run "accept_single_conference_name" {
