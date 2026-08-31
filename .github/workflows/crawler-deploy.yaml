@@ -1,7 +1,6 @@
 name: Crawler Deploy
 
 # INFRA-ADR-019: write 系の ci_scope は protected main に閉じる。
-# feature branch の push では ci_scope=none で token 交換が失敗するため、trigger 自体を main に限定する
 on:
   push:
     branches:
