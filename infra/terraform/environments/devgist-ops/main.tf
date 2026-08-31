@@ -19,8 +19,7 @@ locals {
     "haru256-devgist-app-dev",
   ])
 
-  tfstate_buckets        = data.terraform_remote_state.tf.outputs.tfstate_buckets
-  all_tfstate_bucket_ids = toset([for bucket in local.tfstate_buckets : bucket.bucket_id])
+  tfstate_buckets = data.terraform_remote_state.tf.outputs.tfstate_buckets
   ci_deploy_state_bucket_ids = toset([
     for bucket in local.tfstate_buckets : bucket.bucket_id
     if contains(local.ci_deploy_state_bucket_keys, bucket.project_id)
