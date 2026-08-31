@@ -1,6 +1,8 @@
 ## 概要
 crawler-deploy が push した image digest を `crawler_image` に反映する。
 
+トリガー commit: `{{SOURCE_SHA}}`
+
 ## Why
 Cloud Run Job は Terraform 管理の digest pin（INFRA-ADR-010 / 019）。この PR を merge すると terraform-apply.yml が Job の image を更新する。
 

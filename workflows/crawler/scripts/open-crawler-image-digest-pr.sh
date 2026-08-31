@@ -18,6 +18,9 @@ RUN_URL="${RUN_URL:-}"
 BRANCH="ci/crawler-image-digest"
 TFVARS_REL="infra/terraform/environments/devgist-app/dev/terraform.tfvars"
 COMMIT_MSG="chore(infra): bump crawler Cloud Run image digest"
+if [[ -n "${SOURCE_SHA}" ]]; then
+  COMMIT_MSG="${COMMIT_MSG} (${SOURCE_SHA})"
+fi
 PR_TITLE="${COMMIT_MSG}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -59,16 +62,17 @@ git add -- "${TFVARS}"
 git commit -m "${COMMIT_MSG}"
 git push --force-with-lease origin "HEAD:${BRANCH}"
 
-pr_url="$(gh pr list --head "${BRANCH}" --base main --state open --json url --jq '.[0].url // empty')"
-if [[ -n "${pr_url}" ]]; then
-  printf 'Updated existing PR: %s\n' "${pr_url}"
-  exit 0
-fi
-
 body="$(sed \
   -e "s|{{IMAGE_REF}}|${IMAGE_REF}|g" \
   -e "s|{{SOURCE_SHA}}|${SOURCE_SHA}|g" \
   -e "s|{{RUN_URL}}|${RUN_URL}|g" \
   "${BODY_TEMPLATE}")"
+
+pr_url="$(gh pr list --head "${BRANCH}" --base main --state open --json url --jq '.[0].url // empty')"
+if [[ -n "${pr_url}" ]]; then
+  gh pr edit "${pr_url}" --title "${PR_TITLE}" --body "${body}"
+  printf 'Updated existing PR: %s\n' "${pr_url}"
+  exit 0
+fi
 
 gh pr create --base main --head "${BRANCH}" --title "${PR_TITLE}" --body "${body}"
