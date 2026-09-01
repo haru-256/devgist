@@ -64,12 +64,17 @@ runs:
         if [ "${SAVE_PLAN}" = "true" ]; then
           out_flag=(-out=tfplan)
         fi
+        # -detailed-exitcode は差分ありで 2。composite の bash -e が 2 を失敗にするので
+        # 先に +e してから判定する。0 / 2 は成功、それ以外は失敗。
+        set +e
         terraform plan -no-color -input=false -lock=false -detailed-exitcode "${out_flag[@]}" 2>&1 | tee plan.txt
         code="${PIPESTATUS[0]}"
+        set -e
         echo "plan-exit-code=${code}" >> "${GITHUB_OUTPUT}"
-        if [ "${code}" -eq 1 ]; then
-          exit 1
+        if [ "${code}" -eq 0 ] || [ "${code}" -eq 2 ]; then
+          exit 0
         fi
+        exit "${code}"
 
     - name: Show saved plan in summary
       if: ${{ inputs.save-plan == 'true' }}
