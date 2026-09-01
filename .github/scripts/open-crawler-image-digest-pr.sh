@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Update crawler_image in app-dev tfvars and open or update a digest PR.
+# app-dev tfvars の crawler_image を更新し、digest PR を作成または更新する。
 #
-# Required env: IMAGE_REF, GH_TOKEN
-# Optional env: SOURCE_SHA, RUN_URL
-# Caller must be able to push to origin and call the GitHub API.
+# 必須 env: IMAGE_REF, GH_TOKEN
+# 任意 env: SOURCE_SHA, RUN_URL
+# origin への push と GitHub API が使えること。
 #
-# Branch is always reset from origin/main (ci/crawler-image-digest).
-# No-op when tfvars already has IMAGE_REF.
+# ブランチ ci/crawler-image-digest は毎回 origin/main から作り直す。
+# tfvars がすでに IMAGE_REF なら no-op。
 
 IMAGE_REF="${IMAGE_REF:?IMAGE_REF is required}"
 GH_TOKEN="${GH_TOKEN:?GH_TOKEN is required}"
@@ -35,10 +35,15 @@ fi
 
 cd "${REPO_ROOT}"
 
+# actions/checkout は remote.origin.fetch を main に狭める。
+# origin/main を更新し、digest ブランチは origin/<branch> へ明示マップする。
+# 素の `git fetch origin <branch>` は FETCH_HEAD だけ更新し、lease 用の
+# tracking ref が立たない。初回はリモートにブランチが無いので失敗してよい。
 printf 'Resetting %s from origin/main\n' "${BRANCH}"
 git fetch origin main
-# Lease needs origin/<branch>. checkout often narrows remote.origin.fetch to main.
 git fetch origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}" || true
+# 毎回 origin/main から作り直す。upstream を origin/main に付けると、
+# 引数なしの --force-with-lease が dest を main の SHA と比べて stale になる。
 git checkout --no-track -B "${BRANCH}" origin/main
 
 matches="$(grep -c -E '^crawler_image[[:space:]]*=' "${TFVARS}" || true)"
@@ -60,6 +65,9 @@ git config user.name "github-actions[bot]"
 git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 git add -- "${TFVARS}"
 git commit -m "${COMMIT_MSG}"
+# --force-with-lease=<dest>:<expect>。expect は「リモート dest はまだこの SHA」。
+# tracking ref があればそれを expect にする。無ければ空 expect（未作成）で作る。
+# 引数なしの --force-with-lease は local upstream を見るので使わない。
 if git rev-parse --verify "refs/remotes/origin/${BRANCH}" >/dev/null 2>&1; then
   git push --force-with-lease="refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}" \
     origin "HEAD:${BRANCH}"
