@@ -56,7 +56,7 @@ async def test_execute_flow(
     mock_arxiv_repo: MagicMock,
     mock_datalake: MagicMock,
 ) -> None:
-    """RecSysの論文取得フローが正しく実行されることを検証"""
+    """DOI あり論文を取得し、S2 と Unpaywall で埋めたあと arXiv を呼ばないことを検証"""
 
     # 1. DBLPから取得される初期論文リスト
     initial_papers = [
@@ -223,6 +223,7 @@ async def test_execute_skips_later_enrichers_when_paper_is_complete(
     mock_arxiv_repo: MagicMock,
     mock_datalake: MagicMock,
 ) -> None:
+    """前段で abstract と pdf_url が揃った論文は後段 enricher を呼ばないことを検証"""
     paper = Paper(
         title="P1",
         authors=[],
@@ -269,6 +270,7 @@ async def test_execute_overwrite_still_calls_all_enrichers(
     mock_arxiv_repo: MagicMock,
     mock_datalake: MagicMock,
 ) -> None:
+    """overwrite_enrichments=True のときは既に揃っていても全 enricher を呼ぶことを検証"""
     paper = Paper(
         title="P1",
         authors=[],

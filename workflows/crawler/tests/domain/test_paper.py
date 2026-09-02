@@ -284,6 +284,7 @@ def test_paper_apply_enrichment_respects_overwrite_flag() -> None:
 
 
 def test_paper_needs_enrichment() -> None:
+    """abstract または pdf_url が無いときだけ needs_enrichment が True になることをテスト"""
     missing = Paper(title="T", authors=["A"], year=2025, venue="RecSys")
     abstract_only = Paper(
         title="T", authors=["A"], year=2025, venue="RecSys", abstract="abs"
