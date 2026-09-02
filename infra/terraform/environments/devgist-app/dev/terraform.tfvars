@@ -8,4 +8,4 @@ service_account_user_emails = ["yohei.okabayashi@haru256.dev", "admin@haru256.de
 
 # crawler image の digest。crawler-deploy が main で push した image に合わせ、
 # digest を書き換える infra PR で更新する（INFRA-ADR-019）
-crawler_image = "us-central1-docker.pkg.dev/haru256-devgist-ops/crawler/crawler@sha256:c85e37e684a28dafb5ac45c9329951584cd268eb07b9e6795b17bf453efc2590"
+crawler_image = "us-central1-docker.pkg.dev/haru256-devgist-ops/crawler/crawler@sha256:dbe0e2a4298dd5e4d061c7a04c59e1cc14d5656cfd4eadf6e6992a0a32adbb4a"
