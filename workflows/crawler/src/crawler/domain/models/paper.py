@@ -53,6 +53,10 @@ class Paper(BaseModel):
         if enrichment.pdf_url and (self.pdf_url is None or overwrite):
             self.pdf_url = enrichment.pdf_url
 
+    def needs_enrichment(self) -> bool:
+        """abstract または pdf_url が未設定なら True を返します。"""
+        return self.abstract is None or self.pdf_url is None
+
 
 class FetchedPaperEnrichment(BaseModel):
     """論文識別子と補完情報を組にした取得結果。"""
