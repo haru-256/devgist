@@ -111,7 +111,7 @@ async def test_execute_flow(
     expected_papers_for_enrich = [initial_papers[0]]
     mock_semantic_scholar_repo.fetch_enrichments.assert_called_once_with(expected_papers_for_enrich)
     mock_unpaywall_repo.fetch_enrichments.assert_called_once_with(expected_papers_for_enrich)
-    mock_arxiv_repo.fetch_enrichments.assert_called_once_with(expected_papers_for_enrich)
+    mock_arxiv_repo.fetch_enrichments.assert_not_called()
 
     # 5. Datalake save_papers（最終的なenrich済み論文が保存されること）
     mock_datalake.save_papers.assert_called_once_with(
@@ -214,3 +214,91 @@ async def test_apply_enrichments_can_overwrite_existing_values(
     await usecase.execute(2024)
 
     assert paper.abstract == "Updated abstract"
+
+
+@pytest.mark.asyncio
+async def test_execute_skips_later_enrichers_when_paper_is_complete(
+    mock_dblp_repo: MagicMock,
+    mock_semantic_scholar_repo: MagicMock,
+    mock_unpaywall_repo: MagicMock,
+    mock_arxiv_repo: MagicMock,
+    mock_datalake: MagicMock,
+) -> None:
+    paper = Paper(
+        title="P1",
+        authors=[],
+        year=2024,
+        venue="RecSys",
+        doi="10.1145/1",
+    )
+    mock_dblp_repo.fetch_papers.return_value = [paper]
+    mock_semantic_scholar_repo.fetch_enrichments.return_value = [
+        FetchedPaperEnrichment(
+            doi="10.1145/1",
+            enrichment=PaperEnrichment(
+                abstract="Abstract from S2",
+                pdf_url="https://example.com/p1.pdf",
+            ),
+        )
+    ]
+
+    usecase = CrawlConferencePapers(
+        conf_name=ConferenceName.RECSYS,
+        paper_retriever=mock_dblp_repo,
+        paper_enrichers=[
+            mock_semantic_scholar_repo,
+            mock_unpaywall_repo,
+            mock_arxiv_repo,
+        ],
+        paper_datalake=mock_datalake,
+    )
+
+    await usecase.execute(2024)
+
+    mock_semantic_scholar_repo.fetch_enrichments.assert_called_once_with([paper])
+    mock_unpaywall_repo.fetch_enrichments.assert_not_called()
+    mock_arxiv_repo.fetch_enrichments.assert_not_called()
+    assert paper.abstract == "Abstract from S2"
+    assert paper.pdf_url == "https://example.com/p1.pdf"
+
+
+@pytest.mark.asyncio
+async def test_execute_overwrite_still_calls_all_enrichers(
+    mock_dblp_repo: MagicMock,
+    mock_semantic_scholar_repo: MagicMock,
+    mock_unpaywall_repo: MagicMock,
+    mock_arxiv_repo: MagicMock,
+    mock_datalake: MagicMock,
+) -> None:
+    paper = Paper(
+        title="P1",
+        authors=[],
+        year=2024,
+        venue="RecSys",
+        doi="10.1145/1",
+        abstract="Original abstract",
+        pdf_url="https://example.com/original.pdf",
+    )
+    mock_dblp_repo.fetch_papers.return_value = [paper]
+    mock_semantic_scholar_repo.fetch_enrichments.return_value = []
+    mock_unpaywall_repo.fetch_enrichments.return_value = []
+    mock_arxiv_repo.fetch_enrichments.return_value = []
+
+    usecase = CrawlConferencePapers(
+        conf_name=ConferenceName.RECSYS,
+        paper_retriever=mock_dblp_repo,
+        paper_enrichers=[
+            mock_semantic_scholar_repo,
+            mock_unpaywall_repo,
+            mock_arxiv_repo,
+        ],
+        paper_datalake=mock_datalake,
+        overwrite_enrichments=True,
+    )
+
+    await usecase.execute(2024)
+
+    expected = [paper]
+    mock_semantic_scholar_repo.fetch_enrichments.assert_called_once_with(expected)
+    mock_unpaywall_repo.fetch_enrichments.assert_called_once_with(expected)
+    mock_arxiv_repo.fetch_enrichments.assert_called_once_with(expected)

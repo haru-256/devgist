@@ -111,9 +111,16 @@ class CrawlConferencePapers:
             f"Enriching {self.conf_name.upper()} {year} papers with {len(self.paper_enrichers)} enricher(s)..."
         )
         for paper_enricher in self.paper_enrichers:
+            targets = (
+                papers
+                if self.overwrite_enrichments
+                else [p for p in papers if p.needs_enrichment()]
+            )
+            if not targets:
+                continue
             enricher_name = paper_enricher.__class__.__name__
             logger.info(f"Enriching {self.conf_name.upper()} {year} papers with {enricher_name}...")
-            fetched_enrichments = await paper_enricher.fetch_enrichments(papers)
+            fetched_enrichments = await paper_enricher.fetch_enrichments(targets)
             self._apply_enrichments(
                 papers,
                 fetched_enrichments,
