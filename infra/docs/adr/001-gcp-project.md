@@ -1,1 +1,0 @@
-../../../docs/adr/infra/001-gcp-project-structure.md

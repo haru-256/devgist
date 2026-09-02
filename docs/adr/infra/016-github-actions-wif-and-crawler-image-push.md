@@ -16,6 +16,8 @@ Accepted (承認済み) - 2026-08-28
 
 [INFRA-ADR-007](./007-artifact-registry-and-sa-strategy.md) の AR 1 本 / SHA pin / workload SA は維持する。007 の「push する SA は `github-actions`」と「初期は全リポジトリ writer」は本 ADR が置き換える。007 本文は履歴として残す。
 
+[INFRA-ADR-019](./019-github-actions-terraform-plan-apply.md) が「IAM は `attribute.environment/dev`」と「crawler image は branch を問わず」を置き換える。GitHub 専用 pool、direct resource access、SA impersonation なし、condition は repository id、という認証モデルは本 ADR のまま。
+
 ## Context (背景・課題)
 
 ### 背景

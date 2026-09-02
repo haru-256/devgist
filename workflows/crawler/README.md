@@ -4,9 +4,15 @@
 
 DBLP Computer Science Bibliographyから主要な推薦システム・データマイニング系カンファレンスの論文情報を取得し、Semantic Scholar・Unpaywall・arXivの各APIで要約やPDF URLを付加します。最終的にGoogle Cloud Storage（データレイク）へ保存します。
 
+## 現行方針
+
+crawler の**今の方針**は [docs/architecture/crawler-runtime.md](../../docs/architecture/crawler-runtime.md) にあります。
+CI/CD と image の扱いは [docs/architecture/cicd.md](../../docs/architecture/cicd.md) です。変更に着手する前に読んでください。
+
 ## 関連 ADR
 
-crawler に関する Architecture Decision Record (ADR) は [docs/adr/](../../docs/adr/) 配下で管理します。
+判断の**経緯**は Architecture Decision Record (ADR) として [docs/adr/](../../docs/adr/) 配下で管理します。
+ADR は追記のみで運用しており、部分的な supersede が積み重なるため、現行方針の判断には使わないでください。
 
 - 運用ガイド: [docs/adr/README.md](../../docs/adr/README.md)
 - テンプレート: [docs/adr/_template.md](../../docs/adr/_template.md)
@@ -20,7 +26,7 @@ crawler に関する Architecture Decision Record (ADR) は [docs/adr/](../../do
 - [CRAWLER-ADR-001](../../docs/adr/crawler/001-language-selection.md)
 - [CRAWLER-ADR-002](../../docs/adr/crawler/002-xml-parsing-security.md)
 
-このディレクトリ配下の `workflows/crawler/docs/adr/` は互換性維持のための参照パスであり、正本は [docs/adr/](../../docs/adr/) 側です。
+ADR は `docs/adr/` 配下にのみ置きます。`workflows/crawler/docs/adr/` にあった複製は削除済みです。
 
 ## 対象カンファレンス
 
@@ -99,7 +105,7 @@ graph LR
 - コンテナイメージは `Artifact Registry` に保存する。`workflows/crawler` の image に効く変更、または Crawler Deploy workflow 自身が push されると GitHub Actions が build / push する。README だけでは走らない。ops を apply する前は repository variable が空なので job は skip する
 - GitHub Actions の image tag は `GITHUB_SHA`。同じ tag があっても build し直す
 - 手元の `make build-push-image` の tag は現在の HEAD の短縮 SHA（`IMAGE_TAG` で上書きできる）。CI の tag とは一致しないことがある
-- GitHub Actions からの image push の認証と IAM は [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md) に従う。`REPO_URL` / `IMAGE_NAME` / WIF provider は ops Terraform が GitHub の repository variable に書く（[INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)）
+- GitHub Actions からの image push の認証と IAM は [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md) に従う。`REPO_URL` / `IMAGE_NAME` / WIF provider は `environments/devgist-github` root が GitHub の repository variable として書く（[INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)。置き場は [INFRA-ADR-019](../../docs/adr/infra/019-github-actions-terraform-plan-apply.md) が ops から変えた）
 - crawler-deploy が `.github/scripts/open-crawler-image-digest-pr.sh` で `crawler_image` digest PR を出す。merge 後に terraform-apply.yml が Cloud Run Job の image を更新する（[INFRA-ADR-021](../../docs/adr/infra/021-crawler-image-digest-pr.md)）
 - 手元の `make build-push-image` も同じ build script を使うが、digest PR は出さない。Cloud Run は committed tfvars の `crawler_image` のまま
 - crawler は HTTP サービスではなく完了まで走るバッチなので、`Cloud Run Service` ではなく `Cloud Run Jobs` を使う

@@ -3,6 +3,17 @@
 このディレクトリは、DevGist 全体の Architecture Decision Record (ADR) を管理するための正本ディレクトリです。  
 インフラ、クローラー、バックエンドなど、個別ディレクトリに閉じない設計判断をここに集約します。
 
+> **「今どうなっているか」を知りたい場合は、[`docs/architecture/`](../architecture/) を読んでください。**
+>
+> ADR は追記のみで運用します。新しい ADR が既存の ADR を**部分的にしか**打ち消さないことがあり、
+> `Accepted` / `Superseded` のステータスだけでは現行方針を判断できません。
+> ADR 群を横断して現状を組み立てるのではなく、畳んだ結果である `docs/architecture/` を参照してください。
+>
+> | | 何を持つか |
+> |---|---|
+> | `docs/architecture/` | **今こうする**。断定形の現行ルール |
+> | `docs/adr/` | **なぜそうしたか**。判断時点の記録 |
+
 ## ADR 一覧
 
 | ID | ドメイン | タイトル | ステータス | 正本パス |
@@ -13,17 +24,17 @@
 | `INFRA-ADR-004` | `infra` | Terraform State Project と Ops Project を分離する | Accepted | [docs/adr/infra/004-separate-tf-and-ops-projects.md](infra/004-separate-tf-and-ops-projects.md) |
 | `INFRA-ADR-005` | `infra` | Terraform environments は GCP project ごとに分割する | Accepted | [docs/adr/infra/005-terraform-environment-slicing.md](infra/005-terraform-environment-slicing.md) |
 | `INFRA-ADR-006` | `infra` | Cross-project Terraform output 共有戦略 | Accepted | [docs/adr/infra/006-cross-project-output-sharing.md](infra/006-cross-project-output-sharing.md) |
-| `INFRA-ADR-007` | `infra` | Artifact Registry リポジトリ戦略とワークロード用 Service Account 設計 | Accepted | [docs/adr/infra/007-artifact-registry-and-sa-strategy.md](infra/007-artifact-registry-and-sa-strategy.md) |
+| `INFRA-ADR-007` | `infra` | Artifact Registry リポジトリ戦略とワークロード用 Service Account 設計 | Accepted (一部 superseded) | [docs/adr/infra/007-artifact-registry-and-sa-strategy.md](infra/007-artifact-registry-and-sa-strategy.md) |
 | `INFRA-ADR-008` | `infra` | Service Account 命名規則 | Accepted | [docs/adr/infra/008-service-account-naming.md](infra/008-service-account-naming.md) |
 | `INFRA-ADR-009` | `infra` | Cross-project IAM binding の ownership | Accepted | [docs/adr/infra/009-cross-project-iam-ownership.md](infra/009-cross-project-iam-ownership.md) |
 | `INFRA-ADR-010` | `infra` | Cloud Run Job の管理責務を Terraform に集約する | Accepted | [docs/adr/infra/010-cloud-run-job-management.md](infra/010-cloud-run-job-management.md) |
 | `INFRA-ADR-011` | `infra` | Terraform monorepo における CI 対象検出と検証方針 | Accepted | [docs/adr/infra/011-terraform-ci-for-monorepo.md](infra/011-terraform-ci-for-monorepo.md) |
 | `INFRA-ADR-012` | `infra` | Cloud Run Job の実行粒度と実行時パラメータ設計 | Accepted | [docs/adr/infra/012-crawler-execution-parameters.md](infra/012-crawler-execution-parameters.md) |
-| `INFRA-ADR-013` | `infra` | Cursor Cloud から GCP への認証に Cursor OIDC と WIF を採用する | Superseded | [docs/adr/infra/013-cursor-oidc-workload-identity-federation.md](infra/013-cursor-oidc-workload-identity-federation.md) |
-| `INFRA-ADR-014` | `infra` | Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする | Superseded | [docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md](infra/014-cursor-oidc-wif-direct-resource-access.md) |
+| `INFRA-ADR-013` | `infra` | Cursor Cloud から GCP への認証に Cursor OIDC と WIF を採用する | Superseded (一部有効) | [docs/adr/infra/013-cursor-oidc-workload-identity-federation.md](infra/013-cursor-oidc-workload-identity-federation.md) |
+| `INFRA-ADR-014` | `infra` | Cursor Cloud の GCP 権限は WIF federated principal への direct resource access とする | Superseded (一部有効) | [docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md](infra/014-cursor-oidc-wif-direct-resource-access.md) |
 | `INFRA-ADR-015` | `infra` | data は箱とし、guest IAM は依存の下流が書く | Accepted | [docs/adr/infra/015-guest-iam-downstream.md](infra/015-guest-iam-downstream.md) |
-| `INFRA-ADR-016` | `infra` | GitHub Actions から crawler image を Artifact Registry へ push する | Accepted | [docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md](infra/016-github-actions-wif-and-crawler-image-push.md) |
-| `INFRA-ADR-017` | `infra` | GitHub Actions の Terraform 由来設定は ops が repository variable として書く | Accepted | [docs/adr/infra/017-github-actions-terraform-managed-variables.md](infra/017-github-actions-terraform-managed-variables.md) |
+| `INFRA-ADR-016` | `infra` | GitHub Actions から crawler image を Artifact Registry へ push する | Accepted (一部 superseded) | [docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md](infra/016-github-actions-wif-and-crawler-image-push.md) |
+| `INFRA-ADR-017` | `infra` | GitHub Actions の Terraform 由来設定は ops が repository variable として書く | Accepted (一部 superseded) | [docs/adr/infra/017-github-actions-terraform-managed-variables.md](infra/017-github-actions-terraform-managed-variables.md) |
 | `INFRA-ADR-018` | `infra` | Artifact Registry の vulnerability scanning と image retention | Accepted | [docs/adr/infra/018-artifact-registry-cost-controls.md](infra/018-artifact-registry-cost-controls.md) |
 | `INFRA-ADR-019` | `infra` | GitHub Actions から terraform plan / apply する | Accepted | [docs/adr/infra/019-github-actions-terraform-plan-apply.md](infra/019-github-actions-terraform-plan-apply.md) |
 | `INFRA-ADR-020` | `infra` | Terraform CI/CD と Secret Management 方針 | Accepted | [docs/adr/infra/020-terraform-cicd-secret-management.md](infra/020-terraform-cicd-secret-management.md) |
@@ -31,7 +42,15 @@
 | `CRAWLER-ADR-001` | `crawler` | 論文収集クローラーの実装言語としてPythonを採用 | Accepted | [docs/adr/crawler/001-language-selection.md](crawler/001-language-selection.md) |
 | `CRAWLER-ADR-002` | `crawler` | XMLパースにdefusedxmlを採用 | Accepted | [docs/adr/crawler/002-xml-parsing-security.md](crawler/002-xml-parsing-security.md) |
 
-新しい ADR を追加したら、この一覧も更新してください。
+ステータスの読み方:
+
+- `Accepted (一部 superseded)` — 後続 ADR が一部を置き換えている。残りは有効
+- `Superseded (一部有効)` — 全体としては置き換え済みだが、一部の判断は現行方針として生きている
+
+どこが生きているかは、各 ADR の `## Status` 本文に書いてあります。  
+現行方針だけを知りたい場合は [`docs/architecture/`](../architecture/) を読んでください。
+
+新しい ADR を追加したら、この一覧と、対応する [`docs/architecture/`](../architecture/) のファイルも更新してください。
 
 ## 目的
 
@@ -57,7 +76,7 @@ ADR は「なぜその設計判断をしたのか」を残すためのドキュ�
 
 ADR はドメインごとのサブディレクトリに配置します。
 
-```/dev/null/docs-adr-structure.txt#L1-9
+```text
 docs/adr/
 ├── README.md
 ├── _template.md
@@ -183,7 +202,7 @@ ADR では、比較した選択肢を**表でも整理する**ことを推奨し
 
 推奨フォーマット:
 
-```/dev/null/adr-comparison-table.md#L1-6
+```text
 | 選択肢 | 向いている用途 | メリット | デメリット | 今回の評価 |
 |---|---|---|---|---|
 | Option A | ... | ... | ... | 採用 |
@@ -206,6 +225,25 @@ ADR のステータスには以下を使います。
 
 - `Accepted (承認済み) - 2026-02-17`
 
+### 部分 supersede を明記する
+
+既存 ADR の一部だけを置き換えることは頻繁に起こります。  
+そのとき、ステータスのラベルだけでは「どこまでが無効か」が伝わりません。
+
+置き換える側の `## Status` には、**何を捨て、何を維持するか**を必ず書きます。
+
+```text
+Accepted (承認済み) - 2026-08-27
+
+INFRA-ADR-014 を supersede する。014 が差し替えたのは impersonation から direct access への権限の付け方である。本 ADR が差し替えるのは guest IAM の置き場である。014 の認証モデルは維持する。
+```
+
+置き換えられる側の `## Status` にも、同じ内容を 1〜2 行で書きます。  
+本文は書き換えず、当時の判断の記録として残します。
+
+`Superseded` のスタンプだけで済ませないでください。  
+全体が無効だと誤読され、実際には生きている判断まで捨てられます。
+
 ## 参照ルール
 
 他のドキュメントや Issue、PR、README から ADR を参照する場合は、可能な限り namespace 付きで記載します。
@@ -223,24 +261,30 @@ ADR のステータスには以下を使います。
 - 将来の再検討条件を明示する
 - 実装詳細に寄りすぎず、設計判断のレベルを保つ
 - 変更があった場合は既存 ADR を上書きするのではなく、新しい ADR で supersede することを基本とする
+- ADR を追加・変更したら、**同じ PR で対応する [`docs/architecture/`](../architecture/) のファイルも更新する**
+- ADR は `docs/adr/` 配下にのみ置く。サブシステム配下に複製を残さない
 
-## 既存 ADR の移設方針
+## 棚卸し
 
-既存の `infra` や `workflows/crawler` 配下の ADR は、段階的に `docs/adr/` 配下へ移設する。  
-移設時は以下を行う。
+ADR が増えて相互参照が追えなくなったとき、`docs/architecture/` の鮮度が疑わしいときは棚卸しを行います。  
+手順の正本は [`.agents/skills/adr-workflow/SKILL.md`](../../.agents/skills/adr-workflow/SKILL.md) の「Architecture Doc の棚卸し」です。
 
-- 適切なドメインディレクトリへ移動
-- namespace 付きタイトルへ更新
-- 既存の番号と namespace ベースの識別子は維持する
-- 関連 README やドキュメントの参照先を更新
+要点は次の通りです。
+
+1. `docs/adr/README.md` の一覧ではなく、各 ADR ファイルの `## Status` 本文を読む
+2. 新しい ADR ごとに「何を捨て、何を維持したか」を書き出し、全体 supersede と部分 supersede を区別する
+3. 現行方針が `Superseded` の ADR にしか書かれていないものを探す
+4. ADR が決めたことが実装に入っているかを突き合わせる（未実装なら architecture 側にそう書く）
+5. `docs/architecture/` を畳んで書き直す。追記で済ませず、古い記述は削除する
 
 ## まとめ
 
 DevGist の ADR は、以下のルールで運用します。
 
-- 正本は `docs/adr/`
+- 決定記録の正本は `docs/adr/`、**現行方針の正本は `docs/architecture/`**
 - テンプレート正本は `docs/adr/_template.md`
 - ドメインごとにサブディレクトリを切る
 - 採番はドメイン別連番
 - 参照は `INFRA-ADR-001` のように namespace 付き
 - 分類はコード配置ではなく、意思決定の責務単位で行う
+- 部分 supersede は `## Status` に「捨てるもの / 維持するもの」を明記する

@@ -1,1 +1,0 @@
-../../../docs/adr/infra/002-terraform-module-structure.md
