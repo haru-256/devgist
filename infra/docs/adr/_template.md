@@ -1,1 +1,0 @@
-../../../docs/adr/_template.md
