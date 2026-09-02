@@ -42,7 +42,7 @@ resource 単位の custom role は作らない（predefined で足りるため�
 ## write は protected `main` に閉じる
 
 `main` は Ruleset 済み（PR 必須、required checks、up-to-date 必須、force push / delete 禁止）。
-apply も crawler の image push も `main` の push だけで動く。feature branch では `ci_scope=none` になり token 交換に失敗する。
+apply は `main` への push、または `main` 上の `workflow_dispatch`（`target=dev`）。crawler の image push は `main` の push だけ（`workflow_dispatch` では `ci_scope=none`）。feature branch では `ci_scope=none` になり token 交換に失敗する。
 
 fork の `pull_request` は GitHub が OIDC token を発行しないため、workflow 側に追加の head repo ガードは置かない。
 

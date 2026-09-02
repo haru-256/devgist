@@ -63,7 +63,7 @@ graph TD
   - Artifact Registry
   - GitHub Actions 連携、WIF、共通 CI/CD 用 Service Account などの運用基盤
   - Cursor Cloud 用 OIDC WIF pool / provider（認証は [INFRA-ADR-014](../docs/adr/infra/014-cursor-oidc-wif-direct-resource-access.md)、guest IAM の置き場は [INFRA-ADR-015](../docs/adr/infra/015-guest-iam-downstream.md)）
-  - GitHub Actions 用 OIDC WIF pool / provider（認証は [INFRA-ADR-016](../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)。初期 IAM は crawler Artifact Registry への push のみ）
+  - GitHub Actions 用 OIDC WIF pool / provider（認証は [INFRA-ADR-016](../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md)。認可は `attribute.ci_scope`。[docs/architecture/cicd.md](../docs/architecture/cicd.md)）
 
 - `haru256-devgist-data-{env}`
   - GCS datalake

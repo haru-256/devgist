@@ -105,7 +105,7 @@ graph LR
 - コンテナイメージは `Artifact Registry` に保存する。`workflows/crawler` の image に効く変更、または Crawler Deploy workflow 自身が push されると GitHub Actions が build / push する。README だけでは走らない。ops を apply する前は repository variable が空なので job は skip する
 - GitHub Actions の image tag は `GITHUB_SHA`。同じ tag があっても build し直す
 - 手元の `make build-push-image` の tag は現在の HEAD の短縮 SHA（`IMAGE_TAG` で上書きできる）。CI の tag とは一致しないことがある
-- GitHub Actions からの image push の認証と IAM は [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md) に従う。`REPO_URL` / `IMAGE_NAME` / WIF provider は ops Terraform が GitHub の repository variable に書く（[INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)）
+- GitHub Actions からの image push の認証と IAM は [INFRA-ADR-016](../../docs/adr/infra/016-github-actions-wif-and-crawler-image-push.md) に従う。`REPO_URL` / `IMAGE_NAME` / WIF provider は `environments/devgist-github` root が GitHub の repository variable として書く（[INFRA-ADR-017](../../docs/adr/infra/017-github-actions-terraform-managed-variables.md)。置き場は [INFRA-ADR-019](../../docs/adr/infra/019-github-actions-terraform-plan-apply.md) が ops から変えた）
 - crawler-deploy が `.github/scripts/open-crawler-image-digest-pr.sh` で `crawler_image` digest PR を出す。merge 後に terraform-apply.yml が Cloud Run Job の image を更新する（[INFRA-ADR-021](../../docs/adr/infra/021-crawler-image-digest-pr.md)）
 - 手元の `make build-push-image` も同じ build script を使うが、digest PR は出さない。Cloud Run は committed tfvars の `crawler_image` のまま
 - crawler は HTTP サービスではなく完了まで走るバッチなので、`Cloud Run Service` ではなく `Cloud Run Jobs` を使う

@@ -28,20 +28,25 @@ tf → data → ops → app
 
 ## module
 
-`infra/terraform/modules/` に置く。現在あるもの。
+`infra/terraform/modules/` に置く。分割は責務とデータの性質（OLTP / OLAP）で行う。技術レイヤ（network / storage / compute）では割らない（[INFRA-ADR-002](../adr/infra/002-terraform-module-structure.md)）。
+
+実装済み（`.tf` がある）:
 
 | module | 役割 |
 |---|---|
 | `google_project_services` | API 有効化 |
 | `tfstate_gcs_bucket` | state bucket（`tf` root のみ） |
-| `network_base` | VPC / Subnet / Firewall |
-| `data_platform` | GCS datalake、BigQuery（OLAP） |
-| `app_databases` | Cloud SQL（OLTP） |
+| `data_platform` | GCS datalake。BigQuery は未実装 |
 | `artifact_registry` | Docker repository。scanning / cleanup policy 込み |
 | `service_accounts` | Service Account。`generate_keys = false` |
 | `workload_identity_oidc` | WIF pool / provider |
 
-分割は責務とデータの性質（OLTP / OLAP）で行う。技術レイヤ（network / storage / compute）では割らない（[INFRA-ADR-002](../adr/infra/002-terraform-module-structure.md)）。
+README だけの stub（`.tf` は無い。呼ばない）:
+
+| module | 想定する役割 |
+|---|---|
+| `network_base` | VPC / Subnet / Firewall |
+| `app_databases` | Cloud SQL（OLTP） |
 
 Terraform root には必ず `providers.tf` を置く。CI の root 自動検出がこれを目印にするため、無いと CI 対象から漏れる（[INFRA-ADR-011](../adr/infra/011-terraform-ci-for-monorepo.md)）。
 

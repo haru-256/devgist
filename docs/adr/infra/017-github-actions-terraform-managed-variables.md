@@ -12,6 +12,8 @@ Accepted (承認済み) - 2026-08-28
 
 [INFRA-ADR-016](./016-github-actions-wif-and-crawler-image-push.md) の GitHub 側設定の書き手を決める。016 の認証モデルは維持する。
 
+[INFRA-ADR-019](./019-github-actions-terraform-plan-apply.md) が GitHub リソースの置き場を `environments/devgist-github` root に変える。「Terraform が正本の値は GitHub にベタ書きせず Terraform から書く」原則は本 ADR のまま。
+
 ## Context (背景・課題)
 
 ### 背景

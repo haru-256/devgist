@@ -76,7 +76,7 @@ ADR は「なぜその設計判断をしたのか」を残すためのドキュ�
 
 ADR はドメインごとのサブディレクトリに配置します。
 
-```/dev/null/docs-adr-structure.txt#L1-9
+```text
 docs/adr/
 ├── README.md
 ├── _template.md
@@ -202,7 +202,7 @@ ADR では、比較した選択肢を**表でも整理する**ことを推奨し
 
 推奨フォーマット:
 
-```/dev/null/adr-comparison-table.md#L1-6
+```text
 | 選択肢 | 向いている用途 | メリット | デメリット | 今回の評価 |
 |---|---|---|---|---|
 | Option A | ... | ... | ... | 採用 |
@@ -232,7 +232,7 @@ ADR のステータスには以下を使います。
 
 置き換える側の `## Status` には、**何を捨て、何を維持するか**を必ず書きます。
 
-```/dev/null/adr-status-example.md#L1-3
+```text
 Accepted (承認済み) - 2026-08-27
 
 INFRA-ADR-014 を supersede する。014 が差し替えたのは impersonation から direct access への権限の付け方である。本 ADR が差し替えるのは guest IAM の置き場である。014 の認証モデルは維持する。

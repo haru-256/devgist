@@ -34,7 +34,7 @@ image 更新の 2 PR 運用は [cicd.md](cicd.md) を参照。
 
 ## 実行粒度は単一の汎用 Job
 
-カンファレンス論文クロールは **1 つの汎用 Job**（例: `crawler-job`）で運用し、対象は実行時に上書きする（[INFRA-ADR-012](../adr/infra/012-crawler-execution-parameters.md)）。
+カンファレンス論文クロールは **1 つの汎用 Job**（`crawler`、region `us-central1`）で運用し、対象は実行時に上書きする（[INFRA-ADR-012](../adr/infra/012-crawler-execution-parameters.md)）。
 
 **カンファレンス名や年度はインフラの識別子ではなく実行時パラメータ。**
 カンファレンスや年度が増えても Terraform を変更しない。Job をカンファレンス別に分けない。
@@ -45,18 +45,19 @@ image 更新の 2 PR 運用は [cicd.md](cicd.md) を参照。
 |---|---|
 | `CONFERENCE_NAMES` | カンマ区切り（`recsys,kdd`） |
 | `YEARS` | カンマ区切り（`2024,2025`） |
-| `CRAWL_RUN_ID` / `RUN_LABEL` | 任意。ログと出力パスの追跡用 |
+
+`CRAWL_RUN_ID` / `RUN_LABEL` は [INFRA-ADR-012](../adr/infra/012-crawler-execution-parameters.md) の Next Steps のまま未実装。crawler は読まない。
 
 ```bash
 # 単一カンファレンス・単一年度
-gcloud run jobs execute crawler-job \
+gcloud run jobs execute crawler \
   --update-env-vars=CONFERENCE_NAMES=recsys,YEARS=2025 \
-  --region=asia-northeast1
+  --region=us-central1
 
 # 値にカンマを含むので、先頭に ^@^ を付けて @ を区切り文字にする
-gcloud run jobs execute crawler-job \
-  --update-env-vars='^@^CONFERENCE_NAMES=recsys,kdd,wsdm@YEARS=2024,2025@RUN_LABEL=backfill-2024-2025' \
-  --region=asia-northeast1
+gcloud run jobs execute crawler \
+  --update-env-vars='^@^CONFERENCE_NAMES=recsys,kdd,wsdm@YEARS=2024,2025' \
+  --region=us-central1
 ```
 
 注意点:
