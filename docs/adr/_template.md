@@ -10,9 +10,10 @@
 
 ## Status (ステータス)
 
-* Proposed (提案中) / Accepted (承認済み) / Deprecated (非推奨) など
+* Proposed (提案中) / Accepted (承認済み) / Deprecated (非推奨) / Superseded (置き換え済み) など
 * 必要に応じて日付を付ける
   * 例: `Accepted (承認済み) - 2026-02-17`
+* 部分 supersede する場合は、何を捨て何を維持するかを 1〜2 行書く。置き換えられる側の Status にも同じ内容を追記する（本文は書き換えない）
 
 ## Context (背景・課題)
 
