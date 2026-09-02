@@ -54,6 +54,7 @@ class Paper(BaseModel):
             self.pdf_url = enrichment.pdf_url
 
     def needs_enrichment(self) -> bool:
+        """abstract または pdf_url が未設定なら True を返します。"""
         return self.abstract is None or self.pdf_url is None
 
 

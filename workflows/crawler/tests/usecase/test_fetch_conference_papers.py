@@ -83,7 +83,6 @@ async def test_execute_flow(
             enrichment=PaperEnrichment(pdf_url="https://example.com/p1.pdf"),
         )
     ]
-    mock_arxiv_repo.fetch_enrichments.return_value = []
 
     usecase = CrawlConferencePapers(
         conf_name=ConferenceName.RECSYS,
