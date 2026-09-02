@@ -283,6 +283,32 @@ def test_paper_apply_enrichment_respects_overwrite_flag() -> None:
     assert paper.pdf_url == "https://example.com/updated.pdf"
 
 
+def test_paper_needs_enrichment() -> None:
+    missing = Paper(title="T", authors=["A"], year=2025, venue="RecSys")
+    abstract_only = Paper(
+        title="T", authors=["A"], year=2025, venue="RecSys", abstract="abs"
+    )
+    pdf_only = Paper(
+        title="T",
+        authors=["A"],
+        year=2025,
+        venue="RecSys",
+        pdf_url="https://example.com/p.pdf",
+    )
+    complete = Paper(
+        title="T",
+        authors=["A"],
+        year=2025,
+        venue="RecSys",
+        abstract="abs",
+        pdf_url="https://example.com/p.pdf",
+    )
+    assert missing.needs_enrichment() is True
+    assert abstract_only.needs_enrichment() is True
+    assert pdf_only.needs_enrichment() is True
+    assert complete.needs_enrichment() is False
+
+
 def test_paper_enrichment_is_empty() -> None:
     """補完情報が空かどうかを判定できることをテスト"""
     assert PaperEnrichment().is_empty() is True
