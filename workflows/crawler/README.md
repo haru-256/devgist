@@ -4,9 +4,15 @@
 
 DBLP Computer Science Bibliographyから主要な推薦システム・データマイニング系カンファレンスの論文情報を取得し、Semantic Scholar・Unpaywall・arXivの各APIで要約やPDF URLを付加します。最終的にGoogle Cloud Storage（データレイク）へ保存します。
 
+## 現行方針
+
+crawler の**今の方針**は [docs/architecture/crawler-runtime.md](../../docs/architecture/crawler-runtime.md) にあります。
+CI/CD と image の扱いは [docs/architecture/cicd.md](../../docs/architecture/cicd.md) です。変更に着手する前に読んでください。
+
 ## 関連 ADR
 
-crawler に関する Architecture Decision Record (ADR) は [docs/adr/](../../docs/adr/) 配下で管理します。
+判断の**経緯**は Architecture Decision Record (ADR) として [docs/adr/](../../docs/adr/) 配下で管理します。
+ADR は追記のみで運用しており、部分的な supersede が積み重なるため、現行方針の判断には使わないでください。
 
 - 運用ガイド: [docs/adr/README.md](../../docs/adr/README.md)
 - テンプレート: [docs/adr/_template.md](../../docs/adr/_template.md)
@@ -20,7 +26,7 @@ crawler に関する Architecture Decision Record (ADR) は [docs/adr/](../../do
 - [CRAWLER-ADR-001](../../docs/adr/crawler/001-language-selection.md)
 - [CRAWLER-ADR-002](../../docs/adr/crawler/002-xml-parsing-security.md)
 
-このディレクトリ配下の `workflows/crawler/docs/adr/` は互換性維持のための参照パスであり、正本は [docs/adr/](../../docs/adr/) 側です。
+ADR は `docs/adr/` 配下にのみ置きます。`workflows/crawler/docs/adr/` にあった複製は削除済みです。
 
 ## 対象カンファレンス
 

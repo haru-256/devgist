@@ -8,9 +8,19 @@
 - **Kubernetes**: アプリケーションのデプロイメント設定（Manifests, Helm Chartsなど）。
 - CI/CDパイプラインに関連するスクリプトや設定。
 
+## 現行方針
+
+インフラの**今の方針**は [docs/architecture/](../docs/architecture/) にあります。変更に着手する前に読んでください。
+
+- [gcp-projects.md](../docs/architecture/gcp-projects.md) — プロジェクトの分割と責務
+- [terraform.md](../docs/architecture/terraform.md) — root module、state、cross-project 参照、tfvars
+- [iam.md](../docs/architecture/iam.md) — Service Account、WIF、guest IAM の置き場
+- [cicd.md](../docs/architecture/cicd.md) — GitHub Actions、Artifact Registry
+
 ## 関連 ADR
 
-インフラに関する Architecture Decision Record (ADR) は [docs/adr/](../docs/adr/) 配下で管理します。
+判断の**経緯**は Architecture Decision Record (ADR) として [docs/adr/](../docs/adr/) 配下で管理します。
+ADR は追記のみで運用しており、部分的な supersede が積み重なるため、現行方針の判断には使わないでください。
 
 - 運用ガイド: [docs/adr/README.md](../docs/adr/README.md)
 - テンプレート: [docs/adr/_template.md](../docs/adr/_template.md)
@@ -28,7 +38,7 @@
 - `INFRA-ADR-019`: [docs/adr/infra/019-github-actions-terraform-plan-apply.md](../docs/adr/infra/019-github-actions-terraform-plan-apply.md)
 - `INFRA-ADR-020`: [docs/adr/infra/020-terraform-cicd-secret-management.md](../docs/adr/infra/020-terraform-cicd-secret-management.md)
 
-このディレクトリ配下の `infra/docs/adr/` は互換性維持のための参照パスであり、正本は [docs/adr/](../docs/adr/) 側です。
+ADR は `docs/adr/` 配下にのみ置きます。`infra/docs/adr/` にあった複製は削除済みです。
 
 ## Current GCP Project Responsibilities
 

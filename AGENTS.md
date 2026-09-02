@@ -24,6 +24,21 @@
 - 小さなリファクタリングや命名整理
 - 挙動や責務境界を変えないドキュメント更新
 
+## 現行方針の確認
+
+**実装や変更に着手する前に、[`docs/architecture/`](docs/architecture/) の該当ファイルを読むこと。**
+ここが「今どうなっているか」の正本である。
+
+- [gcp-projects.md](docs/architecture/gcp-projects.md) — プロジェクト分割と責務
+- [terraform.md](docs/architecture/terraform.md) — root module、state、cross-project 参照、tfvars
+- [iam.md](docs/architecture/iam.md) — Service Account、WIF、guest IAM の置き場
+- [cicd.md](docs/architecture/cicd.md) — GitHub Actions、Artifact Registry
+- [crawler-runtime.md](docs/architecture/crawler-runtime.md) — Cloud Run Job、crawler 実装の前提
+
+ADR は追記のみで運用しており、新しい ADR が既存 ADR を**部分的にしか**打ち消さないことがある。
+`Accepted` / `Superseded` のステータスだけでは現行方針を判断できない。
+ADR 群を直接読んで現状を組み立てないこと。
+
 ## ADR
 
 設計判断を伴う変更では、ADR の要否を確認すること。
@@ -32,6 +47,8 @@
 - 詳細な進め方: [`.agents/skills/adr-workflow/SKILL.md`](.agents/skills/adr-workflow/SKILL.md)
 - ADR 運用ガイド: [`docs/adr/README.md`](docs/adr/README.md)
 - ADR テンプレート: [`docs/adr/_template.md`](docs/adr/_template.md)
+
+ADR を追加・変更したら、**同じ PR で対応する `docs/architecture/*.md` も更新すること。**
 
 ADR の判断基準、相談の境界、記録ルールなどの詳細は skill を参照すること。
 
