@@ -459,8 +459,10 @@ uv run pytest -n auto
 
 ### 型チェック
 
+`ty` で `src` と `tests` を Python 3.13 の設定で検査する。警告もエラーとして扱う。
+
 ```bash
-uv run mypy .
+uv run ty check
 ```
 
 ### リントチェック

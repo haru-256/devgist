@@ -1,7 +1,7 @@
 .PHONY: lint
 lint: ## Run Linter
 	uv run ruff check .
-	uv run mypy .
+	uv run ty check
 
 .PHONY: fmt
 fmt: ## Run formatter
